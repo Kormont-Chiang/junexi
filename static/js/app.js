@@ -1,0 +1,2899 @@
+/**
+ * 六月息 · 历史学学术面板前端
+ * API 驱动的交互逻辑
+ */
+
+const API_BASE = '';
+const VAULT_NAME = '论文写作';
+
+// ── Toast 通知 ─────────────────────────────────────────
+let toastContainer = null;
+function showToast(message, type = 'info', duration = 3000) {
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container';
+        document.body.appendChild(toastContainer);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span class="toast-msg">${message}</span>`;
+    toastContainer.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('toast-out');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+// ── 标签页切换 ─────────────────────────────────────────
+function initTabs() {
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    });
+}
+
+function switchTab(tabId) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === tabId));
+    // 页面特定初始化
+    if (tabId === 'dashboard') loadDashboard();
+    if (tabId === 'map') initMap();
+    if (tabId === 'workspace') loadWorkspace();
+    if (tabId === 'library') loadLibrary();
+    if (tabId === 'tools') initToolTabs();
+    if (tabId === 'cbdb') loadCBDBDynasties();
+}
+
+// ── Obsidian 集成 ──────────────────────────────────────
+function openObsidianURI(path) {
+    if (path) {
+        window.location.href = `obsidian://open?vault=${encodeURIComponent(VAULT_NAME)}&file=${encodeURIComponent(path)}`;
+    } else {
+        window.location.href = `obsidian://open?vault=${encodeURIComponent(VAULT_NAME)}`;
+    }
+}
+
+async function openObsidianNote(path) {
+    try {
+        const res = await fetch(`/api/obsidian/note/${encodeURIComponent(path)}`);
+        const data = await res.json();
+        if (!data.error) return data;
+    } catch {}
+    // API 失败，直接跳转
+    openObsidianURI(path);
+}
+
+async function createDailyNote() {
+    const content = prompt('今日札记内容（可选）：', '');
+    try {
+        const res = await fetch('/api/obsidian/daily', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content || '' })
+        });
+        const data = await res.json();
+        if (!data.error) {
+            showToast('今日札记已创建！', 'success');
+            openObsidianURI('');
+        } else {
+            showToast('API 调用失败：' + data.error, 'error');
+            openObsidianURI('');
+        }
+    } catch (e) {
+        showToast('API 错误：' + e.message, 'error');
+        openObsidianURI('');
+    }
+}
+
+async function createExcerptNote() {
+    const content = prompt('史料摘录内容：', '');
+    if (!content) return;
+    try {
+        const res = await fetch(`/api/obsidian/note/${encodeURIComponent('史料/史料摘录 ' + new Date().toISOString().slice(0, 10) + '.md')}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: `# 史料摘录\n\n${content}\n\n---\n*摘录时间：${new Date().toLocaleString()}*` })
+        });
+        const data = await res.json();
+        if (!data.error) {
+            showToast('摘录已保存！', 'success');
+        } else {
+            showToast('保存失败：' + data.error, 'error');
+        }
+    } catch (e) {
+        showToast('API 错误：' + e.message, 'error');
+    }
+}
+
+async function saveQuickNote() {
+    const textarea = document.getElementById('quickNote');
+    if (!textarea) return;
+    const content = textarea.value.trim();
+    if (!content) { showToast('请先输入内容', 'warning'); return; }
+    try {
+        const res = await fetch('/api/obsidian/daily', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: '\n\n## 快速笔记\n' + content })
+        });
+        const data = await res.json();
+        if (!data.error) {
+            showToast('已保存到今日札记！', 'success');
+            textarea.value = '';
+        } else {
+            showToast('保存失败：' + data.error, 'error');
+        }
+    } catch (e) {
+        showToast('API 错误：' + e.message, 'error');
+    }
+}
+
+// ── 仪表盘数据 ─────────────────────────────────────────
+async function loadDashboard() {
+    await Promise.all([loadStats(), loadNews(), loadRecentActivity(), loadPapersList()]);
+}
+
+async function loadStats() {
+    try {
+        const res = await fetch('/api/obsidian/stats');
+        const data = await res.json();
+        const legacy = data.legacy || {};
+        const folders = data.folders || {};
+
+        document.getElementById('statPapers').textContent = legacy['论文'] || 0;
+        document.getElementById('statNotes').textContent = (legacy['札记'] || 0) + (legacy['日记'] || 0);
+        document.getElementById('statPeople').textContent = legacy['人物'] || 0;
+        document.getElementById('statSources').textContent = legacy['史料'] || 0;
+
+        // Vault 概览
+        const totalFiles = Object.values(folders).reduce((s, f) => s + (f.files || 0), 0);
+        const totalFolders = Object.keys(folders).length;
+        const rootItems = Object.keys(folders).filter(k => !folders[k].subfolders).length;
+
+        document.getElementById('vaultTotalFiles').textContent = totalFiles;
+        document.getElementById('vaultTotalFolders').textContent = totalFolders;
+        document.getElementById('vaultRootFiles').textContent = rootItems;
+    } catch {}
+}
+
+async function loadNews() {
+    const container = document.getElementById('newsList');
+    if (!container) return;
+    try {
+        const res = await fetch('/api/news');
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+            container.innerHTML = data.slice(0, 5).map(item => `
+                <div class="news-item" ${item.link ? `onclick="window.open('${item.link}','_blank')"` : ''}>
+                    <div class="news-text">
+                        ${item.badge ? `<span class="news-badge ${item.badge === 'HOT' ? 'hot' : ''}">${item.badge}</span>` : ''}
+                        <span>${item.title}</span>
+                    </div>
+                    <span class="news-date">${item.date || ''}</span>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📰</div>
+                    <div class="empty-state-text">暂无学术动态</div>
+                    <div class="empty-state-hint">在 Vault 根目录创建「学术动态.md」即可编辑</div>
+                </div>
+            `;
+        }
+    } catch {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📰</div>
+                <div class="empty-state-text">加载失败</div>
+                <div class="empty-state-hint">请确认 Obsidian 已连接</div>
+            </div>
+        `;
+    }
+}
+
+async function loadRecentActivity() {
+    const container = document.getElementById('activityTimeline');
+    if (!container) return;
+    // 从 Obsidian 获取最近修改的文件
+    try {
+        const res = await fetch('/api/obsidian/notes?folder=札记');
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+            container.innerHTML = data.slice(0, 5).map(f => `
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">编辑了 <a onclick="openObsidianURI('${f.path || f}')">${f.basename || f}</a></div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🕐</div>
+                    <div class="empty-state-text">暂无近期活动</div>
+                    <div class="empty-state-hint">在 Obsidian 中编辑文件后自动更新</div>
+                </div>
+            `;
+        }
+    } catch {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🕐</div>
+                <div class="empty-state-text">无法加载动态</div>
+                <div class="empty-state-hint">请确认 Obsidian 和 Local REST API 插件已启用</div>
+            </div>
+        `;
+    }
+}
+
+async function loadPapersList() {
+    const container = document.getElementById('papersList');
+    if (!container) return;
+    try {
+        const res = await fetch('/api/obsidian/notes?folder=论文');
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+            container.innerHTML = data.slice(0, 5).map(f => `
+                <div class="doc-item" onclick="switchTab('workspace')" style="cursor:pointer">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <div class="doc-title">${(f.basename || f).replace('.md', '')}</div>
+                        <div class="doc-meta">在 Obsidian 中查看</div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📄</div>
+                    <div class="empty-state-text">暂无论在研论文</div>
+                    <div class="empty-state-hint">在 Obsidian Vault 的「论文」文件夹中创建笔记</div>
+                </div>
+            `;
+        }
+    } catch {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">⚠️</div>
+                <div class="empty-state-text">加载失败</div>
+            </div>
+        `;
+    }
+}
+
+// ── 论文工作台 ─────────────────────────────────────────
+
+// 当前查看/编辑的论文状态
+let currentPaperPath = null;
+let currentPaperContent = '';
+let currentPaperTitle = '';
+let currentEditingPath = null;
+
+function showPaperEditor(existingPath = null, title = '', content = '') {
+    currentEditingPath = existingPath;
+    const preview = document.getElementById('paperPreview');
+    const isNew = !existingPath;
+
+    preview.innerHTML = `
+        <div class="panel-header">
+            <span class="panel-icon">✏️</span>
+            ${isNew ? '新建论文' : '编辑：' + title}
+        </div>
+        <div class="paper-editor">
+            <input type="text" id="paperTitleInput" class="paper-editor-title"
+                placeholder="输入论文标题..." value="${title}"
+                ${isNew ? '' : 'disabled'}>
+            <textarea id="paperBodyInput" class="paper-editor-body"
+                placeholder="开始写作...&#10;&#10;支持 Markdown 格式。&#10;&#10;## 摘要&#10;&#10;## 引言&#10;&#10;## 正文&#10;&#10;## 参考文献">${content}</textarea>
+            <div class="paper-editor-actions">
+                <button class="btn-primary" onclick="savePaper()">💾 保存到 Obsidian</button>
+                ${isNew ? '' : `<button class="btn-secondary" onclick="viewPaper('${existingPath}')">取消</button>`}
+                <span class="paper-editor-status" id="editorStatus"></span>
+            </div>
+        </div>
+    `;
+
+    if (isNew) {
+        document.getElementById('paperTitleInput').focus();
+    } else {
+        document.getElementById('paperBodyInput').focus();
+    }
+}
+
+async function savePaper() {
+    const titleInput = document.getElementById('paperTitleInput');
+    const bodyInput = document.getElementById('paperBodyInput');
+    const status = document.getElementById('editorStatus');
+
+    const title = titleInput.value.trim();
+    const body = bodyInput.value.trim();
+
+    if (!title) { showToast('请输入论文标题', 'warning'); titleInput.focus(); return; }
+    if (!body) { showToast('正文不能为空', 'warning'); bodyInput.focus(); return; }
+
+    status.innerHTML = '<div class="loading" style="width:14px;height:14px"></div> 保存中...';
+
+    const filename = title.endsWith('.md') ? title : title + '.md';
+    const path = `论文/${filename}`;
+    const content = `# ${title.replace('.md', '')}\n\n${body}\n`;
+
+    try {
+        const res = await fetch(`/api/obsidian/note/${encodeURIComponent(path)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+        });
+        const data = await res.json();
+
+        if (!data.error) {
+            showToast('已保存到 Obsidian！', 'success');
+            currentEditingPath = path;
+            loadWorkspace();
+            viewPaper(path);
+        } else {
+            status.textContent = '';
+            showToast('保存失败：' + data.error, 'error');
+        }
+    } catch (e) {
+        status.textContent = '';
+        showToast('保存失败：' + e.message, 'error');
+    }
+}
+
+async function loadWorkspace() {
+    const container = document.getElementById('workspacePapers');
+    try {
+        const res = await fetch('/api/obsidian/notes?folder=论文');
+        const data = await res.json();
+
+        document.getElementById('wsPaperCount').textContent = Array.isArray(data) ? data.length : 0;
+
+        if (Array.isArray(data) && data.length > 0) {
+            container.innerHTML = data.map(f => `
+                <div class="doc-item" onclick="viewPaper('论文/${f.basename || f}')" style="cursor:pointer">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <div class="doc-title">${(f.basename || f).replace('.md', '')}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // 自动加载第一篇论文
+            viewPaper(`论文/${data[0].basename || data[0]}`);
+        } else {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📄</div>
+                    <div class="empty-state-text">暂无论在研论文</div>
+                    <div class="empty-state-hint">点击下方「新建」创建论文</div>
+                </div>
+            `;
+            document.getElementById('wsPaperCount').textContent = '0';
+        }
+
+        loadWorkspaceStats();
+    } catch {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">⚠️</div>
+                <div class="empty-state-text">无法加载</div>
+                <div class="empty-state-hint">请确认 Obsidian 已连接</div>
+            </div>
+        `;
+    }
+}
+
+async function viewPaper(path) {
+    currentPaperPath = path;
+    const preview = document.getElementById('paperPreview');
+    const title = path.split('/').pop().replace('.md', '');
+    currentPaperTitle = title;
+
+    preview.innerHTML = `
+        <div class="panel-header"><span class="panel-icon">📄</span> ${title}</div>
+        <div class="loading" style="margin:20px auto;display:block"></div>
+    `;
+
+    try {
+        const res = await fetch(`/api/obsidian/note/${encodeURIComponent(path)}`);
+        const data = await res.json();
+        if (data.error) {
+            preview.innerHTML = `
+                <div class="panel-header"><span class="panel-icon">📄</span> ${title}</div>
+                <div class="empty-state">
+                    <div class="empty-state-icon">⚠️</div>
+                    <div class="empty-state-text">无法读取文件</div>
+                </div>
+            `;
+            return;
+        }
+
+        const content = data.content || '';
+        currentPaperContent = content;
+        const lines = content.split('\n');
+        const previewText = lines.slice(0, 50).join('\n');
+        const totalChars = content.replace(/\s/g, '').length;
+
+        preview.innerHTML = `
+            <div class="panel-header"><span class="panel-icon">📄</span> ${title}</div>
+            <div class="paper-meta-bar">
+                <span class="paper-meta-item">📝 ${totalChars} 字</span>
+                <span class="paper-meta-item">📋 ${lines.length} 行</span>
+            </div>
+            <div class="file-preview">${previewText}${lines.length > 50 ? '\n\n... (更多内容请在 Obsidian 中查看)' : ''}</div>
+            <div class="paper-actions">
+                <button class="btn-primary" onclick="editCurrentPaper()">✏️ 编辑</button>
+                <button class="btn-secondary" onclick="openObsidianURI('${path}')">在 Obsidian 中打开</button>
+                <button class="btn-secondary" onclick="switchTab('ai')">AI 分析</button>
+            </div>
+        `;
+    } catch (e) {
+        preview.innerHTML = `
+            <div class="panel-header"><span class="panel-icon">📄</span> ${title}</div>
+            <div class="empty-state">
+                <div class="empty-state-icon">⚠️</div>
+                <div class="empty-state-text">加载失败</div>
+            </div>
+        `;
+    }
+}
+
+function editCurrentPaper() {
+    if (!currentPaperPath) return;
+    showPaperEditor(currentPaperPath, currentPaperTitle, currentPaperContent);
+}
+
+async function loadWorkspaceStats() {
+    try {
+        const res = await fetch('/api/obsidian/stats');
+        const stats = await res.json();
+        const legacy = stats.legacy || {};
+
+        const notes = legacy['札记'] || 0;
+        const diary = legacy['日记'] || 0;
+        document.getElementById('wsTodayNotes').textContent = notes + diary;
+        document.getElementById('wsTotalWords').textContent = stats.total_files || 0;
+        document.getElementById('wsLastEdit').textContent = '今天';
+    } catch {}
+}
+
+async function createPaper() {
+    showPaperEditor();
+}
+
+// ── 史料库 ────────────────────────────────────────────
+
+async function loadLibrary() {
+    // 史料库页面以数据库导航为主，Vault 搜索由用户手动触发
+}
+
+async function viewLibraryFile(path) {
+    const detail = document.getElementById('obsidianSearchResults');
+    if (!detail) return;
+    detail.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
+
+    try {
+        const res = await fetch(`/api/obsidian/note/${encodeURIComponent(path)}`);
+        const data = await res.json();
+        const preview = data.content ? data.content.split('\n').slice(0, 30).join('\n') : '(空文件)';
+
+        detail.innerHTML = `
+            <div class="panel-header"><span class="panel-icon">📚</span> ${path.split('/').pop().replace('.md', '')}</div>
+            <div class="file-preview">${preview}${data.content && data.content.split('\n').length > 30 ? '\n\n... (更多内容请在 Obsidian 中查看)' : ''}</div>
+            <div style="margin-top:16px;display:flex;gap:10px">
+                <button class="btn-primary" onclick="openObsidianURI('${path}')">在 Obsidian 中打开</button>
+            </div>
+        `;
+    } catch (e) {
+        detail.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">⚠️</div>
+                <div class="empty-state-text">加载失败</div>
+                <div class="empty-state-hint">${e.message}</div>
+            </div>
+        `;
+    }
+}
+
+async function initVaultFolders() {
+    showToast('正在创建标准文件夹...', 'info');
+    try {
+        const res = await fetch('/api/obsidian/init-folders', { method: 'POST' });
+        const data = await res.json();
+        if (data.created && data.created.length > 0) {
+            showToast(`已创建：${data.created.join(', ')}`, 'success');
+            loadLibrary();
+        } else {
+            showToast('文件夹已存在或创建失败', 'warning');
+        }
+    } catch (e) {
+        showToast('初始化失败：' + e.message, 'error');
+    }
+}
+
+// ── Vault 搜索 ─────────────────────────────────────────
+async function searchVault() {
+    const input = document.getElementById('obsidianSearchInput');
+    const query = input ? input.value.trim() : '';
+    if (!query) { showToast('请输入搜索关键词', 'warning'); return; }
+
+    switchTab('cbdb'); // 临时用 CBDB 页显示搜索结果
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<div class="loading"></div> 搜索中...';
+
+    try {
+        const res = await fetch(`/api/obsidian/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+            resultsDiv.innerHTML = data.slice(0, 10).map(f => `
+                <div class="doc-item" onclick="openObsidianURI('${f.path || f}')">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <div class="doc-title">${(f.basename || f).replace('.md', '')}</div>
+                        <div class="doc-meta">${f.path || ''}</div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            resultsDiv.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-text">未找到结果</div></div>';
+        }
+    } catch (e) {
+        resultsDiv.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">搜索失败</div><div class="empty-state-hint">请检查 Obsidian Local REST API 是否已启用</div></div>';
+    }
+}
+
+// ── CBDB 查询 ──────────────────────────────────────────
+// CBDB 检索（复刻原生十大检索模块：人/官/地/社会关系/入仕/社会区分/著作/年份/综合）
+window._cbdbType = 'person';
+window._cbdbViewStack = [];
+window._cbdbListView = null;
+window._cbdbPlaceCache = {};
+window._cbdbExport = null;
+window._cbdbAdvState = { place: null, entry: null, office: null, status: null, text: null, assoc: null };
+window._cbdbAssocState = { type: null };
+
+const CBDB_TYPE_CONFIG = {
+    person: { placeholder: '姓名/字/号/谥号/拼音/人物ID（如 王安石、介甫、1762）' },
+    office: { placeholder: '输入官名（如 尚書、刺史），可叠加门类筛选' },
+    place:  { placeholder: '输入地名（如 洛陽、開封），可叠加层级/年代' },
+    assoc:  { placeholder: '' },
+    pair:   { placeholder: '' },
+    placeassoc: { placeholder: '' },
+    entry:  { placeholder: '输入入仕方式（如 進士、蔭補）' },
+    status: { placeholder: '输入身份类型（如 進士、封爵、孝廉）' },
+    text:   { placeholder: '输入书名（如 資治通鑑、文選）' },
+    year:   { placeholder: '' },
+    adv:    { placeholder: '' },
+};
+
+// 社会关系大类（与后端 _ASSOC_CATEGORY_RULES 输出对应）
+const CBDB_ASSOC_CATEGORIES = ['学术教育', '政治行政', '文学创作', '丧葬纪念', '交游应酬',
+    '宗教方外', '刑戮迫害', '军事戎务', '艺术赏鉴', '婚姻亲属', '法律诉讼', '医疗照护', '财物往来', '其他'];
+
+// 行政层级选项（ADDR_CODES c_admin_type 主要取值）
+const CBDB_ADMIN_TYPES = [
+    ['', '全部层级'], ['Xian', '县'], ['Zhou', '州'], ['Fu', '府'], ['Shi', '市/都市'],
+    ['Jun', '郡'], ['Dao', '道'], ['Lu', '路'], ['Jiedu', '节度'], ['Dudufu', '都督府'],
+    ['Fengjun', '封君'], ['Du', '都'], ['Wei', '卫'], ['Qi', '旗'],
+];
+
+// 渲染各类型对应的检索输入区
+function renderCBDBSearchArea(type) {
+    const area = document.getElementById('cbdbSearchArea');
+    if (!area) return;
+    if (type === 'adv') {
+        // 原生 CBDB 综合查询全维度：各模块条件任意 AND 组合
+        area.innerHTML = `
+            <div class="cbdb-adv-form">
+                <div class="cbdb-adv-section">人物</div>
+                <div class="cbdb-adv-row">
+                    <label>姓名</label>
+                    <input type="text" id="cbdbAdvName" placeholder="姓名/字/号，支持模糊" ${''}>
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>朝代</label>
+                    <select id="cbdbDynasty"><option value="">全部朝代</option></select>
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>性别</label>
+                    <select id="cbdbAdvGender"><option value="">不限</option><option value="0">男</option><option value="1">女</option></select>
+                </div>
+                <div class="cbdb-adv-section">年份</div>
+                <div class="cbdb-adv-row">
+                    <label>指数年</label>
+                    <input type="number" id="cbdbAdvFrom" placeholder="自" style="width:48%">
+                    <span style="color:var(--text-muted)">至</span>
+                    <input type="number" id="cbdbAdvTo" placeholder="至" style="width:48%">
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>生年</label>
+                    <input type="number" id="cbdbAdvBirthFrom" placeholder="自" style="width:48%">
+                    <span style="color:var(--text-muted)">至</span>
+                    <input type="number" id="cbdbAdvBirthTo" placeholder="至" style="width:48%">
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>卒年</label>
+                    <input type="number" id="cbdbAdvDeathFrom" placeholder="自" style="width:48%">
+                    <span style="color:var(--text-muted)">至</span>
+                    <input type="number" id="cbdbAdvDeathTo" placeholder="至" style="width:48%">
+                </div>
+                <div class="cbdb-adv-section">地址</div>
+                <div class="cbdb-adv-row">
+                    <label>地名</label>
+                    <input type="text" id="cbdbAdvPlace" placeholder="输入地名，点击选择（可留空）" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbAdvPlaceList"></div>
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>类型</label>
+                    <select id="cbdbAdvAddrType">
+                        <option value="1">籍贯（含指数地址）</option>
+                        <option value="5">祖籍（郡望）</option>
+                        <option value="6">实际居址</option>
+                        <option value="7">户籍地</option>
+                        <option value="8">出生地</option>
+                        <option value="9">葬地</option>
+                        <option value="10">卒地</option>
+                    </select>
+                </div>
+                <div class="cbdb-adv-section">入仕</div>
+                <div class="cbdb-adv-row">
+                    <label>方式</label>
+                    <input type="text" id="cbdbAdvEntry" placeholder="入仕方式，点击选择（可留空）" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbAdvEntryList"></div>
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>入仕年</label>
+                    <input type="number" id="cbdbAdvEntryFrom" placeholder="自" style="width:48%">
+                    <span style="color:var(--text-muted)">至</span>
+                    <input type="number" id="cbdbAdvEntryTo" placeholder="至" style="width:48%">
+                </div>
+                <div class="cbdb-adv-section">职官</div>
+                <div class="cbdb-adv-row">
+                    <label>官名</label>
+                    <input type="text" id="cbdbAdvOffice" placeholder="官名，点击选择（可留空）" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbAdvOfficeList"></div>
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>任职年</label>
+                    <input type="number" id="cbdbAdvOfficeFrom" placeholder="自" style="width:48%">
+                    <span style="color:var(--text-muted)">至</span>
+                    <input type="number" id="cbdbAdvOfficeTo" placeholder="至" style="width:48%">
+                </div>
+                <div class="cbdb-adv-section">身份 · 著作 · 关系</div>
+                <div class="cbdb-adv-row">
+                    <label>身份</label>
+                    <input type="text" id="cbdbAdvStatus" placeholder="社会区分，点击选择（可留空）" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbAdvStatusList"></div>
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>著作</label>
+                    <input type="text" id="cbdbAdvText" placeholder="著作名，点击选择（可留空）" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbAdvTextList"></div>
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>关系</label>
+                    <input type="text" id="cbdbAdvAssoc" placeholder="社会关系类型（并入配对方向）" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbAdvAssocList"></div>
+                </div>
+                <button class="btn-primary" style="width:100%;margin-top:4px" onclick="runAdvancedQuery()">组合查询</button>
+                <div class="cbdb-hint">全部条件按"且"组合；留空的条件不参与筛选</div>
+            </div>`;
+        const placeFetcher = async q => {
+            const res = await fetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            return (Array.isArray(data) ? data : []).map(p => ({ id: p.addr_id, label: p.name_chn, sub: p.firstyear ? `${p.firstyear}${p.lastyear ? '-' + p.lastyear : ''}` : (p.admin_type || '') }));
+        };
+        const pick = (key, inputId) => item => {
+            window._cbdbAdvState[key] = item;
+            const inp = document.getElementById(inputId);
+            if (inp) inp.value = item.label + (item.sub ? `（${item.sub}）` : '');
+        };
+        bindCBDBAutocomplete('cbdbAdvPlace', 'cbdbAdvPlaceList', placeFetcher, pick('place', 'cbdbAdvPlace'));
+        bindCBDBAutocomplete('cbdbAdvEntry', 'cbdbAdvEntryList',
+            async q => {
+                const res = await fetch(`/api/cbdb/entries/search?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                return (Array.isArray(data) ? data : []).map(e => ({ id: e.code, label: e.name_chn, sub: e.name_eng }));
+            },
+            pick('entry', 'cbdbAdvEntry'));
+        bindCBDBAutocomplete('cbdbAdvOffice', 'cbdbAdvOfficeList',
+            async q => {
+                const res = await fetch(`/api/cbdb/offices/search?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                return (Array.isArray(data) ? data : []).map(o => ({ id: o.office_id, label: o.office_chn, sub: [o.dynasty, o.category].filter(Boolean).join(' · ') }));
+            },
+            pick('office', 'cbdbAdvOffice'));
+        bindCBDBAutocomplete('cbdbAdvStatus', 'cbdbAdvStatusList',
+            async q => {
+                const res = await fetch(`/api/cbdb/status/search?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                return (Array.isArray(data) ? data : []).map(s => ({ id: s.code, label: s.name_chn, sub: s.name_eng }));
+            },
+            pick('status', 'cbdbAdvStatus'));
+        bindCBDBAutocomplete('cbdbAdvText', 'cbdbAdvTextList',
+            async q => {
+                const res = await fetch(`/api/cbdb/texts/search?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                return (Array.isArray(data) ? data : []).map(tx => ({ id: tx.text_id, label: tx.title_chn, sub: tx.dynasty || '' }));
+            },
+            pick('text', 'cbdbAdvText'));
+        bindCBDBAutocomplete('cbdbAdvAssoc', 'cbdbAdvAssocList',
+            async q => {
+                const res = await fetch(`/api/cbdb/assoc/types?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                return (Array.isArray(data) ? data : []).map(x => ({ id: x.code, label: x.name_chn, sub: x.category }));
+            },
+            pick('assoc', 'cbdbAdvAssoc'));
+        loadCBDBDynasties();
+    } else if (type === 'assoc') {
+        // 社会关系检索（原生十大模块之五）：大类 + 类型搜索 + pair/年份/朝代过滤
+        const catOpts = ['<option value="">全部大类</option>']
+            .concat(CBDB_ASSOC_CATEGORIES.map(c => `<option value="${c}">${c}</option>`)).join('');
+        area.innerHTML = `
+            <div class="cbdb-adv-form">
+                <div class="cbdb-adv-row">
+                    <label>大类</label>
+                    <select id="cbdbAssocCat">${catOpts}</select>
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>关系</label>
+                    <input type="text" id="cbdbAssocInput" placeholder="搜索关系类型（如 師、門生、墓誌、同年）" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbAssocList"></div>
+                </div>
+                <div id="cbdbAssocChips"></div>
+                <div class="cbdb-adv-row">
+                    <label>年份</label>
+                    <input type="number" id="cbdbAssocFrom" placeholder="起" style="width:48%">
+                    <span style="color:var(--text-muted)">—</span>
+                    <input type="number" id="cbdbAssocTo" placeholder="止" style="width:48%">
+                </div>
+                <div class="cbdb-adv-row">
+                    <label>朝代</label>
+                    <select id="cbdbDynasty"><option value="">全部朝代</option></select>
+                </div>
+                <div class="cbdb-adv-row" style="flex-direction:row;align-items:center;gap:6px">
+                    <input type="checkbox" id="cbdbAssocPair" checked style="width:auto">
+                    <label for="cbdbAssocPair" style="flex:1">含配对关系（如 師長↔門生 双向）</label>
+                </div>
+                <button class="btn-primary" style="width:100%;margin-top:4px" onclick="runAssocQuery()">查询关系</button>
+                <div class="cbdb-hint">社会关系多未标年份，设年份区间会大幅收窄结果</div>
+            </div>`;
+        bindCBDBAutocomplete('cbdbAssocInput', 'cbdbAssocList',
+            async q => {
+                const cat = (document.getElementById('cbdbAssocCat') || {}).value || '';
+                const res = await fetch(`/api/cbdb/assoc/types?q=${encodeURIComponent(q)}${cat ? '&category=' + encodeURIComponent(cat) : ''}`);
+                const data = await res.json();
+                return (Array.isArray(data) ? data : []).map(x => ({
+                    id: x.code, label: x.name_chn,
+                    sub: `${x.category}${x.pair && x.pair !== x.code ? ' · 配对 ' + x.pair : ''}`
+                }));
+            },
+            item => {
+                window._cbdbAssocState.type = { code: item.id, name_chn: item.label };
+                renderAssocChips();
+                document.getElementById('cbdbAssocInput').value = '';
+            });
+        const catSel = document.getElementById('cbdbAssocCat');
+        if (catSel) catSel.onchange = () => {
+            const inp = document.getElementById('cbdbAssocInput');
+            if (inp) inp.value = '';
+        };
+        loadCBDBDynasties();
+        renderAssocChips();
+    } else if (type === 'year') {
+        area.innerHTML = `
+            <div class="cbdb-adv-form">
+                <div class="cbdb-adv-row"><label>年份</label><input type="number" id="cbdbYearInput" placeholder="公历年份（如 1086）" onkeydown="if(event.key==='Enter')searchCBDB()"></div>
+                <div class="cbdb-adv-row"><label>朝代</label><select id="cbdbDynasty"><option value="">全部朝代</option></select></div>
+                <button class="btn-primary" style="width:100%;margin-top:2px" onclick="searchCBDB()">查询</button>
+                <div class="cbdb-hint">检索该年份在世的人物（按生卒年/活跃期判定）</div>
+            </div>`;
+        loadCBDBDynasties();
+    } else if (type === 'pair') {
+        // 两人关系（原生 Query Pair-wise Associations）：双向社会关系 + 直系亲属直查
+        area.innerHTML = `
+            <div class="cbdb-adv-form">
+                <div class="cbdb-adv-row"><label>人物 A</label><input type="text" id="cbdbPairA" placeholder="输入姓名，下拉选择人物 A" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbPairAList"></div></div>
+                <div class="cbdb-adv-row"><label>人物 B</label><input type="text" id="cbdbPairB" placeholder="输入姓名，下拉选择人物 B" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbPairBList"></div></div>
+                <button class="btn-primary" style="width:100%;margin-top:4px" onclick="runPairQuery()">查询两人关系</button>
+                <div class="cbdb-hint">两人之间的全部社会关系（双向）+ 直系亲属直查（附五服）</div>
+            </div>`;
+        window._cbdbPairState = { a: null, b: null };
+        const pairFetcher = async q => {
+            const res = await fetch(`/api/cbdb/search?name=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            return (Array.isArray(data) ? data : []).map(p => ({
+                id: p.id, label: p.name_chn || p.name,
+                sub: [p.dynasty, (p.birthyear > 0 ? `${p.birthyear}—${p.deathyear || '?'}` : '')].filter(Boolean).join(' · ')
+            }));
+        };
+        bindCBDBAutocomplete('cbdbPairA', 'cbdbPairAList', pairFetcher, item => {
+            window._cbdbPairState.a = item;
+            document.getElementById('cbdbPairA').value = item.label;
+        });
+        bindCBDBAutocomplete('cbdbPairB', 'cbdbPairBList', pairFetcher, item => {
+            window._cbdbPairState.b = item;
+            document.getElementById('cbdbPairB').value = item.label;
+        });
+    } else if (type === 'placeassoc') {
+        // 地区关系（原生 Query Place Associations）：某地人物之间的社会关系
+        area.innerHTML = `
+            <div class="cbdb-adv-form">
+                <div class="cbdb-adv-row"><label>地名</label><input type="text" id="cbdbPlaceAssocInput" placeholder="输入地名（如 洛陽、開封），下拉选择" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbPlaceAssocList"></div></div>
+                <div class="cbdb-adv-row"><label>关系</label><input type="text" id="cbdbPlaceAssocType" placeholder="全部关系（可空，搜索并选择类型）" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbPlaceAssocTypeList"></div></div>
+                <div class="cbdb-adv-row"><label>年份</label><input type="number" id="cbdbPlaceAssocFrom" placeholder="自" style="width:48%"><span style="color:var(--text-muted)">至</span><input type="number" id="cbdbPlaceAssocTo" placeholder="至" style="width:48%"></div>
+                <div class="cbdb-adv-row" style="flex-direction:row;align-items:center;gap:6px">
+                    <input type="checkbox" id="cbdbPlaceAssocSame" style="width:auto">
+                    <label for="cbdbPlaceAssocSame" style="flex:1">并入同坐标地址</label>
+                </div>
+                <div class="cbdb-adv-row" style="flex-direction:row;align-items:center;gap:6px">
+                    <input type="checkbox" id="cbdbPlaceAssocBoth" style="width:auto">
+                    <label for="cbdbPlaceAssocBoth" style="flex:1">仅双方均在该地区</label>
+                </div>
+                <button class="btn-primary" style="width:100%;margin-top:4px" onclick="runPlaceAssocQuery()">查询地区关系</button>
+                <div class="cbdb-hint">该地区人物（籍贯/居址/任职地/索引地址）之间的社会关系</div>
+            </div>`;
+        window._cbdbPlaceAssocState = { place: null, type: null };
+        bindCBDBAutocomplete('cbdbPlaceAssocInput', 'cbdbPlaceAssocList',
+            async q => {
+                const res = await fetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                return (Array.isArray(data) ? data : []).map(p => ({ id: p.addr_id, label: p.name_chn, sub: p.firstyear ? `${p.firstyear}—${p.lastyear || ''}` : (p.admin_type || '') }));
+            },
+            item => {
+                window._cbdbPlaceAssocState.place = item;
+                document.getElementById('cbdbPlaceAssocInput').value = item.label;
+            });
+        bindCBDBAutocomplete('cbdbPlaceAssocType', 'cbdbPlaceAssocTypeList',
+            async q => {
+                const res = await fetch(`/api/cbdb/assoc/types?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                return (Array.isArray(data) ? data : []).map(x => ({ id: x.code, label: x.name_chn, sub: x.category }));
+            },
+            item => {
+                window._cbdbPlaceAssocState.type = { code: item.id, name_chn: item.label };
+                document.getElementById('cbdbPlaceAssocType').value = item.label;
+            });
+    } else {
+        // 竖排舒展表单：一行一个条件，原生查询维度全部铺开
+        const cfg = CBDB_TYPE_CONFIG[type] || CBDB_TYPE_CONFIG.person;
+        const enterGo = `onkeydown="if(event.key==='Enter')searchCBDB()"`;
+        let rows = '';
+        if (type === 'person') {
+            rows = `
+                <div class="cbdb-adv-row cbdb-adv-row-top"><label>姓名</label><textarea id="cbdbSearchInput" class="cbdb-textarea" rows="2" placeholder="${cfg.placeholder}"></textarea></div>
+                <div class="cbdb-adv-row"><label>朝代</label><select id="cbdbDynasty"><option value="">全部朝代</option></select></div>
+                <div class="cbdb-adv-row"><label>性别</label><select id="cbdbGender"><option value="">不限</option><option value="0">男</option><option value="1">女</option></select></div>
+                <div class="cbdb-adv-row"><label>生年</label><input type="number" id="cbdbBirthFrom" placeholder="自" style="width:48%"><span style="color:var(--text-muted)">至</span><input type="number" id="cbdbBirthTo" placeholder="至" style="width:48%"></div>
+                <div class="cbdb-adv-row"><label>卒年</label><input type="number" id="cbdbDeathFrom" placeholder="自" style="width:48%"><span style="color:var(--text-muted)">至</span><input type="number" id="cbdbDeathTo" placeholder="至" style="width:48%"></div>
+                <div class="cbdb-adv-row"><label>指数年</label><input type="number" id="cbdbIndexFrom" placeholder="自" style="width:48%"><span style="color:var(--text-muted)">至</span><input type="number" id="cbdbIndexTo" placeholder="至" style="width:48%"></div>
+                <div class="cbdb-adv-row"><label>籍贯</label><input type="text" id="cbdbPersonPlace" placeholder="输入地名，点击选择（可留空）" autocomplete="off" ${enterGo}>
+                    <div class="cbdb-ac" id="cbdbPersonPlaceList"></div></div>
+                <div class="cbdb-hint">检索框可纵向拉开：多行/顿号/逗号分隔 = 批量查人（或）。拼音：小写模糊（hao）；首字母大写按词首（Hao 命中 Zhang Hao 与 Hao Jing）；! 开头最左前缀（!Hao 仅 Hao Jing）</div>`;
+        } else if (type === 'office') {
+            rows = `
+                <div class="cbdb-adv-row"><label>官名</label><input type="text" id="cbdbSearchInput" placeholder="${cfg.placeholder}" ${enterGo}></div>
+                <div class="cbdb-adv-row"><label>门类</label><input type="text" id="cbdbOfficeCat" placeholder="如 統稱、機構（可空，简体自动转繁）" ${enterGo}></div>`;
+        } else if (type === 'place') {
+            const opts = CBDB_ADMIN_TYPES.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+            rows = `
+                <div class="cbdb-adv-row"><label>地名</label><input type="text" id="cbdbSearchInput" placeholder="${cfg.placeholder}" ${enterGo}></div>
+                <div class="cbdb-adv-row"><label>层级</label><select id="cbdbAdminType">${opts}</select></div>
+                <div class="cbdb-adv-row"><label>存续年</label><input type="number" id="cbdbPlaceFrom" placeholder="起始年"><span style="color:var(--text-muted)">—</span><input type="number" id="cbdbPlaceTo" placeholder="结束年"></div>`;
+        } else {
+            rows = `<div class="cbdb-adv-row"><label>${{entry:'入仕', status:'身份', text:'书名'}[type] || '检索'}</label><input type="text" id="cbdbSearchInput" placeholder="${cfg.placeholder}" ${enterGo}></div>`;
+        }
+        area.innerHTML = `<div class="cbdb-adv-form">${rows}
+            <button class="btn-primary" style="width:100%;margin-top:2px" onclick="searchCBDB()">搜索</button></div>`;
+        if (type === 'person') {
+            loadCBDBDynasties();
+            window._cbdbPersonState = window._cbdbPersonState || { place: null };
+            bindCBDBAutocomplete('cbdbPersonPlace', 'cbdbPersonPlaceList',
+                async q => {
+                    const res = await fetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
+                    const data = await res.json();
+                    return (Array.isArray(data) ? data : []).map(p => ({ id: p.addr_id, label: p.name_chn, sub: p.firstyear ? `${p.firstyear}—${p.lastyear || ''}` : (p.admin_type || '') }));
+                },
+                item => {
+                    window._cbdbPersonState.place = item;
+                    const inp = document.getElementById('cbdbPersonPlace');
+                    if (inp) inp.value = item.label;
+                });
+        }
+    }
+}
+
+// 简易自动补全：输入防抖 → 下拉列表 → 点击选中
+function bindCBDBAutocomplete(inputId, listId, fetcher, onPick) {
+    const input = document.getElementById(inputId);
+    const box = document.getElementById(listId);
+    if (!input || !box) return;
+    let timer = null;
+    input.addEventListener('input', () => {
+        clearTimeout(timer);
+        const q = input.value.trim();
+        if (!q) { box.innerHTML = ''; box.style.display = 'none'; return; }
+        timer = setTimeout(async () => {
+            try {
+                const items = await fetcher(q);
+                if (!items || !items.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+                box.innerHTML = items.slice(0, 8).map((it, i) =>
+                    `<div class="cbdb-ac-item" data-i="${i}">${escapeHtml(it.label)}${it.sub ? ` <span class="cbdb-ac-sub">${escapeHtml(it.sub)}</span>` : ''}</div>`
+                ).join('');
+                box.style.display = 'block';
+                box.querySelectorAll('.cbdb-ac-item').forEach(el => {
+                    el.onclick = () => { onPick(items[+el.dataset.i]); box.innerHTML = ''; box.style.display = 'none'; };
+                });
+            } catch (e) { box.style.display = 'none'; }
+        }, 250);
+    });
+    document.addEventListener('click', e => {
+        if (!box.contains(e.target) && e.target !== input) { box.style.display = 'none'; }
+    });
+}
+
+function switchCBDBType(type) {
+    window._cbdbType = type;
+    window._cbdbAdvState = { place: null, entry: null };
+    document.querySelectorAll('.cbdb-type-tab').forEach(b =>
+        b.classList.toggle('active', b.dataset.type === type));
+    renderCBDBSearchArea(type);
+    const results = document.getElementById('cbdbResults');
+    if (results) results.innerHTML = '';
+    window._cbdbViewStack = [];
+    window._cbdbListView = null;
+    window._cbdbExport = null;
+}
+
+async function loadCBDBDynasties() {
+    const sel = document.getElementById('cbdbDynasty');
+    if (!sel || sel.dataset.loaded) return;
+    try {
+        const res = await fetch('/api/cbdb/dynasties');
+        const data = await res.json();
+        if (!Array.isArray(data)) return;
+        sel.innerHTML = '<option value="">全部朝代</option>' +
+            data.map(d => `<option value="${d.code}">${escapeHtml(d.name)}</option>`).join('');
+        sel.dataset.loaded = '1';
+    } catch (e) { /* 保留默认项即可 */ }
+}
+
+function renderCBDBBackBar(title) {
+    if (!window._cbdbViewStack.length) return '';
+    return `<div class="cbdb-back-bar">
+        <button class="btn-secondary" onclick="cbdbGoBack()">← 返回</button>
+        <span class="cbdb-view-title">${escapeHtml(title || '')}</span>
+    </div>`;
+}
+
+// 导出工具条：结果数 + 范围/GeoJSON/CSV/群体按钮（人物列表附带三期范围传递 + 六期群体网络/人群属性入口）
+function renderCBDBToolbar(count, persons) {
+    const scopeBtns = (persons && persons.length)
+        ? `<button class="btn-secondary cbdb-export-btn" onclick="cbdbSetScopeFromTable()" title="将勾选行（未勾选时为全部）设为查询范围，综合查询/年份检索自动取交集">🔎 设为查询范围</button>
+           <button class="btn-secondary cbdb-export-btn" onclick="cbdbExportGeoJSON()" title="导出这些人物的地址坐标点（GeoJSON），可直接拖入 QGIS">🗺️ GeoJSON</button>
+           <button class="btn-secondary cbdb-export-btn" onclick="cbdbGroupNetwork()" title="将勾选行（未勾选时为全部）作为群体，查看他们彼此之间的社会关系网络（原生社会关系网络窗体）">🕸️ 群体网络</button>
+           <button class="btn-secondary cbdb-export-btn" onclick="cbdbGroupData()" title="将勾选行（未勾选时为全部）生成属性总表（原生按人群查询：入仕/官职/社会区分/著作/亲属/社会关系数）">📊 人群属性</button>` : '';
+    const csvBtn = window._cbdbExport
+        ? `<button class="btn-secondary cbdb-export-btn" onclick="exportCBDBCSV()">⬇ 导出 CSV</button>` : '';
+    return `<div class="cbdb-toolbar">
+        <span class="cbdb-result-meta" style="margin:0">共 ${count} 条</span>
+        ${scopeBtns}${csvBtn}
+    </div>`;
+}
+
+// ── 三期：人物表格统一渲染（勾选 + 范围 + 导出）────────────────
+// opts: {backTitle, columns:[{label,render}], export:{filename,headers,rows}, extraMeta, extraHTML}
+function cbdbRenderPersons(container, persons, opts = {}) {
+    window._cbdbLastPersons = persons;
+    if (opts.export) setCBDBExport(opts.export.filename, opts.export.headers, opts.export.rows);
+    else window._cbdbExport = null;
+
+    const cols = opts.columns || [];
+    const thead = `<th class="cbdb-chk"><input type="checkbox" id="cbdbChkAll" title="全选"></th>` +
+        cols.map(c => `<th>${c.label}</th>`).join('');
+    const tbody = persons.map(p => `
+        <tr data-pid="${p.id}">
+            <td class="cbdb-chk" onclick="event.stopPropagation()"><input type="checkbox" class="cbdb-row-chk" data-pid="${p.id}"></td>
+            ${cols.map(c => `<td>${c.render(p)}</td>`).join('')}
+        </tr>`).join('');
+
+    container.innerHTML = `
+        ${opts.backTitle != null ? renderCBDBBackBar(opts.backTitle) : ''}
+        ${renderCBDBToolbar(persons.length, persons)}
+        ${opts.extraMeta || ''}
+        <table class="cbdb-table">
+            <thead><tr>${thead}</tr></thead>
+            <tbody>${tbody}</tbody>
+        </table>
+        ${opts.extraHTML || ''}`;
+
+    const chkAll = document.getElementById('cbdbChkAll');
+    if (chkAll) chkAll.onchange = () => {
+        document.querySelectorAll('.cbdb-row-chk').forEach(c => { c.checked = chkAll.checked; });
+    };
+    const rows = container.querySelectorAll('tbody tr');
+    rows.forEach((tr, i) => {
+        tr.onclick = () => { if (persons[i]) loadCBDBPersonDetail(persons[i].id); };
+    });
+}
+
+// ── 三期：跨查询人物列表传递 ─────────────────────────────
+function cbdbSetScopeFromTable() {
+    const persons = window._cbdbLastPersons || [];
+    const checked = [...document.querySelectorAll('.cbdb-row-chk:checked')].map(c => +c.dataset.pid);
+    const ids = checked.length ? checked : persons.map(p => p.id);
+    if (!ids.length) { showToast('当前列表没有人物', 'warning'); return; }
+    window._cbdbScope = { ids, label: (checked.length ? '勾选' : '全部') + ' ' + ids.length + ' 人' };
+    renderScopeBar();
+    showToast(`查询范围已设：${ids.length} 人，综合查询/年份检索将自动取交集`, 'success', 4000);
+}
+
+function cbdbClearScope() {
+    window._cbdbScope = null;
+    renderScopeBar();
+}
+
+function renderScopeBar() {
+    const results = document.getElementById('cbdbResults');
+    if (!results) return;
+    let bar = document.getElementById('cbdbScopeBar');
+    if (!window._cbdbScope) { if (bar) bar.remove(); return; }
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'cbdbScopeBar';
+        results.parentNode.insertBefore(bar, results);
+    }
+    bar.className = 'cbdb-scope-bar';
+    bar.innerHTML = `<span class="cbdb-scope-label">🔎 查询范围 <b>${window._cbdbScope.ids.length}</b> 人（${escapeHtml(window._cbdbScope.label)}）</span>
+        <span class="cbdb-scope-hint">已自动应用于 综合查询 / 年份检索</span>
+        <button class="btn-secondary cbdb-scope-clear" onclick="cbdbClearScope()">✕ 清除</button>`;
+}
+
+// ── 六期：群体网络 / 人群属性（任意人物列表 → 原生 Query Social Networks / Look Up Group）──
+function cbdbCollectCheckedIds() {
+    const persons = window._cbdbLastPersons || [];
+    const checked = [...document.querySelectorAll('.cbdb-row-chk:checked')].map(c => +c.dataset.pid);
+    return { ids: checked.length ? checked : persons.map(p => p.id), checked: !!checked.length };
+}
+
+async function cbdbGroupNetwork() {
+    const { ids, checked } = cbdbCollectCheckedIds();
+    if (!ids.length) { showToast('当前列表没有人物', 'warning'); return; }
+    window._cbdbGroupNet = { ids, label: (checked ? '勾选' : '全部') + ' ' + ids.length + ' 人' };
+    _cbdbNetState.includeKin = false;
+    _cbdbNetState.dy = '';
+    showCBDBNetworkView();
+    await loadCBDBGroupNetwork();
+}
+
+async function loadCBDBGroupNetwork() {
+    const panel = document.getElementById('cbdbNetwork');
+    const g = window._cbdbGroupNet;
+    if (!panel || !g) return;
+    panel.innerHTML = '<div class="loading" style="margin:30px auto;display:block"></div>';
+    try {
+        const res = await fetch('/api/cbdb/network/group', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ids: g.ids.slice(0, 500),
+                include_kin: !!_cbdbNetState.includeKin,
+                up: 2, down: 2, col: 1, mar: 1,
+                dy: _cbdbNetState.dy || undefined
+            })
+        });
+        const data = await res.json();
+        if (data.error) { panel.innerHTML = `<p style="color:var(--danger);padding:20px">${escapeHtml(data.error)}</p>`; return; }
+        renderNetworkPanel(panel, data, 0, g);
+    } catch (e) {
+        panel.innerHTML = `<p style="color:var(--danger);padding:20px">网络加载失败：${escapeHtml(e.message)}</p>`;
+    }
+}
+
+async function cbdbGroupData() {
+    const { ids, checked } = cbdbCollectCheckedIds();
+    if (!ids.length) { showToast('当前列表没有人物', 'warning'); return; }
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<div class="loading"></div> 正在生成属性总表...';
+    window._cbdbExport = null;
+    try {
+        const res = await fetch('/api/cbdb/group/data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids.slice(0, 500) })
+        });
+        const data = await res.json();
+        if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger)">${escapeHtml(data.error)}</p>`; return; }
+        const rows = data.rows || [];
+        if (!rows.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">没有可用数据</p>'; return; }
+        const cols = [
+            ['姓名', r => `<span class="cbdb-name" onclick="loadCBDBPersonDetail(${r.id});event.stopPropagation()">${escapeHtml(r.name_chn)}</span>`],
+            ['朝代', r => escapeHtml(r.dynasty)],
+            ['生卒', r => (r.birthyear > 0 || r.deathyear > 0) ? `${r.birthyear > 0 ? r.birthyear : '?'}—${r.deathyear > 0 ? r.deathyear : '?'}` : '—'],
+            ['索引年', r => r.index_year || '—'],
+            ['性别', r => r.female ? '女' : '男'],
+            ['籍贯', r => escapeHtml(r.native_place) || '—'],
+            ['入仕', r => escapeHtml(r.entry) || '—'],
+            ['官职', r => escapeHtml(r.offices) || '—'],
+            ['社会区分', r => escapeHtml(r.statuses) || '—'],
+            ['著作', r => r.texts_count || '—'],
+            ['亲属', r => r.kin_count || '—'],
+            ['社会关系', r => r.assoc_count || '—']
+        ];
+        setCBDBExport(`cbdb_人群属性_${rows.length}人.csv`,
+            ['姓名', '朝代', '生年', '卒年', '索引年', '性别', '籍贯', '入仕', '官职', '社会区分', '著作数', '亲属数', '社会关系数', '人物ID'],
+            rows.map(r => [r.name_chn, r.dynasty, r.birthyear || '', r.deathyear || '', r.index_year || '',
+                r.female ? '女' : '男', r.native_place, r.entry, r.offices, r.statuses,
+                r.texts_count, r.kin_count, r.assoc_count, r.id]));
+        resultsDiv.innerHTML = `
+            <div class="cbdb-toolbar">
+                <span class="cbdb-result-meta" style="margin:0">共 ${rows.length} 人${checked ? '（勾选行）' : ''}</span>
+                <button class="btn-secondary cbdb-export-btn" onclick="exportCBDBCSV()">⬇ 导出 CSV</button>
+            </div>
+            <div class="cbdb-hint" style="margin:4px 0">按人群查询（原生 Look Up Data on a Group of People）：任意人物列表一键转属性总表</div>
+            <table class="cbdb-table"><thead><tr>${cols.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead>
+            <tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${c[1](r)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+        resultsDiv.scrollTop = 0;
+    } catch (e) {
+        resultsDiv.innerHTML = `<p style="color:var(--danger)">生成失败：${escapeHtml(e.message)}</p>`;
+    }
+}
+
+// ── 三期：GeoJSON 导出（QGIS 直读）────────────────────────
+async function cbdbExportGeoJSON() {
+    const persons = window._cbdbLastPersons || [];
+    if (!persons.length) { showToast('当前列表没有人物', 'warning'); return; }
+    showToast('正在生成 GeoJSON…', 'info', 1500);
+    try {
+        const res = await fetch('/api/cbdb/persons/geojson', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: persons.map(p => p.id) })
+        });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        const n = (data.features || []).length;
+        if (!n) { showToast('这些人物没有带坐标的地址记录', 'warning', 3500); return; }
+        const blob = new Blob([JSON.stringify(data)], { type: 'application/geo+json;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `cbdb_人物地址_${new Date().toISOString().slice(0, 10)}.geojson`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        showToast(`GeoJSON 已导出：${n} 个地址点，可直接拖入 QGIS`, 'success', 4000);
+    } catch (e) { showToast('导出失败：' + e.message, 'error'); }
+}
+
+function setCBDBExport(filename, headers, rows) {
+    window._cbdbExport = { filename, headers, rows };
+}
+
+function exportCBDBCSV() {
+    const exp = window._cbdbExport;
+    if (!exp) { alert('当前没有可导出的结果'); return; }
+    const esc = v => {
+        const s = String(v == null ? '' : v);
+        return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const lines = [exp.headers.map(esc).join(',')];
+    exp.rows.forEach(r => lines.push(r.map(esc).join(',')));
+    // BOM 保证 Excel 正确识别 UTF-8 中文
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = exp.filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+function cbdbGoBack() {
+    const view = window._cbdbViewStack.pop();
+    window._cbdbListView = null;
+    window._cbdbExport = null;
+    if (!view) { closeCBDBDetail(); return; }
+    if (view.type === 'search') {
+        if (window._cbdbType !== view.searchType) switchCBDBType(view.searchType);
+        else renderCBDBSearchArea(view.searchType);
+        const input = document.getElementById('cbdbSearchInput');
+        if (input) input.value = view.query;
+        searchCBDB();
+        closeCBDBDetail();
+    } else if (view.type === 'officePersons') {
+        loadOfficePersons(view.officeId, view.title, view.filters);
+        closeCBDBDetail();
+    } else if (view.type === 'placePersons') {
+        loadPlacePersons(view.addrId, view.includeSame);
+        closeCBDBDetail();
+    } else if (view.type === 'statusPersons') {
+        loadStatusPersons(view.code, view.title, view.filters);
+        closeCBDBDetail();
+    } else if (view.type === 'textPersons') {
+        loadTextPersons(view.textId, view.title);
+        closeCBDBDetail();
+    } else if (view.type === 'kinRecursive') {
+        // 亲属递归视图本身渲染在右栏，直接恢复即可
+        loadKinRecursive(view.id, view.title);
+    } else if (view.type === 'entryPersons') {
+        loadEntryPersons(view.entryCode, view.title, view.filters);
+        closeCBDBDetail();
+    }
+}
+
+function cbdbPushListView() {
+    if (window._cbdbListView) {
+        window._cbdbViewStack.push(window._cbdbListView);
+        window._cbdbListView = null;
+    }
+}
+
+function searchCBDBByName(name) {
+    if (window._cbdbType !== 'person') switchCBDBType('person');
+    else renderCBDBSearchArea('person');
+    const input = document.getElementById('cbdbSearchInput');
+    if (input) input.value = name;
+    searchCBDB();
+}
+
+function showPlaceOnMap(lng, lat) {
+    switchTab('map');
+    setTimeout(() => {
+        try {
+            initMap();
+            if (chgisMap && typeof flyToLocation === 'function') flyToLocation(lng, lat, 9);
+        } catch (e) { /* 地图初始化失败时忽略 */ }
+    }, 300);
+}
+
+// 社会关系：已选类型 chip
+function renderAssocChips() {
+    const box = document.getElementById('cbdbAssocChips');
+    if (!box) return;
+    const tp = window._cbdbAssocState.type;
+    box.innerHTML = tp
+        ? `<div class="cbdb-assoc-chip" onclick="cbdbClearAssocType()" title="点击清除已选类型">
+             <b>${escapeHtml(tp.name_chn)}</b><span class="chip-code">code ${tp.code}</span><span class="chip-x">✕</span>
+           </div>`
+        : `<div class="cbdb-hint" style="margin:0">先在上方搜索并选择一种关系类型</div>`;
+}
+
+function cbdbClearAssocType() {
+    window._cbdbAssocState.type = null;
+    renderAssocChips();
+}
+
+// 社会关系检索执行：关系对表格（extraMeta 插槽）+ 涉及人物走统一表格（勾选/范围传递/导出全套）
+async function runAssocQuery() {
+    const tp = window._cbdbAssocState.type;
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!tp) { showToast('请先搜索并选择关系类型', 'warning'); return; }
+    if (!resultsDiv) return;
+    const pair = (document.getElementById('cbdbAssocPair') || {}).checked ? 1 : 0;
+    const fromYear = (document.getElementById('cbdbAssocFrom') || {}).value || '';
+    const toYear = (document.getElementById('cbdbAssocTo') || {}).value || '';
+    const dy = (document.getElementById('cbdbDynasty') || {}).value || '';
+    resultsDiv.innerHTML = '<div class="loading"></div> 查询中...';
+    window._cbdbViewStack = [];
+    window._cbdbListView = { type: 'assoc', query: tp.name_chn };
+    window._cbdbExport = null;
+
+    try {
+        const params = new URLSearchParams({ code: tp.code, pair: String(pair), limit: '500' });
+        if (fromYear) params.set('from_year', fromYear);
+        if (toYear) params.set('to_year', toYear);
+        if (dy) params.set('dy', dy);
+        const res = await fetch('/api/cbdb/assoc/persons?' + params);
+        const data = await res.json();
+        if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger)">${escapeHtml(data.error)}</p>`; return; }
+        const rels = data.relations || [];
+        const persons = data.persons || [];
+        if (!rels.length) {
+            resultsDiv.innerHTML = `<p style="color:var(--text-muted)">未找到「${escapeHtml(tp.name_chn)}」关系记录${pair ? '（含配对）' : ''}。提示：社会关系多未标年份，年份区间会大幅收窄结果</p>`;
+            return;
+        }
+        const relRows = rels.map(r => `
+            <tr>
+                <td><span class="cbdb-name" onclick="loadCBDBPersonDetail(${r.a_id});event.stopPropagation()">${escapeHtml(r.a_name)}</span></td>
+                <td class="cbdb-rel-arrow">${escapeHtml(r.relation)}</td>
+                <td><span class="cbdb-name" onclick="loadCBDBPersonDetail(${r.b_id});event.stopPropagation()">${escapeHtml(r.b_name)}</span></td>
+                <td>${r.year || '—'}</td>
+                <td class="cbdb-rel-text">${escapeHtml((r.text && r.text !== '[n/a]') ? r.text : '')}</td>
+            </tr>`).join('');
+        const relTableHTML = `
+            <div class="cbdb-subhead">关系对（共 ${data.total} 条${data.total > rels.length ? `，显示前 ${rels.length} 条` : ''}）</div>
+            <table class="cbdb-table cbdb-rel-table">
+                <thead><tr><th>人物 A</th><th>关系</th><th>人物 B</th><th>年份</th><th>文献</th></tr></thead>
+                <tbody>${relRows}</tbody>
+            </table>`;
+        cbdbRenderPersons(resultsDiv, persons, {
+            columns: [
+                { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || '')}</span>` },
+                { label: '朝代', render: p => escapeHtml(p.dynasty || '—') },
+            ],
+            extraMeta: relTableHTML,
+            export: {
+                filename: `cbdb_社会关系_${tp.name_chn}_${tp.code}${pair ? '_含配对' : ''}.csv`,
+                headers: ['人物A', 'A_ID', '关系', '人物B', 'B_ID', '年份', '文献'],
+                rows: rels.map(r => [r.a_name, r.a_id, r.relation, r.b_name, r.b_id, r.year || '', r.text || ''])
+            }
+        });
+        document.getElementById('cbdbResults').scrollTop = 0;
+    } catch (e) {
+        resultsDiv.innerHTML = `<p style="color:var(--danger)">查询失败：${escapeHtml(e.message)}</p>`;
+    }
+}
+
+// 关系对表格（两人关系/地区关系/社会关系共用渲染）
+function cbdbRelationsTableHTML(rels, total) {
+    const rows = rels.map(r => `
+        <tr>
+            <td><span class="cbdb-name" onclick="loadCBDBPersonDetail(${r.a_id});event.stopPropagation()">${escapeHtml(r.a_name)}</span></td>
+            <td class="cbdb-rel-arrow">${escapeHtml(r.relation)}</td>
+            <td><span class="cbdb-name" onclick="loadCBDBPersonDetail(${r.b_id});event.stopPropagation()">${escapeHtml(r.b_name)}</span></td>
+            <td>${r.year || '—'}</td>
+            <td class="cbdb-rel-text">${escapeHtml((r.text && r.text !== '[n/a]') ? r.text : '')}</td>
+        </tr>`).join('');
+    return `
+        <div class="cbdb-subhead">关系对（共 ${total} 条${total > rels.length ? `，显示前 ${rels.length} 条` : ''}）</div>
+        <table class="cbdb-table cbdb-rel-table">
+            <thead><tr><th>人物 A</th><th>关系</th><th>人物 B</th><th>年份</th><th>文献</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+}
+
+// 两人关系检索执行（原生 Query Pair-wise Associations）
+async function runPairQuery() {
+    const a = (window._cbdbPairState || {}).a;
+    const b = (window._cbdbPairState || {}).b;
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    if (!a || !b) { showToast('请在两个输入框分别搜索并选择人物', 'warning'); return; }
+    if (a.id === b.id) { showToast('双方不能是同一个人', 'warning'); return; }
+    resultsDiv.innerHTML = '<div class="loading"></div> 查询中...';
+    window._cbdbViewStack = [];
+    window._cbdbListView = { type: 'pair', query: a.label + ' · ' + b.label };
+    window._cbdbExport = null;
+    try {
+        const res = await fetch(`/api/cbdb/assoc/between?a=${a.id}&b=${b.id}`);
+        const data = await res.json();
+        if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger)">${escapeHtml(data.error)}</p>`; return; }
+        const rels = data.relations || [];
+        const kin = data.kin || [];
+        const life = p => (p.birthyear > 0 || p.deathyear > 0)
+            ? `${p.birthyear > 0 ? p.birthyear : '?'}—${p.deathyear > 0 ? p.deathyear : '?'}` : '生卒不详';
+        let body = '';
+        if (kin.length) {
+            body += `<div class="cbdb-subhead">直系亲属（${kin.length} 条，附五服）</div>
+            <table class="cbdb-table cbdb-rel-table"><thead><tr><th>从</th><th>关系</th><th>至</th><th>服制</th><th>亲类型</th></tr></thead><tbody>
+            ${kin.map(k => `<tr><td><span class="cbdb-name" onclick="loadCBDBPersonDetail(${k.from_id});event.stopPropagation()">${escapeHtml(k.from_name)}</span></td><td class="cbdb-rel-arrow">${escapeHtml(k.relation)}</td><td>${escapeHtml(k.to_name)}</td><td>${k.mourning ? `<span class="result-card-badge">${escapeHtml(k.mourning)}</span>` : '—'}</td><td style="font-size:12px;color:var(--text-muted)">${escapeHtml(k.kintype || '')}</td></tr>`).join('')}
+            </tbody></table>`;
+        }
+        if (rels.length) {
+            body += `<div class="cbdb-subhead">社会关系（${rels.length} 条，双向）</div>
+            <table class="cbdb-table cbdb-rel-table"><thead><tr><th>从</th><th>关系</th><th>至</th><th>年份</th><th>文献</th></tr></thead><tbody>
+            ${rels.map(r => `<tr><td><span class="cbdb-name" onclick="loadCBDBPersonDetail(${r.from_id});event.stopPropagation()">${escapeHtml(r.from_name)}</span></td><td class="cbdb-rel-arrow">${escapeHtml(r.relation)}</td><td>${escapeHtml(r.to_name)}</td><td>${r.year || '—'}</td><td class="cbdb-rel-text">${escapeHtml((r.text && r.text !== '[n/a]') ? r.text : '')}</td></tr>`).join('')}
+            </tbody></table>`;
+        }
+        if (!rels.length && !kin.length) {
+            body = '<p style="color:var(--text-muted);margin-top:8px">两人之间没有直接的社会关系或亲属记录（亲属为单向记录，若互为亲属但仅一方有记录，会显示在有记录的一侧）</p>';
+        }
+        setCBDBExport(`cbdb_两人关系_${data.a.name_chn}_${data.b.name_chn}.csv`,
+            ['类型', '从', '从ID', '关系', '至', '至ID', '年份', '文献', '服制'],
+            kin.map(k => ['亲属', k.from_name, k.from_id, k.relation, k.to_name, k.to_id, '', '', k.mourning])
+                .concat(rels.map(r => ['社会', r.from_name, r.from_id, r.relation, r.to_name, r.to_id, r.year || '', (r.text || '').replace('[n/a]', ''), ''])));
+        resultsDiv.innerHTML = `
+            <div class="cbdb-pair-head">
+                <span class="cbdb-name" onclick="loadCBDBPersonDetail(${data.a.id})">${escapeHtml(data.a.name_chn)}</span>
+                <span class="cbdb-pair-vs">${escapeHtml(data.a.dynasty)} · ${life(data.a)}</span>
+                <span class="cbdb-pair-mid">⇋</span>
+                <span class="cbdb-name" onclick="loadCBDBPersonDetail(${data.b.id})">${escapeHtml(data.b.name_chn)}</span>
+                <span class="cbdb-pair-vs">${escapeHtml(data.b.dynasty)} · ${life(data.b)}</span>
+            </div>
+            <div class="cbdb-toolbar">
+                <span class="cbdb-result-meta" style="margin:0">${rels.length} 社会关系 · ${kin.length} 亲属</span>
+                <button class="btn-secondary cbdb-export-btn" onclick="exportCBDBCSV()">⬇ 导出 CSV</button>
+            </div>
+            ${body}`;
+        resultsDiv.scrollTop = 0;
+    } catch (e) {
+        resultsDiv.innerHTML = `<p style="color:var(--danger)">查询失败：${escapeHtml(e.message)}</p>`;
+    }
+}
+
+// 地区关系检索执行（原生 Query Place Associations）：关系对 + 涉及人物走统一表格
+async function runPlaceAssocQuery() {
+    const place = (window._cbdbPlaceAssocState || {}).place;
+    const tp = (window._cbdbPlaceAssocState || {}).type;
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    if (!place) { showToast('请先通过下拉选择地名', 'warning'); return; }
+    const fromYear = (document.getElementById('cbdbPlaceAssocFrom') || {}).value || '';
+    const toYear = (document.getElementById('cbdbPlaceAssocTo') || {}).value || '';
+    const same = (document.getElementById('cbdbPlaceAssocSame') || {}).checked ? 1 : 0;
+    const both = (document.getElementById('cbdbPlaceAssocBoth') || {}).checked ? 1 : 0;
+    resultsDiv.innerHTML = '<div class="loading"></div> 查询中...';
+    window._cbdbViewStack = [];
+    window._cbdbListView = { type: 'placeassoc', query: place.label };
+    window._cbdbExport = null;
+    try {
+        const params = new URLSearchParams({ same: String(same), both: String(both), limit: '500' });
+        if (tp) { params.set('code', String(tp.code)); params.set('pair', '1'); }
+        if (fromYear) params.set('from_year', fromYear);
+        if (toYear) params.set('to_year', toYear);
+        const res = await fetch(`/api/cbdb/places/${place.id}/assoc?` + params);
+        const data = await res.json();
+        if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger)">${escapeHtml(data.error)}</p>`; return; }
+        const rels = data.relations || [];
+        const persons = data.persons || [];
+        if (!rels.length) {
+            resultsDiv.innerHTML = `<p style="color:var(--text-muted)">${escapeHtml(place.label)}地区人物之间未找到社会关系记录${tp ? `（${escapeHtml(tp.name_chn)}）` : ''}。提示：社会关系多未标年份，年份区间会大幅收窄结果</p>`;
+            return;
+        }
+        cbdbRenderPersons(resultsDiv, persons, {
+            columns: [
+                { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || '')}</span>` },
+                { label: '朝代', render: p => escapeHtml(p.dynasty || '—') },
+            ],
+            extraMeta: cbdbRelationsTableHTML(rels, data.total) +
+                `<div class="cbdb-hint" style="margin-top:6px">地区人物共 ${data.place_persons} 人（籍贯/居址/任职地/索引地址${same ? '，同坐标并入' : ''}），上表为关系涉及人物</div>`,
+            export: {
+                filename: `cbdb_地区关系_${place.label}${tp ? '_' + tp.name_chn : ''}.csv`,
+                headers: ['人物A', 'A_ID', '关系', '人物B', 'B_ID', '年份', '文献'],
+                rows: rels.map(r => [r.a_name, r.a_id, r.relation, r.b_name, r.b_id, r.year || '', r.text || ''])
+            }
+        });
+        resultsDiv.scrollTop = 0;
+    } catch (e) {
+        resultsDiv.innerHTML = `<p style="color:var(--danger)">查询失败：${escapeHtml(e.message)}</p>`;
+    }
+}
+
+async function searchCBDB() {
+    // 社会关系/两人关系/地区关系有自己的表单与执行函数，这里仅做兜底转发
+    if (window._cbdbType === 'assoc') { runAssocQuery(); return; }
+    if (window._cbdbType === 'pair') { runPairQuery(); return; }
+    if (window._cbdbType === 'placeassoc') { runPlaceAssocQuery(); return; }
+    const input = document.getElementById('cbdbSearchInput');
+    const yearInput = document.getElementById('cbdbYearInput');
+    const q = input ? input.value.trim() : (yearInput ? yearInput.value.trim() : '');
+    if (!q) { alert('请输入检索词'); return; }
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<div class="loading"></div> 查询中...';
+    window._cbdbViewStack = [];
+    window._cbdbListView = { type: 'search', query: q, searchType: window._cbdbType };
+    window._cbdbExport = null;
+
+    try {
+        if (window._cbdbType === 'person') {
+            const dy = (document.getElementById('cbdbDynasty') || {}).value || '';
+            const gender = (document.getElementById('cbdbGender') || {}).value || '';
+            const place = (window._cbdbPersonState || {}).place;
+            const byF = (document.getElementById('cbdbBirthFrom') || {}).value || '';
+            const byT = (document.getElementById('cbdbBirthTo') || {}).value || '';
+            const dyF = (document.getElementById('cbdbDeathFrom') || {}).value || '';
+            const dyT = (document.getElementById('cbdbDeathTo') || {}).value || '';
+            const ixF = (document.getElementById('cbdbIndexFrom') || {}).value || '';
+            const ixT = (document.getElementById('cbdbIndexTo') || {}).value || '';
+            const res = await fetch(`/api/cbdb/search?name=${encodeURIComponent(q)}${dy ? '&dy=' + encodeURIComponent(dy) : ''}${gender ? '&gender=' + gender : ''}${place ? '&addr_id=' + place.id : ''}${byF ? '&by_from=' + byF : ''}${byT ? '&by_to=' + byT : ''}${dyF ? '&dy_from=' + dyF : ''}${dyT ? '&dy_to=' + dyT : ''}${ixF ? '&index_from=' + ixF : ''}${ixT ? '&index_to=' + ixT : ''}`);
+            const data = await res.json();
+            if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到结果</p>'; return; }
+            cbdbRenderPersons(resultsDiv, data, {
+                columns: [
+                    { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
+                    { label: '朝代', render: p => escapeHtml(p.dynasty) },
+                    { label: '生卒', render: p => (p.birthyear > 0 && p.deathyear > 0) ? p.birthyear + '—' + p.deathyear : '—' },
+                    { label: '籍贯', render: p => escapeHtml(p.native_place) || '—' }
+                ],
+                export: { filename: `cbdb_人名_${q}.csv`, headers: ['姓名', '朝代', '生卒', '籍贯'],
+                    rows: data.map(p => [p.name_chn || p.name, p.dynasty,
+                        p.birthyear > 0 && p.deathyear > 0 ? `${p.birthyear}—${p.deathyear}` : '',
+                        p.native_place || '']) }
+            });
+            return;
+        } else if (window._cbdbType === 'office') {
+            const cat = ((document.getElementById('cbdbOfficeCat') || {}).value || '').trim();
+            const res = await fetch(`/api/cbdb/offices/search?q=${encodeURIComponent(q)}${cat ? '&category=' + encodeURIComponent(cat) : ''}`);
+            const data = await res.json();
+            if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配官职</p>'; return; }
+            resultsDiv.innerHTML = `
+                <div class="cbdb-result-meta">共 ${data.length} 个官职，点击查看任职者列表</div>
+                ${data.map(o => `
+                    <div class="result-card" onclick="loadOfficePersons(${o.office_id}, '${escapeHtml(o.office_chn)}')">
+                        <div class="result-card-title">${escapeHtml(o.office_chn)}</div>
+                        <div class="result-card-body">
+                            ${o.dynasty ? `<span class="result-card-badge">${escapeHtml(o.dynasty)}</span>` : ''}
+                            ${o.category ? `<span class="result-card-badge">${escapeHtml(o.category)}</span>` : ''}
+                            ${o.trans ? `<span style="font-size:12px;color:var(--text-muted)">${escapeHtml(o.trans)}</span>` : ''}
+                        </div>
+                    </div>`).join('')}`;
+        } else if (window._cbdbType === 'status') {
+            const res = await fetch(`/api/cbdb/status/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配身份类型</p>'; return; }
+            resultsDiv.innerHTML = `
+                <div class="cbdb-result-meta">共 ${data.length} 种身份类型，点击查看人物列表</div>
+                ${data.map(s => `
+                    <div class="result-card" onclick="loadStatusPersons(${s.code}, '${escapeHtml(s.name_chn)}')">
+                        <div class="result-card-title">${escapeHtml(s.name_chn)}</div>
+                        ${s.name_eng ? `<div class="result-card-body"><span style="font-size:12px;color:var(--text-muted)">${escapeHtml(s.name_eng)}</span></div>` : ''}
+                    </div>`).join('')}`;
+        } else if (window._cbdbType === 'text') {
+            const res = await fetch(`/api/cbdb/texts/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配著作</p>'; return; }
+            resultsDiv.innerHTML = `
+                <div class="cbdb-result-meta">共 ${data.length} 部著作，点击查看相关人物</div>
+                ${data.map(tx => `
+                    <div class="result-card" onclick="loadTextPersons(${tx.text_id}, '${escapeHtml(tx.title_chn)}')">
+                        <div class="result-card-title">${escapeHtml(tx.title_chn)}${tx.extant ? ' <span class="result-card-badge">存</span>' : ''}</div>
+                        <div class="result-card-body">
+                            ${tx.dynasty ? `<span class="result-card-badge">${escapeHtml(tx.dynasty)}</span>` : ''}
+                            ${tx.title ? `<span style="font-size:12px;color:var(--text-muted)">${escapeHtml(tx.title)}</span>` : ''}
+                        </div>
+                    </div>`).join('')}`;
+        } else if (window._cbdbType === 'year') {
+            const dy = (document.getElementById('cbdbDynasty') || {}).value || '';
+            let url = `/api/cbdb/year/people?year=${encodeURIComponent(q)}${dy ? '&dy=' + encodeURIComponent(dy) : ''}`;
+            // 三期：查询范围取交集
+            if (window._cbdbScope && window._cbdbScope.ids.length) {
+                url += `&ids=${window._cbdbScope.ids.join(',')}`;
+            }
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
+            const persons = data.persons || [];
+            if (!persons.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">该年份未找到在世人物</p>'; return; }
+            const scopeNote = (window._cbdbScope && window._cbdbScope.ids.length) ? `（∩ 查询范围 ${window._cbdbScope.ids.length} 人）` : '';
+            cbdbRenderPersons(resultsDiv, persons, {
+                extraMeta: `<div class="cbdb-result-meta" style="margin-top:4px">数据库共 ${data.total} 人，显示前 ${persons.length} 位（按索引年排序）${scopeNote}</div>`,
+                columns: [
+                    { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
+                    { label: '朝代', render: p => escapeHtml(p.dynasty) },
+                    { label: '生卒', render: p => (p.birthyear > 0 && p.deathyear > 0) ? p.birthyear + '—' + p.deathyear : '—' },
+                    { label: '索引年', render: p => p.index_year || '—' }
+                ],
+                export: { filename: `cbdb_${q}年在世.csv`, headers: ['姓名', '朝代', '生卒', '索引年'],
+                    rows: persons.map(p => [p.name_chn || p.name, p.dynasty,
+                        p.birthyear > 0 && p.deathyear > 0 ? `${p.birthyear}—${p.deathyear}` : '',
+                        p.index_year || '']) }
+            });
+            return;
+        } else if (window._cbdbType === 'entry') {
+            const res = await fetch(`/api/cbdb/entries/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配入仕方式</p>'; return; }
+            resultsDiv.innerHTML = `
+                <div class="cbdb-result-meta">共 ${data.length} 种入仕方式，点击查看人物列表</div>
+                ${data.map(en => `
+                    <div class="result-card" onclick="loadEntryPersons(${en.code}, '${escapeHtml(en.name_chn)}')">
+                        <div class="result-card-title">${escapeHtml(en.name_chn)}</div>
+                        ${en.name_eng ? `<div class="result-card-body"><span style="font-size:12px;color:var(--text-muted)">${escapeHtml(en.name_eng)}</span></div>` : ''}
+                    </div>`).join('')}`;
+        } else {
+            const adminType = ((document.getElementById('cbdbAdminType') || {}).value || '').trim();
+            const pFrom = ((document.getElementById('cbdbPlaceFrom') || {}).value || '').trim();
+            const pTo = ((document.getElementById('cbdbPlaceTo') || {}).value || '').trim();
+            let url = `/api/cbdb/places/search?q=${encodeURIComponent(q)}`;
+            if (adminType) url += `&admin_type=${encodeURIComponent(adminType)}`;
+            if (pFrom) url += `&from_year=${encodeURIComponent(pFrom)}`;
+            if (pTo) url += `&to_year=${encodeURIComponent(pTo)}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配地名</p>'; return; }
+            window._cbdbPlaceCache = {};
+            data.forEach(pl => { window._cbdbPlaceCache[pl.addr_id] = pl; });
+            resultsDiv.innerHTML = `
+                <div class="cbdb-result-meta">共 ${data.length} 个地名，点击查看相关人物</div>
+                ${data.map(pl => `
+                    <div class="result-card" onclick="loadPlacePersons(${pl.addr_id})">
+                        <div class="result-card-title">${escapeHtml(pl.name_chn)} <span style="font-size:12px;color:var(--text-muted)">${escapeHtml(pl.name)}</span></div>
+                        <div class="result-card-body">
+                            ${pl.firstyear ? `<span class="result-card-badge">${pl.firstyear}${pl.lastyear ? '—' + pl.lastyear : ''}</span>` : ''}
+                            ${pl.admin_type ? `<span class="result-card-badge">${escapeHtml(pl.admin_type)}</span>` : ''}
+                        </div>
+                    </div>`).join('')}`;
+        }
+    } catch (e) {
+        resultsDiv.innerHTML = `<p style="color:var(--danger);">查询失败：${e.message}</p>`;
+    }
+}
+
+async function runAdvancedQuery() {
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    const gv = id => ((document.getElementById(id) || {}).value || '').trim();
+    const st = window._cbdbAdvState || {};
+    const name = gv('cbdbAdvName');
+    const dy = gv('cbdbDynasty');
+    const gender = gv('cbdbAdvGender');
+    const filters = {};
+    const desc = [];
+    if (name) { filters.name = name; desc.push('姓名=' + name); }
+    if (dy) { filters.dy = dy; desc.push('朝代'); }
+    if (gender) { filters.gender = gender; desc.push(gender === '1' ? '女' : '男'); }
+    const yr = (fromId, toId, keyF, keyT, label) => {
+        const f = gv(fromId), t = gv(toId);
+        if (f) filters[keyF] = f;
+        if (t) filters[keyT] = t;
+        if (f || t) desc.push(label);
+    };
+    yr('cbdbAdvFrom', 'cbdbAdvTo', 'from_year', 'to_year', '指数年');
+    yr('cbdbAdvBirthFrom', 'cbdbAdvBirthTo', 'birth_from', 'birth_to', '生年');
+    yr('cbdbAdvDeathFrom', 'cbdbAdvDeathTo', 'death_from', 'death_to', '卒年');
+    if (st.place) { filters.place_id = st.place.id; filters.addr_type = gv('cbdbAdvAddrType') || '1'; desc.push('地址=' + st.place.label); }
+    if (st.entry) { filters.entry_code = st.entry.id; desc.push('入仕=' + st.entry.label); }
+    yr('cbdbAdvEntryFrom', 'cbdbAdvEntryTo', 'entry_from', 'entry_to', '入仕年');
+    if (st.office) { filters.office_id = st.office.id; desc.push('职官=' + st.office.label); }
+    yr('cbdbAdvOfficeFrom', 'cbdbAdvOfficeTo', 'office_from', 'office_to', '任职年');
+    if (st.status) { filters.status_id = st.status.id; desc.push('身份=' + st.status.label); }
+    if (st.text) { filters.text_id = st.text.id; desc.push('著作=' + st.text.label); }
+    if (st.assoc) { filters.assoc_code = st.assoc.id; desc.push('关系=' + st.assoc.label); }
+
+    if (!Object.keys(filters).length) { alert('请至少填写一个查询条件'); return; }
+
+    resultsDiv.innerHTML = '<div class="loading"></div> 查询中...';
+    window._cbdbViewStack = [];
+    window._cbdbListView = null;
+    window._cbdbExport = null;
+
+    try {
+        const scope = window._cbdbScope;
+        const useScope = scope && scope.ids.length;
+        let res;
+        if (useScope) {
+            res = await fetch('/api/cbdb/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filters, person_ids: scope.ids })
+            });
+        } else {
+            const params = new URLSearchParams();
+            Object.entries(filters).forEach(([k, v]) => params.set(k, v));
+            res = await fetch(`/api/cbdb/query?${params.toString()}`);
+        }
+        const data = await res.json();
+        if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配人物</p>'; return; }
+        if (useScope) desc.push(`范围内${scope.ids.length}人`);
+        cbdbRenderPersons(resultsDiv, data, {
+            extraMeta: useScope ? `<div class="cbdb-result-meta" style="color:var(--accent)">⇅ 已应用查询范围（${scope.ids.length} 人）取交集</div>` : '',
+            columns: [
+                { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
+                { label: '朝代', render: p => escapeHtml(p.dynasty) },
+                { label: '生卒', render: p => (p.birthyear > 0 && p.deathyear > 0) ? p.birthyear + '-' + p.deathyear : '?' },
+                { label: '籍贯', render: p => escapeHtml(p.native_place) || '?' },
+                { label: '指数年', render: p => p.index_year || '?' },
+                { label: '性别', render: p => p.female ? '女' : '男' }
+            ],
+            export: { filename: `cbdb_综合查询_${desc.join('_') || '全部'}.csv`,
+                headers: ['姓名', '朝代', '生卒', '籍贯', '指数年', '性别'],
+                rows: data.map(p => [p.name_chn || p.name, p.dynasty,
+                    p.birthyear > 0 && p.deathyear > 0 ? `${p.birthyear}-${p.deathyear}` : '',
+                    p.native_place || '', p.index_year || '', p.female ? '女' : '男']) }
+        });
+    } catch (e) {
+        resultsDiv.innerHTML = `<p style="color:var(--danger);">查询失败：${e.message}</p>`;
+    }
+}
+
+// 通用：官职/入仕/社会区分图的筛选条（年份+地址，原生 CBDB 查询维度）
+function renderFilterBar(kind, id, title, filters) {
+    filters = filters || {};
+    window._cbdbFilterAddr = filters.addrId ? { id: filters.addrId, label: filters.addrLabel || '' } : null;
+    const addrLabel = kind === 'status' ? '' : (filters.addrLabel || '');
+    const addrInput = kind === 'status' ? '' : `
+        <input type="text" id="fltAddr" placeholder="${kind === 'office' ? '任职地（可空）' : '入仕地（可空）'}" value="${escapeHtml(addrLabel)}" autocomplete="off" style="flex:1.4;min-width:0">
+        <div class="cbdb-ac" id="fltAddrList"></div>`;
+    const applyFn = kind === 'office' ? 'applyOfficeFilters' : (kind === 'entry' ? 'applyEntryFilters' : 'applyStatusFilters');
+    return `<div class="cbdb-filter-bar">
+        <input type="number" id="fltFrom" placeholder="${kind === 'office' ? '任年起' : (kind === 'entry' ? '入仕年起' : '身份起')}" value="${filters.from || ''}" style="width:76px">
+        <span style="color:var(--text-muted)">—</span>
+        <input type="number" id="fltTo" placeholder="止" value="${filters.to || ''}" style="width:76px">
+        ${addrInput}
+        <button class="btn-secondary" onclick="${applyFn}(${id}, '${escapeHtml(title)}')">应用过滤</button>
+    </div>`;
+}
+
+function bindFilterAddrAutocomplete() {
+    bindCBDBAutocomplete('fltAddr', 'fltAddrList',
+        async q => {
+            const res = await fetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            return (Array.isArray(data) ? data : []).map(p => ({ id: p.addr_id, label: p.name_chn, sub: p.firstyear ? `${p.firstyear}—${p.lastyear || ''}` : (p.admin_type || '') }));
+        },
+        item => {
+            window._cbdbFilterAddr = item;
+            const inp = document.getElementById('fltAddr');
+            if (inp) inp.value = item.label;
+        });
+}
+
+async function loadOfficePersons(officeId, title, filters) {
+    cbdbPushListView();
+    window._cbdbListView = { type: 'officePersons', officeId: officeId, title: title, filters: filters || null };
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
+    try {
+        const params = new URLSearchParams();
+        if (filters && filters.from) params.set('from_year', filters.from);
+        if (filters && filters.to) params.set('to_year', filters.to);
+        if (filters && filters.addrId) params.set('addr_id', filters.addrId);
+        const res = await fetch(`/api/cbdb/offices/${officeId}/persons${params.toString() ? '?' + params.toString() : ''}`);
+        const data = await res.json();
+        if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + renderFilterBar('office', officeId, title, filters) + '<p style="color:var(--text-muted)">暂无任职记录（过滤条件可能过窄）</p>'; bindFilterAddrAutocomplete(); return; }
+        cbdbRenderPersons(resultsDiv, data, {
+            backTitle: title,
+            extraMeta: renderFilterBar('office', officeId, title, filters),
+            columns: [
+                { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
+                { label: '朝代', render: p => escapeHtml(p.dynasty) },
+                { label: '生卒', render: p => (p.birthyear > 0 && p.deathyear > 0) ? p.birthyear + '—' + p.deathyear : '—' },
+                { label: '任期', render: p => p.firstyear ? p.firstyear + (p.lastyear && p.lastyear !== p.firstyear ? '—' + p.lastyear : '') : '—' }
+            ],
+            export: { filename: `cbdb_官职_${title}.csv`, headers: ['姓名', '朝代', '生卒', '官名', '任期起', '任期止'],
+                rows: data.map(p => [p.name_chn || p.name, p.dynasty,
+                    p.birthyear > 0 && p.deathyear > 0 ? `${p.birthyear}—${p.deathyear}` : '',
+                    p.office_chn || title, p.firstyear || '', p.lastyear || '']) }
+        });
+        bindFilterAddrAutocomplete();
+    } catch (e) {
+        resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">加载失败：${e.message}</p>`;
+    }
+}
+
+function applyOfficeFilters(officeId, title) {
+    const addr = window._cbdbFilterAddr;
+    loadOfficePersons(officeId, title, {
+        from: (document.getElementById('fltFrom') || {}).value || '',
+        to: (document.getElementById('fltTo') || {}).value || '',
+        addrId: addr ? addr.id : '',
+        addrLabel: addr ? addr.label : ''
+    });
+}
+
+function applyEntryFilters(entryCode, title) {
+    const addr = window._cbdbFilterAddr;
+    loadEntryPersons(entryCode, title, {
+        from: (document.getElementById('fltFrom') || {}).value || '',
+        to: (document.getElementById('fltTo') || {}).value || '',
+        addrId: addr ? addr.id : '',
+        addrLabel: addr ? addr.label : '',
+        useIndex: (document.getElementById('fltUseIndex') || {}).checked || false
+    });
+}
+
+function applyStatusFilters(code, title) {
+    loadStatusPersons(code, title, {
+        from: (document.getElementById('fltFrom') || {}).value || '',
+        to: (document.getElementById('fltTo') || {}).value || ''
+    });
+}
+
+async function loadStatusPersons(code, title, filters) {
+    cbdbPushListView();
+    window._cbdbListView = { type: 'statusPersons', code: code, title: title, filters: filters || null };
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
+    try {
+        const params = new URLSearchParams();
+        if (filters && filters.from) params.set('from_year', filters.from);
+        if (filters && filters.to) params.set('to_year', filters.to);
+        const res = await fetch(`/api/cbdb/status/${code}/persons${params.toString() ? '?' + params.toString() : ''}`);
+        const data = await res.json();
+        if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + renderFilterBar('status', code, title, filters) + '<p style="color:var(--text-muted)">暂无人物记录（过滤条件可能过窄）</p>'; return; }
+        cbdbRenderPersons(resultsDiv, data, {
+            backTitle: title,
+            extraMeta: renderFilterBar('status', code, title, filters),
+            columns: [
+                { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
+                { label: '朝代', render: p => escapeHtml(p.dynasty) },
+                { label: '生卒', render: p => (p.birthyear > 0 && p.deathyear > 0) ? p.birthyear + '—' + p.deathyear : '—' },
+                { label: '身份期', render: p => p.firstyear ? p.firstyear + (p.lastyear && p.lastyear !== p.firstyear ? '—' + p.lastyear : '') : '—' }
+            ],
+            export: { filename: `cbdb_社会区分_${title}.csv`, headers: ['姓名', '朝代', '生卒', '身份起', '身份止'],
+                rows: data.map(p => [p.name_chn || p.name, p.dynasty,
+                    p.birthyear > 0 && p.deathyear > 0 ? `${p.birthyear}—${p.deathyear}` : '',
+                    p.firstyear || '', p.lastyear || '']) }
+        });
+    } catch (e) {
+        resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">加载失败：${e.message}</p>`;
+    }
+}
+
+async function loadTextPersons(textId, title) {
+    cbdbPushListView();
+    window._cbdbListView = { type: 'textPersons', textId: textId, title: title };
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
+    try {
+        const res = await fetch(`/api/cbdb/texts/${textId}/persons`);
+        const data = await res.json();
+        if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + '<p style="color:var(--text-muted)">暂无相关人物</p>'; return; }
+        cbdbRenderPersons(resultsDiv, data, {
+            backTitle: title,
+            columns: [
+                { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
+                { label: '朝代', render: p => escapeHtml(p.dynasty) },
+                { label: '生卒', render: p => (p.birthyear > 0 && p.deathyear > 0) ? p.birthyear + '—' + p.deathyear : '—' },
+                { label: '角色', render: p => escapeHtml(p.role || '—') }
+            ],
+            export: { filename: `cbdb_著作_${title}.csv`, headers: ['姓名', '朝代', '生卒', '角色'],
+                rows: data.map(p => [p.name_chn || p.name, p.dynasty,
+                    p.birthyear > 0 && p.deathyear > 0 ? `${p.birthyear}—${p.deathyear}` : '',
+                    p.role || '']) }
+        });
+    } catch (e) {
+        resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">加载失败：${e.message}</p>`;
+    }
+}
+
+async function loadPlacePersons(addrId, includeSame) {
+    const place = window._cbdbPlaceCache[addrId] || {};
+    const title = place.name_chn || ('地名 #' + addrId);
+    cbdbPushListView();
+    window._cbdbListView = { type: 'placePersons', addrId: addrId, includeSame: !!includeSame };
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
+    try {
+        const res = await fetch(`/api/cbdb/places/${addrId}/persons${includeSame ? '?include_same_coord=1' : ''}`);
+        const data = await res.json();
+        if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + '<p style="color:var(--text-muted)">暂无相关人物</p>'; return; }
+        const hasCoord = place.x_coord && place.y_coord;
+        const toggleBtn = hasCoord ? `<button class="btn-secondary" style="margin-left:8px" onclick="loadPlacePersons(${addrId}, ${includeSame ? 'false' : 'true'})">${includeSame ? '✓ 已并入同坐标地址' : '并入同坐标地址'}</button>` : '';
+        cbdbRenderPersons(resultsDiv, data, {
+            backTitle: title,
+            extraMeta: `<div class="cbdb-result-meta">共 ${data.length} 位相关人物${includeSame ? '（含同坐标地址）' : ''}${toggleBtn}</div>`,
+            columns: [
+                { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
+                { label: '朝代', render: p => escapeHtml(p.dynasty) },
+                { label: '生卒', render: p => (p.birthyear > 0 && p.deathyear > 0) ? p.birthyear + '—' + p.deathyear : '—' },
+                { label: '关联', render: p => escapeHtml(p.link_type) }
+            ],
+            export: { filename: `cbdb_地名_${title}.csv`, headers: ['姓名', '朝代', '生卒', '关联'],
+                rows: data.map(p => [p.name_chn || p.name, p.dynasty,
+                    p.birthyear > 0 && p.deathyear > 0 ? `${p.birthyear}—${p.deathyear}` : '',
+                    p.link_type || '']) },
+            extraHTML: hasCoord ? `<div style="margin-top:12px"><button class="btn-secondary" onclick="showPlaceOnMap(${place.x_coord}, ${place.y_coord})">🗺️ 在地图中查看${escapeHtml(title)}</button></div>` : ''
+        });
+    } catch (e) {
+        resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">加载失败：${e.message}</p>`;
+    }
+}
+
+async function loadEntryPersons(entryCode, title, filters) {
+    cbdbPushListView();
+    window._cbdbListView = { type: 'entryPersons', entryCode: entryCode, title: title, filters: filters || null };
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
+    try {
+        const params = new URLSearchParams();
+        if (filters && filters.from) params.set('from_year', filters.from);
+        if (filters && filters.to) params.set('to_year', filters.to);
+        if (filters && filters.addrId) params.set('addr_id', filters.addrId);
+        if (filters && filters.useIndex) params.set('use_index', '1');
+        const res = await fetch(`/api/cbdb/entries/${entryCode}/persons${params.toString() ? '?' + params.toString() : ''}`);
+        const data = await res.json();
+        if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + renderFilterBar('entry', entryCode, title, filters) + '<p style="color:var(--text-muted)">暂无人物记录（过滤条件可能过窄）</p>'; bindFilterAddrAutocomplete(); return; }
+        cbdbRenderPersons(resultsDiv, data, {
+            backTitle: title,
+            extraMeta: renderFilterBar('entry', entryCode, title, filters),
+            columns: [
+                { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
+                { label: '朝代', render: p => escapeHtml(p.dynasty) },
+                { label: '生卒', render: p => (p.birthyear > 0 && p.deathyear > 0) ? p.birthyear + '—' + p.deathyear : '—' },
+                { label: '入仕年', render: p => p.year || '—' },
+                { label: '榜次/科场', render: p => escapeHtml([p.exam_rank, p.exam_field].filter(Boolean).join(' · ')) || '—' }
+            ],
+            export: { filename: `cbdb_入仕_${title}.csv`, headers: ['姓名', '朝代', '生卒', '入仕方式', '入仕年', '榜次', '科场'],
+                rows: data.map(p => [p.name_chn || p.name, p.dynasty,
+                    p.birthyear > 0 && p.deathyear > 0 ? `${p.birthyear}—${p.deathyear}` : '',
+                    p.entry_name || title, p.year || '', p.exam_rank || '', p.exam_field || '']) }
+        });
+    } catch (e) {
+        resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">加载失败：${e.message}</p>`;
+    }
+}
+
+// ── 右栏视图切换：详情（默认）↔ 关系网络（点击才放大）──────────
+function showCBDBDetailView() {
+    const dv = document.getElementById('cbdbDetailView');
+    const nv = document.getElementById('cbdbNetworkView');
+    if (dv) dv.classList.remove('collapsed');
+    if (nv) nv.classList.add('collapsed');
+}
+
+function showCBDBNetworkView() {
+    const dv = document.getElementById('cbdbDetailView');
+    const nv = document.getElementById('cbdbNetworkView');
+    if (dv) dv.classList.add('collapsed');
+    if (nv) nv.classList.remove('collapsed');
+}
+
+// 点「查看关系网络」：加载并切到网络视图
+async function loadCBDBNetworkAndShow(id) {
+    showCBDBNetworkView();
+    await loadCBDBNetwork(id);
+}
+
+// 详情关闭：右栏回默认提示（左栏列表不动）
+function closeCBDBDetail() {
+    const panel = document.getElementById('cbdbDetailPanel');
+    if (panel) panel.innerHTML = '<div class="cbdb-empty-hint">在左侧检索并点击人物，这里显示完整详情</div>';
+}
+
+async function loadCBDBPersonDetail(id) {
+    const detail = document.getElementById('cbdbDetailPanel');
+    if (!detail) return;
+    cbdbPushListView();
+    showCBDBDetailView();
+    detail.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
+
+    try {
+        const res = await fetch(`/api/cbdb/person/${id}`);
+        const p = await res.json();
+        if (p.error) {
+            detail.innerHTML = renderCBDBBackBar('') + `<p style="color:var(--danger);">${p.error}</p>`;
+            return;
+        }
+
+        const fullName = p.name_chn || [p.surname_chn, p.mingzi_chn].filter(Boolean).join('') || p.name;
+        const altNames = (p.alt_names || []).map(a => (a.type ? a.type + '：' : '') + a.name).join('，');
+        const lifeYears = (p.birthyear > 0 || p.deathyear > 0)
+            ? `${p.birthyear > 0 ? p.birthyear : '?'} — ${p.deathyear > 0 ? p.deathyear : '?'}`
+            : '生卒年不详';
+
+        detail.innerHTML = `
+            ${renderCBDBBackBar(fullName)}
+            <div class="cbdb-person-name">${escapeHtml(fullName)}${p.name_chn && p.name ? ` <span class="cbdb-person-pinyin">(${escapeHtml(p.name)})</span>` : ''}</div>
+            <div class="cbdb-person-meta">
+                <span class="result-card-badge">${escapeHtml(p.dynasty || '朝代未知')}</span>
+                <span class="result-card-badge">${lifeYears}</span>
+            </div>
+            ${altNames ? `<div class="detail-row"><span class="detail-label">字号别称</span><span class="detail-value">${escapeHtml(altNames)}</span></div>` : ''}
+            ${(p.addresses || []).length ? `<div class="cbdb-subhead">地址履历</div>
+                <div class="cbdb-grid">${p.addresses.map(a => `<div class="cbdb-cell" title="${escapeHtml(a.place)}"><span class="cell-tag">${escapeHtml(a.type || '地址')}</span><span class="cell-main">${escapeHtml(a.place)}</span>${a.firstyear ? `<span class="cell-years">${a.firstyear}${a.lastyear && a.lastyear !== a.firstyear ? '—' + a.lastyear : ''}</span>` : ''}</div>`).join('')}</div>` : ''}
+            ${(p.postings || []).length ? `<div class="cbdb-subhead">官职履历（前 ${p.postings.length} 条）</div>
+                <div class="cbdb-grid">${p.postings.map(o => `<div class="cbdb-cell"><span class="cell-years">${o.firstyear ? o.firstyear + (o.lastyear && o.lastyear !== o.firstyear ? '—' + o.lastyear : '') : '—'}</span><span class="cell-main">${escapeHtml(o.office)}</span></div>`).join('')}</div>` : ''}
+            ${(p.statuses || []).length ? `<div class="cbdb-subhead">社会区分</div>
+                <div class="cbdb-grid">${p.statuses.map(s => `<div class="cbdb-cell"><span class="cell-years">${s.firstyear ? s.firstyear + (s.lastyear && s.lastyear !== s.firstyear ? '—' + s.lastyear : '') : '—'}</span><span class="cell-main">${escapeHtml(s.status)}</span></div>`).join('')}</div>` : ''}
+            ${(p.texts || []).length ? `<div class="cbdb-subhead">著作（${p.texts.length} 种）</div>
+                <div class="cbdb-grid">${p.texts.map(t => `<div class="cbdb-cell"><span class="cell-tag">${escapeHtml(t.dynasty || '—')}</span><span class="cell-main">${escapeHtml(t.title)}${t.extant ? ' <span class="result-card-badge">存</span>' : ''}${t.role ? ` <span class="cell-role">${escapeHtml(t.role)}</span>` : ''}</span></div>`).join('')}</div>` : ''}
+            ${p.notes ? `<div class="detail-row"><span class="detail-label">备注</span><span class="detail-value">${escapeHtml(p.notes)}</span></div>` : ''}
+            <div style="margin-top:16px">
+                <button class="btn-primary" onclick="loadCBDBNetworkAndShow(${p.id})">🕸️ 查看关系网络</button>
+                <button class="btn-secondary" style="margin-left:8px" onclick="loadKinRecursive(${p.id}, '${escapeHtml(fullName)}')">👨‍👩‍👧 亲属递归检索</button>
+            </div>
+        `;
+        detail.scrollTop = 0;
+    } catch (e) {
+        detail.innerHTML = renderCBDBBackBar('') + `<p style="color:var(--danger);">加载失败：${e.message}</p>`;
+    }
+}
+
+async function loadKinRecursive(id, name) {
+    const detail = document.getElementById('cbdbDetailPanel');
+    if (!detail) return;
+    cbdbPushListView();
+    showCBDBDetailView();
+    window._cbdbListView = { type: 'kinRecursive', id: id, title: name || ('人物 #' + id) };
+    window._cbdbExport = null;
+    detail.innerHTML = `
+        ${renderCBDBBackBar((name || '') + ' · 亲属递归')}
+        <div class="cbdb-adv-form">
+            <div class="cbdb-adv-row" style="flex-wrap:wrap;gap:6px">
+                <label>先世</label><input type="number" id="kinUp" value="2" min="0" max="10" style="width:58px">
+                <label>后世</label><input type="number" id="kinDown" value="2" min="0" max="10" style="width:58px">
+                <label>旁系</label><input type="number" id="kinCol" value="1" min="0" max="10" style="width:58px">
+                <label>姻亲</label><input type="number" id="kinMar" value="1" min="0" max="10" style="width:58px">
+            </div>
+            <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+                <button class="btn-primary" onclick="runKinRecursive(${id})">递归查询</button>
+                <button class="btn-secondary" onclick="document.getElementById('kinUp').value=4;document.getElementById('kinDown').value=4;document.getElementById('kinCol').value=3;document.getElementById('kinMar').value=1;runKinRecursive(${id})">⚰️ 五服一键</button>
+            </div>
+            <div class="cbdb-hint">四参数对应 CBDB 原生亲属检索：先世/后世/旁系/姻亲各维允许的步数；结果附《五服》服制（斬衰/齊衰/期年/大功/小功/緦麻，依 CBDB KIN_Mourning 表）</div>
+        </div>
+        <div id="kinResults" style="margin-top:10px"></div>`;
+}
+
+async function runKinRecursive(id) {
+    const box = document.getElementById('kinResults');
+    if (!box) return;
+    const up = (document.getElementById('kinUp') || {}).value || '2';
+    const down = (document.getElementById('kinDown') || {}).value || '2';
+    const col = (document.getElementById('kinCol') || {}).value || '1';
+    const mar = (document.getElementById('kinMar') || {}).value || '1';
+    box.innerHTML = '<div class="loading"></div> 递归展开中（首次查询需加载亲属索引，约数秒）…';
+    try {
+        const res = await fetch(`/api/cbdb/person/${id}/kin/recursive?up=${up}&down=${down}&col=${col}&mar=${mar}`);
+        const data = await res.json();
+        if (data.error) { box.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
+        const persons = data.persons || [];
+        if (!persons.length) { box.innerHTML = '<p style="color:var(--text-muted)">该参数范围内未找到亲属</p>'; return; }
+        cbdbRenderPersons(box, persons, {
+            extraMeta: data.truncated ? '<div class="cbdb-result-meta" style="color:var(--danger)">⚠️ 已达 5000 人上限，结果不完整</div>' : '',
+            columns: [
+                { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn)}</span>` },
+                { label: '关系', render: p => escapeHtml(p.relation) },
+                { label: '朝代', render: p => escapeHtml(p.dynasty) },
+                { label: '生卒', render: p => (p.birthyear > 0 && p.deathyear > 0) ? p.birthyear + '—' + p.deathyear : '—' },
+                { label: '服制', render: p => p.mourning ? `<span class="result-card-badge">${escapeHtml(p.mourning)}</span>` : '—' },
+                { label: '亲类型', render: p => `<span style="font-size:12px;color:var(--text-muted)">${escapeHtml(p.kintype || '')}</span>` }
+            ],
+            export: { filename: `cbdb_亲属递归_${data.root}.csv`,
+                headers: ['姓名', '关系', '朝代', '生', '卒', '服制', '亲类型', '先世', '后世', '旁系', '姻亲', '关系串'],
+                rows: persons.map(p => [p.name_chn, p.relation, p.dynasty,
+                    p.birthyear || '', p.deathyear || '', p.mourning, p.kintype,
+                    p.up, p.down, p.col, p.mar, p.path_rel]) }
+        });
+    } catch (e) {
+        box.innerHTML = `<p style="color:var(--danger);">查询失败：${e.message}</p>`;
+    }
+}
+
+// ── 三期：关系网络（右侧面板，力导向图）────────────────────
+window._cbdbNetState = { includeKin: false, dy: '' };
+
+async function loadCBDBNetwork(id) {
+    const panel = document.getElementById('cbdbNetwork');
+    if (!panel) return;
+    _cbdbNetState.id = id;
+    panel.innerHTML = '<div class="loading" style="margin:30px auto;display:block"></div>';
+    const params = new URLSearchParams();
+    if (_cbdbNetState.includeKin) params.set('include_kin', '1');
+    if (_cbdbNetState.dy) params.set('dy', _cbdbNetState.dy);
+    try {
+        const res = await fetch(`/api/cbdb/network/${id}?${params.toString()}`);
+        const data = await res.json();
+        if (data.error) { panel.innerHTML = `<p style="color:var(--danger);padding:20px">${data.error}</p>`; return; }
+        renderNetworkPanel(panel, data, id);
+    } catch (e) {
+        panel.innerHTML = `<p style="color:var(--danger);padding:20px">网络加载失败：${e.message}</p>`;
+    }
+}
+
+function renderNetworkPanel(panel, data, centerId, group) {
+    const nodes = data.nodes || [];
+    const edges = data.edges || [];
+    const kinCount = edges.filter(e => e.kind === 'kin').length;
+    const refetch = group ? 'loadCBDBGroupNetwork()' : `loadCBDBNetwork(${centerId})`;
+
+    panel.innerHTML = `
+        <div class="cbdb-net-controls">
+            <label><input type="checkbox" ${_cbdbNetState.includeKin ? 'checked' : ''} onchange="_cbdbNetState.includeKin=this.checked;${refetch}"> 混入亲属</label>
+            <select id="cbdbNetDy" onchange="_cbdbNetState.dy=this.value;${refetch}">
+                <option value="">全部朝代</option>
+            </select>
+            <span class="cbdb-net-stat">${group ? '👥 ' + escapeHtml(group.label) + ' · ' : ''}${nodes.length} 节点 · ${edges.length} 边${kinCount ? ` · 亲属 ${kinCount}` : ''}${data.meta && data.meta.kin_expanded ? `（外延 ${data.meta.kin_expanded} 人）` : ''}</span>
+        </div>
+        <div id="cbdbNetGraph" class="cbdb-net-graph"></div>
+        <div class="cbdb-net-legend">
+            ${group ? '<span><i class="dot" style="background:#c9a44a"></i>群体成员</span>' : '<span><i class="dot" style="background:var(--accent)"></i>中心</span>'}
+            <span><i class="dot" style="background:#5a8ec7"></i>社会关系</span>
+            <span><i class="dot" style="background:#e8912d"></i>亲属</span>
+            <span class="cbdb-net-hint">点节点看详情 · 双击以TA为中心</span>
+        </div>`;
+
+    // 朝代下拉（异步填充，保留选中）
+    fetch('/api/cbdb/dynasties').then(r => r.json()).then(list => {
+        const sel = document.getElementById('cbdbNetDy');
+        if (sel && Array.isArray(list)) {
+            sel.innerHTML = '<option value="">全部朝代</option>' +
+                list.map(d => `<option value="${d.code}" ${String(d.code) === String(_cbdbNetState.dy) ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('');
+        }
+    }).catch(() => {});
+
+    const graph = document.getElementById('cbdbNetGraph');
+    if (!graph) return;
+    if (nodes.length <= 1) {
+        graph.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">暂无关系数据</div>';
+        return;
+    }
+    drawNetGraph(graph, nodes, edges, centerId);
+}
+
+// 力导向布局（纯 SVG，无依赖；220 轮同步模拟，≤150 节点瞬时完成）
+function drawNetGraph(container, nodes, edges, centerId) {
+    const W = Math.max(320, container.clientWidth || 520);
+    const H = Math.max(360, Math.min(560, W * 0.72));
+    const byId = {};
+    nodes.forEach(n => {
+        byId[n.id] = n;
+        n.kinEdge = false;
+        n.deg = 0;
+    });
+    edges.forEach(e => {
+        const a = byId[e.source], b = byId[e.target];
+        if (!a || !b) return;
+        a.deg++; b.deg++;
+        if (e.kind === 'kin' && b) b.kinEdge = true;
+    });
+
+    // 初始：圆周分布，中心固定
+    nodes.forEach((n, i) => {
+        const a = 2 * Math.PI * i / nodes.length;
+        const R = Math.min(W, H) * 0.36;
+        n.x = W / 2 + Math.cos(a) * R;
+        n.y = H / 2 + Math.sin(a) * R;
+    });
+    if (byId[centerId]) { byId[centerId].x = W / 2; byId[centerId].y = H / 2; }
+
+    const TICKS = 220;
+    for (let t = 0; t < TICKS; t++) {
+        const cool = 1 - t / TICKS;
+        // 斥力（库仑，上限防发散）
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                let dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+                let d2 = dx * dx + dy * dy;
+                if (d2 < 0.01) { d2 = 0.01; dx = 0.1; dy = 0.1; }
+                const f = Math.min(2200 / d2, 28) * cool;
+                const d = Math.sqrt(d2);
+                const fx = dx / d * f, fy = dy / d * f;
+                nodes[i].x += fx; nodes[i].y += fy;
+                nodes[j].x -= fx; nodes[j].y -= fy;
+            }
+        }
+        // 弹簧（邻边吸引，休止长度 90）
+        edges.forEach(e => {
+            const a = byId[e.source], b = byId[e.target];
+            if (!a || !b) return;
+            let dx = b.x - a.x, dy = b.y - a.y;
+            const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+            const f = (d - 90) * 0.03 * cool;
+            dx = dx / d * f; dy = dy / d * f;
+            a.x += dx; a.y += dy; b.x -= dx; b.y -= dy;
+        });
+        // 向心引力 + 中心钉住 + 边界
+        nodes.forEach(n => {
+            if (n.center) { n.x = W / 2; n.y = H / 2; return; }
+            n.x += (W / 2 - n.x) * 0.012 * cool;
+            n.y += (H / 2 - n.y) * 0.012 * cool;
+            n.x = Math.max(24, Math.min(W - 24, n.x));
+            n.y = Math.max(24, Math.min(H - 24, n.y));
+        });
+    }
+
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', H);
+
+    edges.forEach(e => {
+        const a = byId[e.source], b = byId[e.target];
+        if (!a || !b) return;
+        const line = document.createElementNS(NS, 'line');
+        line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+        line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
+        line.setAttribute('stroke', e.kind === 'kin' ? 'rgba(232,145,45,0.6)' : 'rgba(90,142,199,0.5)');
+        line.setAttribute('stroke-width', e.kind === 'kin' ? 1.6 : 1.1);
+        const title = document.createElementNS(NS, 'title');
+        title.textContent = `${a.name} —${e.relation || '关联'}→ ${b.name}`;
+        line.appendChild(title);
+        svg.appendChild(line);
+    });
+
+    const showAllLabels = nodes.length <= 45;
+    nodes.forEach(n => {
+        const g = document.createElementNS(NS, 'g');
+        g.style.cursor = 'pointer';
+        const r = n.center ? 13 : 4.5 + Math.min(n.deg, 8) * 0.9;
+        const c = document.createElementNS(NS, 'circle');
+        c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); c.setAttribute('r', r);
+        c.setAttribute('fill', n.center ? 'var(--accent)' : (n.kinEdge ? '#e8b04d' : '#7fa8d9'));
+        if (n.center) { c.setAttribute('stroke', '#fff'); c.setAttribute('stroke-width', '2.5'); }
+        const title = document.createElementNS(NS, 'title');
+        title.textContent = `${n.name}${n.dynasty ? ' · ' + n.dynasty : ''}${n.center ? '（中心）' : ''}`;
+        c.appendChild(title);
+        g.appendChild(c);
+        if (n.center || n.deg >= 2 || showAllLabels) {
+            const tx = document.createElementNS(NS, 'text');
+            tx.setAttribute('x', n.x + r + 4); tx.setAttribute('y', n.y + 4);
+            tx.setAttribute('font-size', n.center ? 13 : 11);
+            tx.setAttribute('fill', n.center ? 'var(--text)' : 'var(--text-muted)');
+            if (n.center) tx.setAttribute('font-weight', '600');
+            tx.textContent = n.name;
+            g.appendChild(tx);
+        }
+        g.addEventListener('click', () => loadCBDBPersonDetail(n.id));
+        g.addEventListener('dblclick', (ev) => { ev.stopPropagation(); loadCBDBNetwork(n.id); });
+        svg.appendChild(g);
+    });
+
+    container.innerHTML = '';
+    container.appendChild(svg);
+}
+
+// ── AI 助手 ────────────────────────────────────────────
+async function sendAIChat() {
+    const input = document.getElementById('aiChatInput');
+    const messages = document.getElementById('aiChatMessages');
+    if (!input || !messages) return;
+    const text = input.value.trim();
+    if (!text) return;
+
+    // 添加用户消息
+    messages.innerHTML += `<div class="ai-message user"><div class="ai-bubble">${escapeHtml(text)}</div></div>`;
+    input.value = '';
+    messages.scrollTop = messages.scrollHeight;
+
+    // 显示加载
+    const loadingId = 'ai-loading-' + Date.now();
+    messages.innerHTML += `<div class="ai-message system" id="${loadingId}"><div class="ai-bubble"><div class="loading"></div> 思考中...</div></div>`;
+    messages.scrollTop = messages.scrollHeight;
+
+    try {
+        const msgs = [
+            { role: 'system', content: '你是「六月息」内置的历史学研究助手，擅长史料解读、历史概念阐释与史学论证。请用准确、清晰的中文回答，必要时引用具体史实，并适当使用小标题与分段以提升可读性。' },
+            ...(Array.isArray(window._aiHistory) ? window._aiHistory : []),
+            { role: 'user', content: text }
+        ];
+        const res = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: msgs })
+        });
+        const data = await res.json();
+
+        // 移除加载
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+
+        const content = data.response || (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+        if (data.error) {
+            messages.innerHTML += `<div class="ai-message system"><div class="ai-bubble">错误：${escapeHtml(data.error)}</div></div>`;
+        } else if (content) {
+            window._aiHistory = msgs.slice(1).concat([{ role: 'assistant', content: content }]).slice(-10);
+            messages.innerHTML += `<div class="ai-message ai"><div class="ai-bubble">${formatAIResponse(content)}</div></div>`;
+        } else {
+            messages.innerHTML += `<div class="ai-message system"><div class="ai-bubble">未收到有效回复</div></div>`;
+        }
+    } catch (e) {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+        messages.innerHTML += `<div class="ai-message system"><div class="ai-bubble">请求失败：${escapeHtml(e.message)}</div></div>`;
+    }
+
+    messages.scrollTop = messages.scrollHeight;
+}
+
+function aiQuickAction(type) {
+    const prompts = {
+        summarize: '请帮我总结以下历史文献的核心内容，提取时间、地点、人物、事件等关键信息：\n\n【请粘贴史料内容】',
+        analyze: '请分析以下历史论证的逻辑结构，指出其薄弱环节和可能存在的问题：\n\n【请粘贴论证内容】',
+        concept: '请解释以下历史概念的内涵、演变过程及其在特定历史时期的意义：\n\n【请输入概念名称】',
+        compare: '请比较分析以下两段史料对同一事件记载的差异及其可能原因：\n\n【史料一】\n\n【史料二】'
+    };
+    const input = document.getElementById('aiChatInput');
+    if (input) {
+        input.value = prompts[type] || '';
+        input.focus();
+    }
+}
+
+function setAIInput(text) {
+    const input = document.getElementById('aiChatInput');
+    if (input) { input.value = text; input.focus(); }
+}
+
+function formatAIResponse(text) {
+    // 简单的 markdown 格式转换
+    return escapeHtml(text)
+        .replace(/\n/g, '<br>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ── 系统状态 ───────────────────────────────────────────
+async function checkStatus() {
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if (!dot || !text) return;
+
+    try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+
+        const obsidianOk = data.obsidian;
+        const deepseekOk = data.deepseek;
+
+        dot.classList.remove('warn', 'error');
+        if (obsidianOk && deepseekOk) {
+            dot.style.background = 'var(--success)';
+            text.textContent = '全部就绪';
+        } else if (obsidianOk || deepseekOk) {
+            dot.classList.add('warn');
+            text.textContent = '部分就绪';
+        } else {
+            dot.classList.add('error');
+            text.textContent = 'API 未连接';
+        }
+    } catch {
+        dot.classList.add('error');
+        text.textContent = '后端未启动';
+    }
+}
+
+// ── 全局搜索（顶部搜索栏）─────────────────────────────
+async function globalSearch() {
+    const input = document.getElementById('obsidianSearchInput');
+    const query = input ? input.value.trim() : '';
+    if (!query) return;
+
+    // 在 Obsidian Vault 中搜索
+    switchTab('cbdb'); // 复用 CBDB 结果区
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<div class="loading" style="margin:12px auto;display:block"></div><p style="text-align:center;color:var(--text-muted);font-size:13px">搜索 Vault 中...</p>';
+
+    try {
+        const res = await fetch(`/api/obsidian/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+            resultsDiv.innerHTML = data.slice(0, 10).map(f => `
+                <div class="doc-item" onclick="openObsidianURI('${f.path || f}')">
+                    <div class="doc-icon">📄</div>
+                    <div class="doc-info">
+                        <div class="doc-title">${(f.basename || f).replace('.md', '')}</div>
+                        <div class="doc-meta">${f.path || ''}</div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            resultsDiv.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-text">未找到结果</div><div class="empty-state-hint">请检查 Obsidian 是否已连接</div></div>';
+        }
+    } catch (e) {
+        resultsDiv.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">搜索失败</div><div class="empty-state-hint">请检查 Obsidian 是否已连接</div></div>';
+    }
+}
+
+// ── 史料地图 ───────────────────────────────────────────
+let chgisMap = null;
+let currentDynastyLayer = null;
+let markerLayers = [];
+
+function initMap() {
+    if (chgisMap) return;
+    const mapEl = document.getElementById('leafletMap');
+    if (!mapEl || typeof L === 'undefined') return;
+
+    chgisMap = L.map('leafletMap', {
+        center: [35, 110],
+        zoom: 5,
+        zoomControl: true,
+        attributionControl: false
+    });
+
+    // 添加底图图层（中文标注优先：高德；CSS 反色滤镜实现暗夜风格）
+    const gaodeUrl = 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}';
+    const gaodeOpts = { maxZoom: 19, subdomains: ['1', '2', '3', '4'] };
+    const DARK_FILTER = 'invert(1) hue-rotate(180deg) saturate(0.35) brightness(0.9) contrast(0.95)';
+    window.baseLayers = {};
+    window.baseLayers['深色'] = L.tileLayer(gaodeUrl, gaodeOpts);
+    // 瓦片容器在图层 add 后才存在，监听 add 事件挂滤镜（重复切换后容器复用，只挂一次即可）
+    window.baseLayers['深色'].on('add', function () {
+        const c = window.baseLayers['深色'].getContainer();
+        if (c) c.style.filter = DARK_FILTER;
+    });
+    window.baseLayers['浅色'] = L.tileLayer(gaodeUrl, gaodeOpts);
+    window.baseLayers['暗灰(英文)'] = L.layerGroup([
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }),
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, pane: 'shadowPane' })
+    ]);
+
+    // 默认使用深色底图
+    window.baseLayers['深色'].addTo(chgisMap);
+    const darkContainer = window.baseLayers['深色'].getContainer();
+    if (darkContainer) darkContainer.style.filter = DARK_FILTER;
+
+    // 添加图层切换控件
+    L.control.layers(window.baseLayers, null, { position: 'topright' }).addTo(chgisMap);
+
+    // 地图加载完成后调整大小
+    setTimeout(() => chgisMap.invalidateSize(), 100);
+}
+
+// 朝代 → 都城键（对应 CHGIS_CAPITALS）
+const DYNASTY_CAPITALS = {
+    xia: ['yangcheng'],
+    shang: ['yinxu'],
+    zhou_west: ['haojing'],
+    zhou_east: ['luoyi_zhou'],
+    qin: ['xianyang'],
+    han_west: ['changan_han'],
+    han_east: ['luoyang_han'],
+    wei: ['luoyang_wei'],
+    shu: ['chengdu_shu'],
+    wu: ['jianye'],
+    jin_west: ['luoyang_jin'],
+    jin_east: ['jiankang'],
+    tang: ['chang_an', 'luoyang'],
+    song_north: ['kaifeng'],
+    song_south: ['hangzhou'],
+    yuan: ['beijing_yuan'],
+    ming: ['nanjing_ming', 'beijing_ming'],
+    qing: ['beijing_ming'],
+    southern_northern: ['pingcheng', 'luoyang_beiwei', 'ye', 'changan_bei', 'jiankang'],
+    sui: ['daxing'],
+    five_dynasties: ['kaifeng', 'luoyang', 'taiyuan', 'jiangning', 'hangzhou_wuyue', 'fuzhou', 'changsha', 'guangzhou', 'jiangling', 'chengdu']
+};
+
+async function switchDynasty(dynastyKey) {
+    if (!chgisMap) initMap();
+    if (!chgisMap) return;
+
+    // 高亮按钮
+    document.querySelectorAll('.dynasty-btn').forEach(b => b.classList.remove('active'));
+    const activeBtn = document.querySelector(`.dynasty-btn[data-dynasty="${dynastyKey}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    const infoLabel = document.getElementById('mapDynastyLabel');
+    if (infoLabel) infoLabel.textContent = '加载中...';
+
+    // 清除旧图层
+    if (currentDynastyLayer) {
+        chgisMap.removeLayer(currentDynastyLayer);
+        currentDynastyLayer = null;
+    }
+    markerLayers.forEach(l => chgisMap.removeLayer(l));
+    markerLayers = [];
+
+    // “无”：仅底图
+    if (dynastyKey === 'none') {
+        if (infoLabel) infoLabel.textContent = '未选择朝代';
+        return;
+    }
+
+    const dynasty = (typeof CHGIS_DYNASTIES !== 'undefined') ? CHGIS_DYNASTIES[dynastyKey] : null;
+    if (!dynasty) {
+        if (infoLabel) infoLabel.textContent = '未知朝代：' + dynastyKey;
+        return;
+    }
+
+    if (infoLabel) infoLabel.textContent = '加载中...';
+
+    // 疆域边界：本地 CHGIS_BORDERS 已含全部 18 朝
+    const borderFeature = (typeof CHGIS_BORDERS !== 'undefined') ? CHGIS_BORDERS[dynastyKey] : null;
+    if (borderFeature) {
+        try {
+            currentDynastyLayer = L.geoJSON(borderFeature, {
+                style: (feature) => {
+                    const c = (feature && feature.properties && feature.properties.color) || dynasty.color || '#c9a96e';
+                    return { color: c, weight: 2, fillColor: c, fillOpacity: 0.12 };
+                }
+            }).addTo(chgisMap);
+        } catch (e) {
+            console.error('[switchDynasty] 边界渲染失败', e);
+        }
+    }
+
+    // 添加都城标记（CHGIS_CAPITALS 按朝代键取）
+    const capitalKeys = DYNASTY_CAPITALS[dynastyKey] || [];
+    const capitals = (typeof CHGIS_CAPITALS !== 'undefined')
+        ? capitalKeys.map(k => CHGIS_CAPITALS[k]).filter(Boolean)
+        : [];
+    capitals.forEach(cap => {
+        if (cap.lat && cap.lng) {
+            const marker = L.marker([cap.lat, cap.lng], {
+                icon: L.divIcon({
+                    className: 'capital-marker',
+                    html: `<div style="background:var(--accent);width:12px;height:12px;border-radius:50%;border:2px solid #fff;"></div>`,
+                    iconSize: [12, 12],
+                    iconAnchor: [6, 6]
+                })
+            }).addTo(chgisMap);
+            marker.bindPopup(`
+                <strong>${cap.name}</strong><br>
+                <span style="font-size:11px;color:#666;">今${cap.modern || '位置不详'}</span>
+                ${cap.period ? `<br><span style="font-size:11px;color:#999;">${cap.period}</span>` : ''}
+            `);
+            markerLayers.push(marker);
+        }
+    });
+
+    // 信息标签与视野
+    const capNames = capitals.map(c => c.name).join('、');
+    if (infoLabel) infoLabel.textContent = `${dynasty.name}（${dynasty.period}）` + (capNames ? ` · 都城：${capNames}` : '');
+    if (dynasty.center) chgisMap.flyTo([dynasty.center[1], dynasty.center[0]], dynasty.zoom || 6, { duration: 1.2 });
+}
+
+function updateMapMarkers() {
+    if (!chgisMap) return;
+    // 清除旧标记（保留都城）
+    markerLayers.forEach(l => chgisMap.removeLayer(l));
+    markerLayers = [];
+}
+
+function searchMapPlace() {
+    const input = document.getElementById('mapPlaceInput');
+    const query = input ? input.value.trim() : '';
+    if (!query || !chgisMap) return;
+
+    const resultsDiv = document.getElementById('mapSearchResults');
+    if (!resultsDiv) return;
+
+    // 在都城中搜索
+    const cityResults = [];
+    if (typeof CHGIS_CAPITALS !== 'undefined') {
+        Object.values(CHGIS_CAPITALS).forEach(cap => {
+            if ((cap.name && cap.name.includes(query)) || (cap.modern && cap.modern.includes(query))) {
+                cityResults.push({ name: cap.name, modern: cap.modern, lat: cap.lat, lng: cap.lng, dynasty: cap.dynasty, type: '都城' });
+            }
+        });
+    }
+
+    // 在 places.js 中搜索
+    const placeResults = [];
+    if (PLACES_DB) {
+        PLACES_DB.forEach(place => {
+            if ((place.ancient && place.ancient.includes(query)) || (place.modern && place.modern.includes(query))) {
+                placeResults.push({ name: place.ancient, modern: place.modern, lat: place.lat, lng: place.lng, dynasty: place.dynasty, type: place.type, notes: place.notes });
+            }
+        });
+    }
+
+    const allResults = [...cityResults, ...placeResults];
+
+    if (allResults.length === 0) {
+        resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到相关地点</p>';
+        return;
+    }
+
+    resultsDiv.innerHTML = allResults.slice(0, 20).map(r => {
+        const hasCoords = r.lat && r.lng;
+        const name = r.name || '';
+        const modern = r.modern || '';
+        return `
+            <div class="map-result-item" ${hasCoords ? `onclick="flyToLocation(${r.lng}, ${r.lat}, 10)"` : ''}
+                style="${hasCoords ? 'cursor:pointer;' : ''}">
+                <div class="map-result-name">${name} ${modern ? `<span style="font-size:11px;color:var(--text-muted);">（今${modern}）</span>` : ''}</div>
+                <div class="map-result-info">${r.dynasty || ''} ${r.type || r.notes || ''}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function flyToLocation(lng, lat, zoom) {
+    if (!chgisMap) return;
+    chgisMap.flyTo([lat, lng], zoom || 10, { duration: 1.5 });
+}
+
+// ── 史学工具 ───────────────────────────────────────────
+function initToolTabs() {
+    // 工具标签页切换（进入 tools 页时调用，防止重复绑定）
+    if (initToolTabs._bound) return;
+    initToolTabs._bound = true;
+    document.querySelectorAll('.tool-nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tool = btn.dataset.tool;
+            document.querySelectorAll('.tool-nav-btn').forEach(b => b.classList.toggle('active', b === btn));
+            document.querySelectorAll('.tool-panel').forEach(p => {
+                p.classList.toggle('active', p.id === 'tool-' + tool);
+            });
+        });
+    });
+}
+
+function switchEraMode(mode) {
+    // 年号换算模式切换（mode 与 HTML data-mode 一致：era-to-year / year-to-era）
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    const eraPanel = document.getElementById('era-to-year-panel');
+    const yearPanel = document.getElementById('year-to-era-panel');
+    if (mode === 'era-to-year') {
+        if (eraPanel) eraPanel.style.display = '';
+        if (yearPanel) yearPanel.style.display = 'none';
+    } else {
+        if (eraPanel) eraPanel.style.display = 'none';
+        if (yearPanel) yearPanel.style.display = '';
+    }
+}
+
+function filterEraByDynasty() {
+    // 朝代筛选：作用于当前已渲染的年号结果卡片（HTML 里 onchange 不传参）
+    const select = document.getElementById('eraDynastySelect');
+    const container = document.getElementById('eraResults');
+    if (!select || !container) return;
+    const dynasty = select.value;
+    container.querySelectorAll('.result-card').forEach(card => {
+        const badge = card.querySelector('.result-card-badge');
+        const match = !dynasty || (badge && badge.textContent.trim() === dynasty);
+        card.style.display = match ? '' : 'none';
+    });
+}
+
+function searchEra() {
+    const input = document.getElementById('eraNameInput');
+    const container = document.getElementById('eraResults');
+    if (!input || !container) return;
+    const query = input.value.trim();
+    if (!query) return;
+
+    const eras = ERA_NAMES_DB || [];
+    const results = eras.filter(e => e.era && e.era.includes(query));
+
+    if (results.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted)">未找到相关年号</p>';
+        return;
+    }
+
+    container.innerHTML = results.map(e => `
+        <div class="result-card">
+            <div class="result-card-title">${e.era}</div>
+            <div class="result-card-body">
+                <span class="result-card-badge">${e.dynasty || ''}</span>
+                <span class="result-card-badge">公元 ${e.startYear} — ${e.endYear}</span>
+            </div>
+            ${e.notes ? `<div class="result-card-row"><span class="result-card-label">备注</span><span class="result-card-value">${e.notes}</span></div>` : ''}
+        </div>
+    `).join('');
+}
+
+function searchYear() {
+    const yearInput = document.getElementById('yearInput');
+    const container = document.getElementById('yearResults');
+    if (!yearInput || !container) return;
+
+    const year = parseInt(yearInput.value);
+    if (!year || isNaN(year)) {
+        container.innerHTML = '<p style="color:var(--text-muted)">请输入有效的公元年份（1—1912）</p>';
+        return;
+    }
+
+    // 使用内置年号数据
+    const eras = ERA_NAMES_DB || [];
+    const matches = [];
+
+    eras.forEach(e => {
+        if (year >= e.startYear && year <= e.endYear) {
+            const nth = year - e.startYear + 1;
+            matches.push({ ...e, nth });
+        }
+    });
+
+    if (matches.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted)">该年份不在数据库范围内（唐—清）</p>';
+        return;
+    }
+
+    container.innerHTML = matches.map(e => `
+        <div class="result-card">
+            <div class="result-card-title">${e.era}${e.nth}年</div>
+            <div class="result-card-body">
+                <span class="result-card-badge">第${e.nth} 年</span>
+                <span class="result-card-badge">${e.dynasty}</span>
+                <span class="result-card-badge">公元 ${e.startYear} — ${e.endYear}</span>
+            </div>
+            ${e.notes ? `<div class="result-card-row"><span class="result-card-label">备注</span><span class="result-card-value">${e.notes}</span></div>` : ''}
+        </div>
+    `).join('');
+}
+
+function searchOfficial() {
+    const input = document.getElementById('officialInput');
+    const container = document.getElementById('officialResults');
+    if (!input || !container) return;
+    const query = input.value.trim();
+    if (!query) return;
+
+    const officials = OFFICIALS_DB || [];
+    const results = officials.filter(o =>
+        (o.name && o.name.includes(query)) ||
+        (o.duties && o.duties.includes(query))
+    );
+
+    if (results.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted)">未找到相关职官</p>';
+        return;
+    }
+
+    container.innerHTML = results.map(o => `
+        <div class="result-card">
+            <div class="result-card-title">${o.name}</div>
+            <div class="result-card-body">
+                <span class="result-card-badge">${o.dynasty || ''}</span>
+                <span class="result-card-badge">${o.rank || ''}</span>
+            </div>
+            ${o.duties ? `<div class="result-card-row"><span class="result-card-label">职掌</span><span class="result-card-value">${o.duties}</span></div>` : ''}
+            ${o.notes ? `<div class="result-card-row"><span class="result-card-label">备注</span><span class="result-card-value">${o.notes}</span></div>` : ''}
+        </div>
+    `).join('');
+}
+
+function searchPlace() {
+    const input = document.getElementById('placeInput');
+    const container = document.getElementById('placeResults');
+    if (!input || !container) return;
+    const query = input.value.trim();
+    if (!query) return;
+
+    const places = PLACES_DB || [];
+    const results = places.filter(p =>
+        (p.ancient && p.ancient.includes(query)) ||
+        (p.modern && p.modern.includes(query))
+    );
+
+    if (results.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted)">未找到相关地名</p>';
+        return;
+    }
+
+    container.innerHTML = results.map(p => `
+        <div class="result-card">
+            <div class="result-card-title">${p.ancient}（今${p.modern}）</div>
+            <div class="result-card-body">
+                <span class="result-card-badge">${p.dynasty || ''}</span>
+                <span class="result-card-badge">${p.province || p.type || ''}</span>
+            </div>
+            ${p.notes ? `<div class="result-card-row"><span class="result-card-label">备注</span><span class="result-card-value">${p.notes}</span></div>` : ''}
+            ${p.lat ? `<div class="result-card-row"><span class="result-card-label">坐标</span><span class="result-card-value">${p.lat}, ${p.lng}</span></div>` : ''}
+        </div>
+    `).join('');
+}
+
+function searchTaboo() {
+    const input = document.getElementById('tabooInput');
+    const container = document.getElementById('tabooResults');
+    if (!input || !container) return;
+    const query = input.value.trim();
+    if (!query) return;
+
+    const taboos = TABOO_DB || [];
+    const results = taboos.filter(t =>
+        (t.name && t.name.includes(query)) ||
+        (t.tabooChars && t.tabooChars.includes(query)) ||
+        (t.alternatives && t.alternatives.includes(query))
+    );
+
+    if (results.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted)">未找到相关避讳记录</p>';
+        return;
+    }
+
+    container.innerHTML = results.map(t => {
+        const tabooList = t.tabooChars.split(',').map(c => `<span class="taboo-highlight">${c.trim()}</span>`).join('');
+        const altList = t.alternatives.split('/').map(a => `<span class="taboo-alt">${a.trim()}</span>`).join('');
+        return `
+            <div class="result-card">
+                <div class="result-card-title">${t.name}</div>
+                <div class="result-card-body">
+                    <span class="result-card-badge">${t.dynasty || ''}</span>
+                    <span class="result-card-badge">${t.emperor || ''}</span>
+                </div>
+                <div class="result-card-row"><span class="result-card-label">避讳字</span><span class="result-card-value">${tabooList}</span></div>
+                <div class="result-card-row"><span class="result-card-label">替代字</span><span class="result-card-value">${altList}</span></div>
+                ${t.notes ? `<div class="result-card-row"><span class="result-card-label">实例</span><span class="result-card-value">${t.notes}</span></div>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function searchPhonology() {
+    const input = document.getElementById('phonologyInput');
+    const container = document.getElementById('phonologyResults');
+    if (!input || !container) return;
+    const query = input.value.trim();
+    if (!query) return;
+
+    const chars = query.split('');
+    const data = PHONOLOGY_DB || [];
+
+    const results = chars.map(ch => {
+        const entry = data.find(e => e.char === ch);
+        if (!entry) return { char: ch, found: false };
+        return { char: ch, found: true, ...entry };
+    });
+
+    container.innerHTML = results.map(r => {
+        if (!r.found) {
+            return `<div class="result-card"><div class="result-card-title">「${r.char}」</div><p style="color:var(--text-muted)">未找到「${r.char}」的中古音记录。数据库收录约120个常用字，可尝试：天、地、人、王、大、小、上、下、中、东、西、南、北 等</p></div>`;
+        }
+        return `
+            <div class="result-card">
+                <div class="result-card-title">${r.char}</div>
+                <div class="result-card-body">
+                    <span class="result-card-badge">${r.dynasty || '中古'}</span>
+                </div>
+                <table class="phonology-table">
+                    <thead><tr><th>声母</th><th>今音</th><th>反切</th><th>韵部</th><th>声调</th></tr></thead>
+                    <tbody><tr>
+                        <td>${r.initials || '—'}</td>
+                        <td>${r.pinyin || '—'}</td>
+                        <td>${r.fanqie || '—'}</td>
+                        <td>${r.rhyme || '—'}</td>
+                        <td>${r.tone || '—'}</td>
+                    </tr></tbody>
+                </table>
+                ${r.notes ? `<div class="result-card-row"><span class="result-card-label">备注</span><span class="result-card-value">${r.notes}</span></div>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function searchVersion() {
+    const input = document.getElementById('versionInput');
+    const container = document.getElementById('versionResults');
+    if (!input || !container) return;
+    const query = input.value.trim();
+    if (!query) return;
+
+    const versions = VERSIONS_DB || [];
+    const results = versions.filter(v =>
+        (v.title && v.title.includes(query)) ||
+        (v.author && v.author.includes(query))
+    );
+
+    if (results.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted)">未找到相关版本记录</p>';
+        return;
+    }
+
+    container.innerHTML = results.map(v => `
+        <div class="result-card">
+            <div class="result-card-title">${v.title}</div>
+            <div class="result-card-body">
+                <span class="result-card-badge">${v.author || ''}</span>
+                <span class="result-card-badge">${v.dynasty || ''}</span>
+                <span class="result-card-badge">${v.category || ''}</span>
+            </div>
+            ${v.versions ? v.versions.map(ver => `
+                <div class="version-info-row">
+                    <span class="version-book-title">${ver.title || ''}</span>
+                    <span class="version-info">${ver.name}${ver.notes ? ' · ' + ver.notes : ''}</span>
+                </div>
+            `).join('') : ''}
+        </div>
+    `).join('');
+}
+
+// ── 初始化 ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    initTabs();
+    checkStatus();
+
+    // 定期检查状态
+    setInterval(checkStatus, 60000);
+
+    // 绑定搜索
+    const searchInput = document.getElementById('obsidianSearchInput');
+    if (searchInput) searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') globalSearch(); });
+
+    // 绑定回车键
+    const aiInput = document.getElementById('aiChatInput');
+    if (aiInput) aiInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendAIChat(); });
+
+    const cbdbInput = document.getElementById('cbdbSearchInput');
+    if (cbdbInput) cbdbInput.addEventListener('keypress', e => { if (e.key === 'Enter') searchCBDB(); });
+
+    // 加载仪表盘
+    loadDashboard();
+});

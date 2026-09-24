@@ -1,0 +1,821 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>六月息 · 历史学学术面板</title>
+    <link rel="icon" href="/static/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+</head>
+<body>
+    <nav class="top-bar">
+        <div class="logo">
+            <div class="logo-icon">🐱</div>
+            <div>
+                <div class="logo-text">六月息</div>
+                <div class="logo-sub">LIUYUEXI · 历史学学术面板</div>
+            </div>
+        </div>
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-tab="dashboard">📊 仪表盘</button>
+            <button class="nav-tab" data-tab="workspace">📝 论文工作台</button>
+            <button class="nav-tab" data-tab="library">📚 史料库</button>
+            <button class="nav-tab" data-tab="map">🗺️ 史料地图</button>
+            <button class="nav-tab" data-tab="tools">🛠️ 史学工具</button>
+            <button class="nav-tab" data-tab="cbdb">🏛️ CBDB</button>
+            <button class="nav-tab" data-tab="ai">🤖 AI 助手</button>
+        </div>
+        <div class="nav-right">
+            <input type="text" id="globalSearch" placeholder="搜索史料、人物、地名...">
+            <div class="status-indicator">
+                <div id="statusDot" class="status-dot error"></div>
+                <span id="statusText">API 未连接</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <main class="main-content">
+        <!-- ═══ 仪表盘 ═══ -->
+        <div id="dashboard" class="page active">
+            <!-- 统计卡片行 -->
+            <div class="stats-row">
+                <div class="stat-card stat-papers">
+                    <div class="stat-card-icon">📄</div>
+                    <div class="stat-card-body">
+                        <div class="stat-value" id="statPapers">-</div>
+                        <div class="stat-label">在研论文</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-notes">
+                    <div class="stat-card-icon">📝</div>
+                    <div class="stat-card-body">
+                        <div class="stat-value" id="statNotes">-</div>
+                        <div class="stat-label">札记 / 日记</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-people">
+                    <div class="stat-card-icon">🏛️</div>
+                    <div class="stat-card-body">
+                        <div class="stat-value" id="statPeople">-</div>
+                        <div class="stat-label">人物卡片</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-sources">
+                    <div class="stat-card-icon">📚</div>
+                    <div class="stat-card-body">
+                        <div class="stat-value" id="statSources">-</div>
+                        <div class="stat-label">史料收藏</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 三栏内容 -->
+            <div class="dashboard-grid">
+                <!-- 左栏 -->
+                <div class="dash-col">
+                    <div class="panel">
+                        <div class="panel-header"><span class="panel-icon">⚡</span> 快捷入口</div>
+                        <div class="quick-links">
+                            <a href="#" onclick="switchTab('workspace'); return false;" class="quick-link">
+                                <div class="quick-link-icon">📄</div>
+                                <div class="quick-link-body">
+                                    <div class="quick-link-text">论文工作台</div>
+                                    <div class="quick-link-desc">继续写作</div>
+                                </div>
+                            </a>
+                            <a href="#" onclick="openObsidianURI('')" class="quick-link">
+                                <div class="quick-link-icon">📓</div>
+                                <div class="quick-link-body">
+                                    <div class="quick-link-text">Obsidian 知识库</div>
+                                    <div class="quick-link-desc">打开 Vault</div>
+                                </div>
+                            </a>
+                            <a href="https://cbdb.fas.harvard.edu/" target="_blank" class="quick-link">
+                                <div class="quick-link-icon">🏛️</div>
+                                <div class="quick-link-body">
+                                    <div class="quick-link-text">CBDB 数据库</div>
+                                    <div class="quick-link-desc">历代人物传记</div>
+                                </div>
+                            </a>
+                            <a href="https://chgis.fairbank.fas.harvard.edu/" target="_blank" class="quick-link">
+                                <div class="quick-link-icon">🌏</div>
+                                <div class="quick-link-body">
+                                    <div class="quick-link-text">CHGIS</div>
+                                    <div class="quick-link-desc">历史地理信息系统</div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="quick-actions-row">
+                            <button class="quick-action-btn" onclick="createDailyNote()" title="创建今日札记">
+                                <span>📅</span> 札记
+                            </button>
+                            <button class="quick-action-btn" onclick="openObsidianURI('')" title="打开 Vault">
+                                <span>📓</span> Vault
+                            </button>
+                            <button class="quick-action-btn" onclick="switchTab('library')" title="搜索 Vault">
+                                <span>🔍</span> 搜索
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header"><span class="panel-icon">🛠️</span> 工具速览</div>
+                        <div class="tools-grid">
+                            <a href="#" onclick="switchTab('tools'); return false;" class="tool-card">
+                                <div class="tool-card-icon">📅</div>
+                                <div class="tool-card-name">年号换算</div>
+                            </a>
+                            <a href="#" onclick="switchTab('tools'); return false;" class="tool-card">
+                                <div class="tool-card-icon">⚖️</div>
+                                <div class="tool-card-name">职官查询</div>
+                            </a>
+                            <a href="#" onclick="switchTab('tools'); return false;" class="tool-card">
+                                <div class="tool-card-icon">🏛️</div>
+                                <div class="tool-card-name">古今地名</div>
+                            </a>
+                            <a href="#" onclick="switchTab('tools'); return false;" class="tool-card">
+                                <div class="tool-card-icon">🚫</div>
+                                <div class="tool-card-name">避讳查询</div>
+                            </a>
+                            <a href="#" onclick="switchTab('tools'); return false;" class="tool-card">
+                                <div class="tool-card-icon">🔊</div>
+                                <div class="tool-card-name">音韵查询</div>
+                            </a>
+                            <a href="#" onclick="switchTab('tools'); return false;" class="tool-card">
+                                <div class="tool-card-icon">📖</div>
+                                <div class="tool-card-name">版本目录</div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 中栏 -->
+                <div class="dash-col">
+                    <div class="panel panel-grow">
+                        <div class="panel-header"><span class="panel-icon">📑</span> 在研论文</div>
+                        <div id="papersList" class="doc-list">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📄</div>
+                                <div class="empty-state-text">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header"><span class="panel-icon">🕐</span> 最近动态</div>
+                        <div id="activityTimeline" class="timeline">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">🕐</div>
+                                <div class="empty-state-text">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-header"><span class="panel-icon">📂</span> Vault 概览</div>
+                        <div id="vaultOverview" class="vault-overview">
+                            <div class="vault-stat">
+                                <span class="vault-stat-num" id="vaultTotalFiles">-</span>
+                                <span class="vault-stat-label">文件</span>
+                            </div>
+                            <div class="vault-stat">
+                                <span class="vault-stat-num" id="vaultTotalFolders">-</span>
+                                <span class="vault-stat-label">文件夹</span>
+                            </div>
+                            <div class="vault-stat">
+                                <span class="vault-stat-num" id="vaultRootFiles">-</span>
+                                <span class="vault-stat-label">根目录</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右栏 -->
+                <div class="dash-col">
+                    <div class="panel">
+                        <div class="panel-header"><span class="panel-icon">📰</span> 学术动态</div>
+                        <div class="news-list" id="newsList">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📰</div>
+                                <div class="empty-state-text">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel panel-grow">
+                        <div class="panel-header"><span class="panel-icon">✏️</span> 快速笔记</div>
+                        <textarea id="quickNote" class="quick-note-textarea" placeholder="灵感一闪，先记下来..."></textarea>
+                        <button class="btn-primary" onclick="saveQuickNote()" style="width:100%">保存到今日札记</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ 论文工作台 ═══ -->
+        <div id="workspace" class="page">
+            <!-- 写作统计卡片 -->
+            <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+                <div class="stat-card stat-papers">
+                    <div class="stat-card-icon">📑</div>
+                    <div class="stat-card-body">
+                        <div class="stat-value" id="wsPaperCount">-</div>
+                        <div class="stat-label">在研论文</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-notes">
+                    <div class="stat-card-icon">✏️</div>
+                    <div class="stat-card-body">
+                        <div class="stat-value" id="wsTotalWords">-</div>
+                        <div class="stat-label">总字数（估）</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-people">
+                    <div class="stat-card-icon">📅</div>
+                    <div class="stat-card-body">
+                        <div class="stat-value" id="wsTodayNotes">-</div>
+                        <div class="stat-label">今日札记</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-sources">
+                    <div class="stat-card-icon">🕐</div>
+                    <div class="stat-card-body">
+                        <div class="stat-value" id="wsLastEdit">-</div>
+                        <div class="stat-label">最近编辑</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="workspace-layout">
+                <!-- 左栏：论文列表 -->
+                <div class="panel">
+                    <div class="panel-header"><span class="panel-icon">📑</span> 在研论文</div>
+                    <div id="workspacePapers"></div>
+                    <div class="quick-actions-row" style="margin-top:12px">
+                        <button class="quick-action-btn" onclick="createPaper()" title="新建论文">
+                            <span>✏️</span> 新建
+                        </button>
+                        <button class="quick-action-btn" onclick="openObsidianURI('论文/')" title="在 Obsidian 中打开论文文件夹">
+                            <span>📂</span> 文件夹
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 中栏：论文预览 / 编辑器 -->
+                <div class="panel" id="paperPreview">
+                    <div class="panel-header"><span class="panel-icon">📄</span> 论文</div>
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📄</div>
+                        <div class="empty-state-text">选择左侧论文查看内容</div>
+                        <div class="empty-state-hint">或点击下方按钮新建论文</div>
+                        <button class="btn-primary" onclick="showPaperEditor()" style="margin-top:16px">✏️ 新建论文</button>
+                    </div>
+                </div>
+
+                <!-- 右栏：写作工具 -->
+                <div class="panel">
+                    <div class="panel-header"><span class="panel-icon">🛠️</span> 写作工具</div>
+                    <div class="ws-tools">
+                        <button class="ws-tool-btn" onclick="createDailyNote()">
+                            <span class="ws-tool-icon">📅</span>
+                            <div class="ws-tool-body">
+                                <div class="ws-tool-name">今日札记</div>
+                                <div class="ws-tool-desc">记录每日思考</div>
+                            </div>
+                        </button>
+                        <button class="ws-tool-btn" onclick="createExcerptNote()">
+                            <span class="ws-tool-icon">📋</span>
+                            <div class="ws-tool-body">
+                                <div class="ws-tool-name">史料摘录</div>
+                                <div class="ws-tool-desc">快速保存引用</div>
+                            </div>
+                        </button>
+                        <button class="ws-tool-btn" onclick="switchTab('ai')">
+                            <span class="ws-tool-icon">🤖</span>
+                            <div class="ws-tool-body">
+                                <div class="ws-tool-name">AI 助手</div>
+                                <div class="ws-tool-desc">论证分析 · 润色</div>
+                            </div>
+                        </button>
+                        <button class="ws-tool-btn" onclick="switchTab('tools')">
+                            <span class="ws-tool-icon">📅</span>
+                            <div class="ws-tool-body">
+                                <div class="ws-tool-name">年号换算</div>
+                                <div class="ws-tool-desc">写作时的纪年对照</div>
+                            </div>
+                        </button>
+                        <button class="ws-tool-btn" onclick="switchTab('map')">
+                            <span class="ws-tool-icon">🗺️</span>
+                            <div class="ws-tool-body">
+                                <div class="ws-tool-name">史料地图</div>
+                                <div class="ws-tool-desc">查证历史地理</div>
+                            </div>
+                        </button>
+                        <button class="ws-tool-btn" onclick="switchTab('library')">
+                            <span class="ws-tool-icon">📚</span>
+                            <div class="ws-tool-body">
+                                <div class="ws-tool-name">史料库</div>
+                                <div class="ws-tool-desc">查阅原始文献</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ 史料库 ═══ -->
+        <div id="library" class="page">
+            <!-- 社科大校内资源 -->
+            <div class="db-section">
+                <div class="db-section-title">🏫 社科大 · 校内资源</div>
+                <div class="db-grid">
+                    <a href="https://lib.ucass.edu.cn/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(199,84,80,0.15)">🏛️</div>
+                        <div class="db-name">社科大图书馆</div>
+                        <div class="db-desc">校图书馆 · 需内网/VPN</div>
+                    </a>
+                    <a href="https://vpn.ucass.edu.cn/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(90,142,199,0.15)">🔐</div>
+                        <div class="db-name">社科大 VPN</div>
+                        <div class="db-desc">校外访问校内资源入口</div>
+                    </a>
+                    <a href="http://www.lib.cass.org.cn/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(201,169,110,0.15)">📚</div>
+                        <div class="db-name">中国社科院图书馆</div>
+                        <div class="db-desc">院图书馆 · 190+ 数据库</div>
+                    </a>
+                    <a href="https://ra.nssd.org/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(90,158,110,0.15)">🌐</div>
+                        <div class="db-name">院馆远程访问</div>
+                        <div class="db-desc">校外访问院图书馆资源</div>
+                    </a>
+                    <a href="http://www.sklib.cn/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(155,107,158,0.15)">📖</div>
+                        <div class="db-name">中国社会科学文库</div>
+                        <div class="db-desc">社科社出版 · 2.5万+ 图书</div>
+                    </a>
+                    <a href="https://www.cashl.edu.cn/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(124,58,237,0.15)">📜</div>
+                        <div class="db-name">CASHL</div>
+                        <div class="db-desc">高校人文社科文献中心</div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 综合古籍库 -->
+            <div class="db-section">
+                <div class="db-section-title">📜 综合古籍库</div>
+                <div class="db-grid">
+                    <a href="https://www.erslib.com/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(199,84,80,0.15)">📚</div>
+                        <div class="db-name">爱如生</div>
+                        <div class="db-desc">中国基本古籍库</div>
+                    </a>
+                    <a href="https://gjqk.com/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(90,142,199,0.15)">📖</div>
+                        <div class="db-name">中华经典古籍库</div>
+                        <div class="db-desc">中华书局 · 点校本</div>
+                    </a>
+                    <a href="https://www.shidianguji.com/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(201,169,110,0.15)">🔍</div>
+                        <div class="db-name">识典古籍</div>
+                        <div class="db-desc">免费古籍检索阅读</div>
+                    </a>
+                    <a href="https://ctext.org/zh" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(90,158,110,0.15)">📜</div>
+                        <div class="db-name">中国哲学书电子化计划</div>
+                        <div class="db-desc">ctext.org · 先秦两汉</div>
+                    </a>
+                    <a href="https://www.shuge.org/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(155,107,158,0.15)">🏛️</div>
+                        <div class="db-name">书格</div>
+                        <div class="db-desc">免费古籍高清影像</div>
+                    </a>
+                    <a href="https://www.guoxue.com/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(124,58,237,0.15)">📋</div>
+                        <div class="db-name">国学网</div>
+                        <div class="db-desc">国学导航 · 综合资源</div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 期刊论文 -->
+            <div class="db-section">
+                <div class="db-section-title">📑 期刊论文</div>
+                <div class="db-grid">
+                    <a href="https://www.cnki.net/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(0,102,204,0.15)">📄</div>
+                        <div class="db-name">中国知网</div>
+                        <div class="db-desc">CNKI · 期刊学位论文</div>
+                    </a>
+                    <a href="https://www.ncpssd.org/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(199,84,80,0.15)">🏛️</div>
+                        <div class="db-name">国家哲社文献中心</div>
+                        <div class="db-desc">免费期刊 · 学位论文</div>
+                    </a>
+                    <a href="https://scholar.google.com/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(90,142,199,0.15)">🎓</div>
+                        <div class="db-name">谷歌学术</div>
+                        <div class="db-desc">Google Scholar</div>
+                    </a>
+                    <a href="https://www.duxiu.com/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(90,158,110,0.15)">📚</div>
+                        <div class="db-name">读秀</div>
+                        <div class="db-desc">图书搜索 · 文献传递</div>
+                    </a>
+                    <a href="https://www.wanfangdata.com.cn/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(201,169,110,0.15)">📊</div>
+                        <div class="db-name">万方数据</div>
+                        <div class="db-desc">期刊 · 学位论文</div>
+                    </a>
+                    <a href="https://www.cqvip.com/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(155,107,158,0.15)">📰</div>
+                        <div class="db-name">维普网</div>
+                        <div class="db-desc">中文科技期刊</div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 简牍墓志 -->
+            <div class="db-section">
+                <div class="db-section-title">🏺 简牍墓志</div>
+                <div class="db-grid">
+                    <a href="http://www.bsm.org.cn/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(139,105,20,0.15)">🎋</div>
+                        <div class="db-name">简帛网</div>
+                        <div class="db-desc">武大简帛研究中心</div>
+                    </a>
+                    <a href="https://www.jgwz.org/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(199,84,80,0.15)">🦴</div>
+                        <div class="db-name">殷契文渊</div>
+                        <div class="db-desc">甲骨文数据库</div>
+                    </a>
+                    <a href="http://www.jianbo.org/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(90,142,199,0.15)">📜</div>
+                        <div class="db-name">简牍网</div>
+                        <div class="db-desc">简牍学研究平台</div>
+                    </a>
+                    <a href="https://www.chinamuseum.org/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(90,158,110,0.15)">🏺</div>
+                        <div class="db-name">国家博物馆</div>
+                        <div class="db-desc">文物数据库</div>
+                    </a>
+                    <a href="https://www.dpm.org.cn/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(201,169,110,0.15)">🏯</div>
+                        <div class="db-name">故宫博物院</div>
+                        <div class="db-desc">文物 · 古籍数字资源</div>
+                    </a>
+                    <a href="http://www.nlc.cn/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(155,107,158,0.15)">📚</div>
+                        <div class="db-name">国家图书馆</div>
+                        <div class="db-desc">中华古籍资源库</div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 数字人文工具 -->
+            <div class="db-section">
+                <div class="db-section-title">🌏 数字人文工具</div>
+                <div class="db-grid">
+                    <a href="#" onclick="switchTab('cbdb'); return false;" class="db-card">
+                        <div class="db-icon" style="background:rgba(201,169,110,0.15)">🏛️</div>
+                        <div class="db-name">CBDB 人物查询</div>
+                        <div class="db-desc">六月息内置 · 已连接</div>
+                    </a>
+                    <a href="#" onclick="switchTab('map'); return false;" class="db-card">
+                        <div class="db-icon" style="background:rgba(90,142,199,0.15)">🗺️</div>
+                        <div class="db-name">CHGIS 史料地图</div>
+                        <div class="db-desc">六月息内置 · 已连接</div>
+                    </a>
+                    <a href="https://cbdb.fas.harvard.edu/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(90,158,110,0.15)">🌐</div>
+                        <div class="db-name">CBDB 官网</div>
+                        <div class="db-desc">哈佛 · 历代人物传记</div>
+                    </a>
+                    <a href="https://chgis.fairbank.fas.harvard.edu/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(199,84,80,0.15)">🌍</div>
+                        <div class="db-name">CHGIS 官网</div>
+                        <div class="db-desc">哈佛 · 历史地理信息</div>
+                    </a>
+                    <a href="https://yugong.fudan.edu.cn/" target="_blank" class="db-card">
+                        <div class="db-icon" style="background:rgba(155,107,158,0.15)">🗺️</div>
+                        <div class="db-name">禹贡网</div>
+                        <div class="db-desc">复旦 · 历史地理平台</div>
+                    </a>
+                    <a href="#" onclick="switchTab('tools'); return false;" class="db-card">
+                        <div class="db-icon" style="background:rgba(124,58,237,0.15)">🛠️</div>
+                        <div class="db-name">史学工具</div>
+                        <div class="db-desc">年号 · 职官 · 避讳等</div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Obsidian Vault 搜索 -->
+            <div class="db-section">
+                <div class="db-section-title">🔍 Obsidian Vault 搜索</div>
+                <div class="panel" style="margin-bottom:0">
+                    <div class="search-row" style="margin-bottom:12px">
+                        <input type="text" id="obsidianSearchInput" class="search-input" style="margin-bottom:0;flex:1" placeholder="搜索自己的 Vault 笔记...">
+                        <button class="btn-primary" onclick="searchVault()">搜索</button>
+                    </div>
+                    <div id="obsidianSearchResults"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ 史料地图 ═══ -->
+        <div id="map" class="page">
+            <div class="map-layout">
+                <div class="map-sidebar">
+                    <div class="map-panel">
+                        <div class="map-panel-title">🗺️ 朝代选择</div>
+                        <div class="dynasty-selector">
+                            <button class="dynasty-btn active" data-dynasty="none" onclick="switchDynasty('none')">无</button>
+                            <button class="dynasty-btn" data-dynasty="xia" onclick="switchDynasty('xia')">夏</button>
+                            <button class="dynasty-btn" data-dynasty="shang" onclick="switchDynasty('shang')">商</button>
+                            <button class="dynasty-btn" data-dynasty="zhou_west" onclick="switchDynasty('zhou_west')">西周</button>
+                            <button class="dynasty-btn" data-dynasty="zhou_east" onclick="switchDynasty('zhou_east')">东周</button>
+                            <button class="dynasty-btn" data-dynasty="qin" onclick="switchDynasty('qin')">秦</button>
+                            <button class="dynasty-btn" data-dynasty="han_west" onclick="switchDynasty('han_west')">西汉</button>
+                            <button class="dynasty-btn" data-dynasty="han_east" onclick="switchDynasty('han_east')">东汉</button>
+                            <button class="dynasty-btn" data-dynasty="wei" onclick="switchDynasty('wei')">曹魏</button>
+                            <button class="dynasty-btn" data-dynasty="shu" onclick="switchDynasty('shu')">蜀汉</button>
+                            <button class="dynasty-btn" data-dynasty="wu" onclick="switchDynasty('wu')">孙吴</button>
+                            <button class="dynasty-btn" data-dynasty="jin_west" onclick="switchDynasty('jin_west')">西晋</button>
+                            <button class="dynasty-btn" data-dynasty="jin_east" onclick="switchDynasty('jin_east')">东晋</button>
+                            <button class="dynasty-btn" data-dynasty="southern_northern" onclick="switchDynasty('southern_northern')">南北朝</button>
+                            <button class="dynasty-btn" data-dynasty="sui" onclick="switchDynasty('sui')">隋</button>
+                            <button class="dynasty-btn" data-dynasty="tang" onclick="switchDynasty('tang')">唐</button>
+                            <button class="dynasty-btn" data-dynasty="five_dynasties" onclick="switchDynasty('five_dynasties')">五代十国</button>
+                            <button class="dynasty-btn" data-dynasty="song_north" onclick="switchDynasty('song_north')">北宋</button>
+                            <button class="dynasty-btn" data-dynasty="song_south" onclick="switchDynasty('song_south')">南宋</button>
+                            <button class="dynasty-btn" data-dynasty="yuan" onclick="switchDynasty('yuan')">元</button>
+                            <button class="dynasty-btn" data-dynasty="ming" onclick="switchDynasty('ming')">明</button>
+                            <button class="dynasty-btn" data-dynasty="qing" onclick="switchDynasty('qing')">清</button>
+                        </div>
+                    </div>
+                    <div class="map-panel">
+                        <div class="map-panel-title">📍 地名搜索</div>
+                        <div class="map-search-box">
+                            <input type="text" id="mapPlaceInput" placeholder="输入古地名或今地名...">
+                            <button onclick="searchMapPlace()">🔍</button>
+                        </div>
+                        <div class="map-search-filters">
+                            <label><input type="checkbox" id="showCapitals" checked onchange="updateMapMarkers()"> 显示都城</label>
+                            <label><input type="checkbox" id="showCities" checked onchange="updateMapMarkers()"> 显示治所</label>
+                            <label><input type="checkbox" id="showPlaces" onchange="updateMapMarkers()"> 古今地名</label>
+                        </div>
+                        <div id="mapSearchResults" class="map-search-results"></div>
+                    </div>
+                    <div class="map-panel">
+                        <div class="map-panel-title">🎯 快速定位</div>
+                        <div class="quick-locations">
+                            <button class="loc-btn" onclick="flyToLocation(108.94, 34.34, 10)">📍 长安（西安）</button>
+                            <button class="loc-btn" onclick="flyToLocation(114.31, 34.80, 10)">📍 东京（开封）</button>
+                            <button class="loc-btn" onclick="flyToLocation(120.15, 30.27, 10)">📍 临安（杭州）</button>
+                            <button class="loc-btn" onclick="flyToLocation(116.40, 39.90, 10)">📍 大都/北京</button>
+                            <button class="loc-btn" onclick="flyToLocation(112.45, 34.62, 10)">📍 洛阳</button>
+                            <button class="loc-btn" onclick="flyToLocation(118.78, 32.06, 10)">📍 南京</button>
+                        </div>
+                    </div>
+                    <div class="map-panel">
+                        <div class="map-panel-title">📂 CHGIS 数据</div>
+                        <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">当前显示为简化示意数据。如需精确历史行政区划，可加载真实 CHGIS 数据。</p>
+                        <a href="https://chgis.fairbank.fas.harvard.edu/" target="_blank" class="chgis-link">🏛️ CHGIS 官网下载</a>
+                        <a href="https://yugong.fudan.edu.cn/" target="_blank" class="chgis-link">🏛️ 复旦历史地理平台</a>
+                    </div>
+                </div>
+                <div class="map-main">
+                    <div id="leafletMap"></div>
+                    <div id="mapDynastyLabel" class="map-overlay-info">选择朝代以显示疆域轮廓</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ 史学工具 ═══ -->
+        <div id="tools" class="page">
+            <div class="tool-nav">
+                <button class="tool-nav-btn active" data-tool="era">📅 年号换算</button>
+                <button class="tool-nav-btn" data-tool="official">⚖️ 职官查询</button>
+                <button class="tool-nav-btn" data-tool="place">🏛️ 古今地名</button>
+                <button class="tool-nav-btn" data-tool="taboo">🚫 避讳查询</button>
+                <button class="tool-nav-btn" data-tool="phonology">🔊 音韵查询</button>
+                <button class="tool-nav-btn" data-tool="version">📖 版本目录</button>
+            </div>
+            <div class="tool-content">
+                <!-- 年号换算 -->
+                <div id="tool-era" class="tool-panel active">
+                    <div class="tool-header">
+                        <h2>📅 年号换算</h2>
+                        <p style="color:var(--text-muted)">输入年号查询公元年份，或输入公元年份查询对应年号。</p>
+                    </div>
+                    <div class="mode-switch">
+                        <button class="mode-btn active" data-mode="era-to-year" onclick="switchEraMode('era-to-year')">年号 → 公元</button>
+                        <button class="mode-btn" data-mode="year-to-era" onclick="switchEraMode('year-to-era')">公元 → 年号</button>
+                    </div>
+                    <div id="era-to-year-panel">
+                        <div class="search-row">
+                            <select id="eraDynastySelect" onchange="filterEraByDynasty()">
+                                <option value="">全部朝代</option>
+                                <option value="夏">夏</option>
+                                <option value="商">商</option>
+                                <option value="西周">西周</option>
+                                <option value="春秋">春秋</option>
+                                <option value="战国">战国</option>
+                                <option value="秦">秦</option>
+                                <option value="西汉">西汉</option>
+                                <option value="东汉">东汉</option>
+                                <option value="曹魏">曹魏</option>
+                                <option value="蜀汉">蜀汉</option>
+                                <option value="孙吴">孙吴</option>
+                                <option value="西晋">西晋</option>
+                                <option value="东晋">东晋</option>
+                                <option value="南北朝">南北朝</option>
+                                <option value="隋">隋</option>
+                                <option value="唐">唐</option>
+                                <option value="五代">五代</option>
+                                <option value="北宋">北宋</option>
+                                <option value="南宋">南宋</option>
+                                <option value="元">元</option>
+                                <option value="明">明</option>
+                                <option value="清">清</option>
+                            </select>
+                            <input type="text" id="eraNameInput" placeholder="输入年号名称...">
+                            <button class="btn-primary" onclick="searchEra()">查询</button>
+                        </div>
+                        <div id="eraResults"></div>
+                    </div>
+                    <div id="year-to-era-panel" style="display:none">
+                        <div class="search-row">
+                            <input type="number" id="yearInput" placeholder="输入公元年份（如：618）">
+                            <button class="btn-primary" onclick="searchYear()">查询</button>
+                        </div>
+                        <div id="yearResults"></div>
+                    </div>
+                </div>
+
+                <!-- 职官查询 -->
+                <div id="tool-official" class="tool-panel">
+                    <div class="tool-header">
+                        <h2>⚖️ 职官查询</h2>
+                        <p style="color:var(--text-muted)">输入官名或选择朝代，查询历代职官制度。</p>
+                    </div>
+                    <div class="search-row">
+                        <select id="officialDynastySelect">
+                            <option value="">全部朝代</option>
+                            <option value="夏">夏</option>
+                            <option value="商">商</option>
+                            <option value="西周">西周</option>
+                            <option value="春秋战国">春秋战国</option>
+                            <option value="秦">秦</option>
+                            <option value="西汉">西汉</option>
+                            <option value="东汉">东汉</option>
+                            <option value="曹魏">曹魏</option>
+                            <option value="西晋">西晋</option>
+                            <option value="东晋">东晋</option>
+                            <option value="南朝">南朝</option>
+                            <option value="北魏北齐">北魏北齐</option>
+                            <option value="北周">北周</option>
+                            <option value="隋">隋</option>
+                            <option value="唐">唐</option>
+                            <option value="宋">宋</option>
+                            <option value="元">元</option>
+                            <option value="明">明</option>
+                            <option value="清">清</option>
+                        </select>
+                        <input type="text" id="officialInput" placeholder="输入官名（如：丞相、尚书令）">
+                        <button class="btn-primary" onclick="searchOfficial()">查询</button>
+                    </div>
+                    <div id="officialResults"></div>
+                </div>
+
+                <!-- 古今地名 -->
+                <div id="tool-place" class="tool-panel">
+                    <div class="tool-header">
+                        <h2>🏛️ 古今地名对照</h2>
+                        <p style="color:var(--text-muted)">输入古地名查询今址，或输入今地名查询古称。</p>
+                    </div>
+                    <div class="search-row">
+                        <input type="text" id="placeInput" placeholder="输入古地名或今地名（如：长安、洛阳）">
+                        <button class="btn-primary" onclick="searchPlace()">查询</button>
+                    </div>
+                    <div id="placeResults"></div>
+                </div>
+
+                <!-- 避讳查询 -->
+                <div id="tool-taboo" class="tool-panel">
+                    <div class="tool-header">
+                        <h2>🚫 避讳查询</h2>
+                        <p style="color:var(--text-muted)">输入皇帝名、避讳字或替代字，查询历代避讳制度。</p>
+                    </div>
+                    <div class="search-row">
+                        <input type="text" id="tabooInput" placeholder="输入皇帝名、避讳字或替代字">
+                        <button class="btn-primary" onclick="searchTaboo()">查询</button>
+                    </div>
+                    <div id="tabooResults"></div>
+                </div>
+
+                <!-- 音韵查询 -->
+                <div id="tool-phonology" class="tool-panel">
+                    <div class="tool-header">
+                        <h2>🔊 音韵查询</h2>
+                        <p style="color:var(--text-muted)">输入汉字查询中古音（反切、声母、韵部、声调）。数据库收录约120个常用字。</p>
+                    </div>
+                    <div class="search-row">
+                        <input type="text" id="phonologyInput" placeholder="输入一个汉字（如：天、地、人）">
+                        <button class="btn-primary" onclick="searchPhonology()">查询</button>
+                    </div>
+                    <div id="phonologyResults"></div>
+                </div>
+
+                <!-- 版本目录 -->
+                <div id="tool-version" class="tool-panel">
+                    <div class="tool-header">
+                        <h2>📖 古籍版本目录</h2>
+                        <p style="color:var(--text-muted)">查询核心典籍的版本信息：宋刻本、明刻本、清刻本、现代整理本。</p>
+                    </div>
+                    <div class="search-row">
+                        <input type="text" id="versionInput" placeholder="输入书名（如：史记、资治通鉴）">
+                        <button class="btn-primary" onclick="searchVersion()">查询</button>
+                    </div>
+                    <div id="versionResults"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ CBDB ═══ -->
+        <div id="cbdb" class="page">
+            <div class="two-col-layout">
+                <div class="panel sidebar">
+                    <div class="panel-header"><span class="panel-icon">🔍</span> CBDB 检索</div>
+                    <div class="cbdb-type-tabs">
+                        <button class="cbdb-type-tab active" data-type="person" onclick="switchCBDBType('person')">人名</button>
+                        <button class="cbdb-type-tab" data-type="office" onclick="switchCBDBType('office')">官名</button>
+                        <button class="cbdb-type-tab" data-type="place" onclick="switchCBDBType('place')">地名</button>
+                        <button class="cbdb-type-tab" data-type="assoc" onclick="switchCBDBType('assoc')">社会关系</button>
+                    <button class="cbdb-type-tab" data-type="pair" onclick="switchCBDBType('pair')">两人关系</button>
+                    <button class="cbdb-type-tab" data-type="placeassoc" onclick="switchCBDBType('placeassoc')">地区关系</button>
+                        <button class="cbdb-type-tab" data-type="entry" onclick="switchCBDBType('entry')">入仕</button>
+                        <button class="cbdb-type-tab" data-type="status" onclick="switchCBDBType('status')">社会区分</button>
+                        <button class="cbdb-type-tab" data-type="text" onclick="switchCBDBType('text')">著作</button>
+                        <button class="cbdb-type-tab" data-type="year" onclick="switchCBDBType('year')">年份</button>
+                        <button class="cbdb-type-tab" data-type="adv" onclick="switchCBDBType('adv')">综合</button>
+                    </div>
+                    <div id="cbdbSearchArea"></div>
+                    <div id="cbdbResults"></div>
+                </div>
+                <div class="panel main-area">
+                    <div id="cbdbDetailView">
+                        <div class="panel-header"><span class="panel-icon">📋</span> 人物详情</div>
+                        <div id="cbdbDetailPanel">
+                            <div class="cbdb-empty-hint">在左侧检索并点击人物，这里显示完整详情</div>
+                        </div>
+                    </div>
+                    <div id="cbdbNetworkView" class="collapsed">
+                        <div class="panel-header">
+                            <span class="panel-icon">🕸️</span> 关系网络
+                            <button class="btn-secondary cbdb-view-back" onclick="showCBDBDetailView()">← 返回详情</button>
+                        </div>
+                        <div id="cbdbNetwork"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ AI 助手 ═══ -->
+        <div id="ai" class="page">
+            <div class="ai-layout">
+                <div class="ai-chat-container">
+                    <div id="aiChatMessages" class="ai-messages">
+                        <div class="ai-message system">你好！我是你的历史学研究助手。我可以帮你摘要史料、梳理论证逻辑、解释历史概念、比较不同史料对同一事件的记载等。有什么可以帮你的？</div>
+                    </div>
+                    <div class="ai-input-area">
+                        <input type="text" id="aiChatInput" placeholder="输入你的问题...">
+                        <button id="aiSendBtn" onclick="sendAIChat()">发送</button>
+                    </div>
+                    <div class="ai-quick-actions">
+                        <button class="ai-quick-btn" onclick="aiQuickAction('summarize')">📋 史料摘要</button>
+                        <button class="ai-quick-btn" onclick="aiQuickAction('analyze')">🔍 论证分析</button>
+                        <button class="ai-quick-btn" onclick="aiQuickAction('concept')">📖 概念解释</button>
+                        <button class="ai-quick-btn" onclick="aiQuickAction('compare')">⚖️ 史料对比</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/data/era-names.js?v=11"></script>
+    <script src="/static/js/data/officials.js?v=11"></script>
+    <script src="/static/js/data/places.js?v=11"></script>
+    <script src="/static/js/data/taboo.js?v=11"></script>
+    <script src="/static/js/data/phonology.js?v=11"></script>
+    <script src="/static/js/data/versions.js?v=11"></script>
+    <script src="/static/js/data/chgis/chgis-data.js?v=11"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="/static/js/app.js?v=11"></script>
+</body>
+</html>

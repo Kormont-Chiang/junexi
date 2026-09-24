@@ -1,0 +1,30 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# 构建产物
+dist/
+build/
+*.toc
+
+# 日志与临时输出
+*.log
+*.out
+
+# 密钥
+.env
+
+# 历史归档（不维护）
+_archive/
+
+# 地理数据（体积大，另行管理）
+chgis_data/
+
+# 安装包产物（每次打包重新生成）
+packaging/installer/
+
+# 系统
+Thumbs.db
+.DS_Store

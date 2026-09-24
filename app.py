@@ -1738,6 +1738,99 @@ class CBDBConnection:
         }
 
     @classmethod
+    def kin_path(cls, a, b, max_depth=6):
+        """两人最短亲属路径（KIN_DATA 无向 BFS）：
+        CBDB 亲属边双向记录（父录子、子录父），沿 out_edges 正向 BFS 即无向遍历；
+        回溯得符号串，翻译链式称谓 + 查五服。max_depth 限深防跑飞。"""
+        idx = cls._load_kin_index()
+        if not idx:
+            return {"error": "亲属索引加载失败"}
+        out_edges, kinship, mourning = idx
+        a, b = int(a), int(b)
+        if a not in out_edges:
+            return {"a": a, "b": b, "found": False,
+                    "reason": "起点在 KIN_DATA 无亲属记录"}
+        from collections import deque
+        visited = {a}
+        prev = {a: None}  # node -> (parent, rel_symbol)
+        queue = deque([a])
+        meet = None
+        while queue:
+            cur = queue.popleft()
+            if cur == b:
+                meet = cur
+                break
+            depth = 0
+            n = cur
+            while prev[n] is not None:
+                depth += 1
+                n = prev[n][0]
+            if depth >= max_depth:
+                continue
+            for k2, code in out_edges.get(cur, []):
+                if k2 in visited:
+                    continue
+                ks = kinship.get(code)
+                if not ks:
+                    continue
+                if ks["up"] >= 99 or ks["down"] >= 99:
+                    continue
+                if ks["up"] == 0 and ks["down"] == 0 and ks["mar"] == 0 and ks["col"] == 0:
+                    continue
+                visited.add(k2)
+                prev[k2] = (cur, ks["rel"])
+                if k2 == b:
+                    meet = k2
+                    queue.clear()
+                    break
+                queue.append(k2)
+        if not meet:
+            return {"a": a, "b": b, "found": False, "depth_limit": max_depth,
+                    "reason": f"{max_depth} 步内无亲属路径（CBDB 亲属记录不全是已知数据边界）"}
+        chain = []
+        n = b
+        while prev[n] is not None:
+            p, rel = prev[n]
+            chain.append((n, rel))
+            n = p
+        chain.reverse()
+        path_rel = "".join(rel for _, rel in chain)
+        person_ids = [a] + [pid for pid, _ in chain]
+        info = {}
+        conn = cls.get_conn()
+        if conn:
+            cursor = conn.cursor()
+            CHUNK = 500
+            for i in range(0, len(person_ids), CHUNK):
+                chunk = person_ids[i:i + CHUNK]
+                ph = ",".join("?" for _ in chunk)
+                cursor.execute(
+                    f"SELECT c_personid, c_name, c_name_chn, c_surname_chn, c_mingzi_chn "
+                    f"FROM BIOG_MAIN WHERE c_personid IN ({ph})", *chunk)
+                for r in cursor.fetchall():
+                    info[r.c_personid] = r
+            conn.close()
+        persons = []
+        for pid in person_ids:
+            r = info.get(pid)
+            surname = safe_decode(r.c_surname_chn) if r else ""
+            mingzi = safe_decode(r.c_mingzi_chn) if r else ""
+            name_chn = (safe_decode(r.c_name_chn) if r else "") or (surname + mingzi)
+            persons.append({
+                "id": pid,
+                "name_chn": name_chn or f"#{pid}",
+                "name": (r.c_name if r else "") or "",
+            })
+        mo = _mourning_lookup(path_rel, mourning)
+        return {
+            "a": a, "b": b, "found": True, "depth": len(chain),
+            "persons": persons,
+            "rel_chain": _describe_kin_path(path_rel),
+            "rel_symbols": path_rel,
+            "mourning": mo,
+        }
+
+    @classmethod
     def query_persons(cls, filters, limit=300):
         """综合查询（原生 CBDB 查询维度全搬运）：姓名(含别名)/朝代/性别/指数年区间/
         生卒年区间/地址(指数或指定类型：籍贯·祖籍·居址·葬地等)/入仕方式+入仕年/
@@ -2726,6 +2819,26 @@ def cbdb_assoc_between():
     if a == b:
         return jsonify({"error": "双方不能是同一个人"})
     return jsonify(CBDBConnection.assoc_between(int(a), int(b)))
+
+
+@app.route("/api/cbdb/kin/path", methods=["GET"])
+def cbdb_kin_path():
+    """两人最短亲属路径：?a=人物ID&b=人物ID&max_depth=6（上限 10）
+    KIN_DATA 无向 BFS + 链式称谓翻译 + 五服；查无记录属数据边界，忠实呈现"""
+    if not CBDBConnection.is_available():
+        return jsonify({"error": "CBDB 数据库未就绪"})
+    a = request.args.get("a", "").strip()
+    b = request.args.get("b", "").strip()
+    if not a.isdigit() or not b.isdigit():
+        return jsonify({"error": "请提供双方数字 ID"})
+    if a == b:
+        return jsonify({"error": "双方不能是同一人"})
+    try:
+        md = int(request.args.get("max_depth", 6))
+    except ValueError:
+        md = 6
+    md = max(1, min(md, 10))
+    return jsonify(CBDBConnection.kin_path(int(a), int(b), md))
 
 
 @app.route("/api/cbdb/places/<int:addr_id>/assoc", methods=["GET"])

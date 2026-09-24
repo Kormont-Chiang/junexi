@@ -1400,10 +1400,48 @@ async function runPairQuery() {
                 <span class="cbdb-result-meta" style="margin:0">${rels.length} 社会关系 · ${kin.length} 亲属</span>
                 <button class="btn-secondary cbdb-export-btn" onclick="exportCBDBCSV()">⬇ 导出 CSV</button>
             </div>
-            ${body}`;
+            ${body}
+            <div class="cbdb-subhead">亲属路径（BFS）</div>
+            <div id="cbdbKinPathBox">
+                <button class="btn-secondary" onclick="runKinPath(${data.a.id}, ${data.b.id})">🔍 查找最短亲属路径（6 步内）</button>
+                <div id="cbdbKinPathResult" style="margin-top:6px;font-size:13px"></div>
+            </div>`;
         resultsDiv.scrollTop = 0;
     } catch (e) {
         resultsDiv.innerHTML = `<p style="color:var(--danger)">查询失败：${escapeHtml(e.message)}</p>`;
+    }
+}
+
+// 两人最短亲属路径（KIN_DATA BFS）：路径人名链 + 整体称谓 + 五服徽标
+async function runKinPath(aId, bId) {
+    const box = document.getElementById('cbdbKinPathResult');
+    if (!box) return;
+    box.innerHTML = '<div class="loading"></div> 搜索中...';
+    try {
+        const res = await fetch('/api/cbdb/kin/path?a=' + aId + '&b=' + bId);
+        const d = await res.json();
+        if (d.error) { box.innerHTML = '<p style="color:var(--danger)">' + escapeHtml(d.error) + '</p>'; return; }
+        if (!d.found) {
+            box.innerHTML = '<p style="color:var(--text-muted)">' + escapeHtml(d.reason || '未找到路径') + '</p>';
+            return;
+        }
+        const arrow = '<span style="color:var(--text-muted);margin:0 4px">→</span>';
+        const names = (d.persons || []).map(p =>
+            '<span class="cbdb-name" onclick="loadCBDBPersonDetail(' + p.id + ');event.stopPropagation()">' + escapeHtml(p.name_chn) + '</span>'
+        ).join(arrow);
+        const mo = d.mourning || {};
+        const moBadge = mo.mourning
+            ? '<span class="result-card-badge" style="margin-left:6px">' + escapeHtml(mo.mourning) + '</span>'
+            : '';
+        box.innerHTML =
+            '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:2px;line-height:1.9">' + names + moBadge + '</div>'
+            + '<div style="color:var(--text-muted);margin-top:4px">'
+            + escapeHtml(d.rel_chain || '')
+            + ' · ' + d.depth + ' 段关系'
+            + (mo.kintype ? ' · ' + escapeHtml(mo.kintype) : '')
+            + '</div>';
+    } catch (e) {
+        box.innerHTML = '<p style="color:var(--danger)">搜索失败：' + escapeHtml(e.message) + '</p>';
     }
 }
 

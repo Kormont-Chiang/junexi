@@ -2128,11 +2128,17 @@ function renderNetworkPanel(panel, data, centerId, group) {
             <span class="cbdb-net-stat">${group ? '👥 ' + escapeHtml(group.label) + ' · ' : ''}${nodes.length} 节点 · ${edges.length} 边${kinCount ? ` · 亲属 ${kinCount}` : ''}${data.meta && data.meta.kin_expanded ? `（外延 ${data.meta.kin_expanded} 人）` : ''}</span>
         </div>
         <div id="cbdbNetGraph" class="cbdb-net-graph"></div>
+        <div class="cbdb-net-controls" id="cbdbNetTypeFilters" style="flex-wrap:wrap">
+                ${['血亲', '姻亲', '师友学术', '政治行政', '文学创作', '其他交游'].map(t =>
+                    `<label style="white-space:nowrap"><input type="checkbox" data-nettype="${t}" checked onchange="applyNetTypeFilter()"> <i class="dot" style="background:${NET_TYPE_STYLE[t].color};display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:2px"></i>${t}</label>`
+                ).join('')}
+                <span class="cbdb-net-stat" id="cbdbNetFilterStat"></span>
+            </div>
+        </div>
         <div class="cbdb-net-legend">
-            ${group ? '<span><i class="dot" style="background:#c9a44a"></i>群体成员</span>' : '<span><i class="dot" style="background:var(--accent)"></i>中心</span>'}
-            <span><i class="dot" style="background:#5a8ec7"></i>社会关系</span>
-            <span><i class="dot" style="background:#e8912d"></i>亲属</span>
-            <span class="cbdb-net-hint">点节点看详情 · 双击以TA为中心</span>
+            ${group ? '<span><i class="dot" style="background:#7fb069"></i>群组成员</span>' : '<span><i class="dot" style="background:#c9a44a"></i>中心</span>'}
+            <span><i class="dot" style="background:#5a8ec7"></i>关联人物</span>
+            <span class="cbdb-net-hint">滚轮缩放 · 拖拽平移 · 悬停高亮 · 点节点看详情 · 双击以TA为中心</span>
         </div>`;
 
     // 朝代下拉（异步填充，保留选中）
@@ -2144,6 +2150,7 @@ function renderNetworkPanel(panel, data, centerId, group) {
         }
     }).catch(() => {});
 
+    window._cbdbNetData = { nodes, edges, centerId };
     const graph = document.getElementById('cbdbNetGraph');
     if (!graph) return;
     if (nodes.length <= 1) {
@@ -2154,116 +2161,142 @@ function renderNetworkPanel(panel, data, centerId, group) {
 }
 
 // 力导向布局（纯 SVG，无依赖；220 轮同步模拟，≤150 节点瞬时完成）
+// 边关系类型归类（供 drawNetGraph 与筛选复用）
+function netEdgeType(e) {
+    const r = e.relation || '';
+    if (e.kind === 'kin') {
+        if (/妻|夫|婿|媳|岳|舅|姨|嫂|姊夫|妹夫|姻|婦|壻/.test(r)) return '姻亲';
+        return '血亲';
+    }
+    if (/師|门|門|弟子|學|学|生|友|問|问|講|讲|授|同年|座主|從游|过从|過從|書院/.test(r)) return '师友学术';
+    if (/恩主|薦|荐|舉|举|同僚|宰|參|参|黜|贬|貶|劾|使|判|知州|太守|守|尉|丞|郎|御史|宰相|執政|除|拜|迁|遷|罷|免/.test(r)) return '政治行政';
+    if (/詩|诗|文|序|跋|字說|字说|祭|書信|唱和|題|题|賦|赋|銘|铭|記|记|传|傳|論|论/.test(r)) return '文学创作';
+    return '其他交游';
+}
+
+const NET_TYPE_STYLE = {
+    '血亲':     { color: '#e8912d', type: 'solid'  },
+    '姻亲':     { color: '#d4573b', type: 'dashed' },
+    '师友学术': { color: '#5a8ec7', type: 'solid'  },
+    '政治行政': { color: '#8e6cc7', type: 'solid'  },
+    '文学创作': { color: '#5aa877', type: 'solid'  },
+    '其他交游': { color: '#9aa3ad', type: 'dotted' }
+};
+
+// ECharts 力导向图：roam 缩放平移 / 类型着色 / 边标签 / 点击详情
 function drawNetGraph(container, nodes, edges, centerId) {
-    const W = Math.max(320, container.clientWidth || 520);
-    const H = Math.max(360, Math.min(560, W * 0.72));
+    if (typeof echarts === 'undefined') {
+        container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">图表组件未加载（static/js/lib/echarts.min.js 缺失）</div>';
+        return;
+    }
+    if (!nodes || nodes.length <= 1) {
+        container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">暂无关系数据</div>';
+        return;
+    }
+
     const byId = {};
-    nodes.forEach(n => {
-        byId[n.id] = n;
-        n.kinEdge = false;
-        n.deg = 0;
-    });
+    nodes.forEach(n => { byId[n.id] = n; n.deg = 0; });
     edges.forEach(e => {
         const a = byId[e.source], b = byId[e.target];
         if (!a || !b) return;
         a.deg++; b.deg++;
-        if (e.kind === 'kin' && b) b.kinEdge = true;
     });
 
-    // 初始：圆周分布，中心固定
-    nodes.forEach((n, i) => {
-        const a = 2 * Math.PI * i / nodes.length;
-        const R = Math.min(W, H) * 0.36;
-        n.x = W / 2 + Math.cos(a) * R;
-        n.y = H / 2 + Math.sin(a) * R;
+    const chartNodes = nodes.map(n => {
+        const isCenter = n.id === centerId;
+        return {
+            id: String(n.id),
+            name: n.name_chn || n.name || String(n.id),
+            symbolSize: Math.min(10 + (n.deg || 0) * 2.6, 30),
+            category: isCenter ? 0 : (n.member ? 1 : 2),
+            label: { show: isCenter || (n.deg || 0) >= 2 || nodes.length <= 40 },
+            itemStyle: isCenter ? { borderColor: '#c9a44a', borderWidth: 3 } : undefined,
+            _raw: n
+        };
     });
-    if (byId[centerId]) { byId[centerId].x = W / 2; byId[centerId].y = H / 2; }
 
-    const TICKS = 220;
-    for (let t = 0; t < TICKS; t++) {
-        const cool = 1 - t / TICKS;
-        // 斥力（库仑，上限防发散）
-        for (let i = 0; i < nodes.length; i++) {
-            for (let j = i + 1; j < nodes.length; j++) {
-                let dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
-                let d2 = dx * dx + dy * dy;
-                if (d2 < 0.01) { d2 = 0.01; dx = 0.1; dy = 0.1; }
-                const f = Math.min(2200 / d2, 28) * cool;
-                const d = Math.sqrt(d2);
-                const fx = dx / d * f, fy = dy / d * f;
-                nodes[i].x += fx; nodes[i].y += fy;
-                nodes[j].x -= fx; nodes[j].y -= fy;
+    const chartLinks = edges.map(e => {
+        const t = netEdgeType(e);
+        const st = NET_TYPE_STYLE[t];
+        return {
+            source: String(e.source),
+            target: String(e.target),
+            _type: t,
+            label: { show: false, formatter: e.relation || '', fontSize: 10, color: '#c8cdd3' },
+            lineStyle: { color: st.color, type: st.type, width: 1.8, curveness: 0.08, opacity: 1 },
+            emphasis: { label: { show: true } }
+        };
+    });
+
+    if (container._echart) { container._echart.dispose(); container._echart = null; }
+    const chart = echarts.init(container);
+    chart.setOption({
+        animationDuration: 800,
+        tooltip: {
+            backgroundColor: 'rgba(30,32,36,0.94)',
+            borderWidth: 0,
+            textStyle: { color: '#e8e4dc', fontSize: 12 },
+            formatter: p => {
+                if (p.dataType === 'node') {
+                    const n = (p.data && p.data._raw) || {};
+                    const life = (n.birthyear > 0 || n.deathyear > 0)
+                        ? (n.birthyear > 0 ? n.birthyear : '?') + '–' + (n.deathyear > 0 ? n.deathyear : '?') : '生卒不详';
+                    return '<b>' + escapeHtml(p.data.name) + '</b><br>'
+                        + escapeHtml(n.dynasty || '') + ' · ' + life
+                        + '<br>关系数：' + (n.deg || 0)
+                        + '<br><span style="color:#9aa3ad">点击查看详情</span>';
+                }
+                const d = p.data || {};
+                const rel = (d.label && d.label.formatter) || '';
+                return escapeHtml(String(d.source)) + ' — ' + escapeHtml(rel) + ' → ' + escapeHtml(String(d.target));
             }
-        }
-        // 弹簧（邻边吸引，休止长度 90）
-        edges.forEach(e => {
-            const a = byId[e.source], b = byId[e.target];
-            if (!a || !b) return;
-            let dx = b.x - a.x, dy = b.y - a.y;
-            const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
-            const f = (d - 90) * 0.03 * cool;
-            dx = dx / d * f; dy = dy / d * f;
-            a.x += dx; a.y += dy; b.x -= dx; b.y -= dy;
-        });
-        // 向心引力 + 中心钉住 + 边界
-        nodes.forEach(n => {
-            if (n.center) { n.x = W / 2; n.y = H / 2; return; }
-            n.x += (W / 2 - n.x) * 0.012 * cool;
-            n.y += (H / 2 - n.y) * 0.012 * cool;
-            n.x = Math.max(24, Math.min(W - 24, n.x));
-            n.y = Math.max(24, Math.min(H - 24, n.y));
-        });
-    }
-
-    const NS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    svg.setAttribute('width', '100%');
-    svg.setAttribute('height', H);
-
-    edges.forEach(e => {
-        const a = byId[e.source], b = byId[e.target];
-        if (!a || !b) return;
-        const line = document.createElementNS(NS, 'line');
-        line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
-        line.setAttribute('x2', b.x); line.setAttribute('y2', b.y);
-        line.setAttribute('stroke', e.kind === 'kin' ? 'rgba(232,145,45,0.6)' : 'rgba(90,142,199,0.5)');
-        line.setAttribute('stroke-width', e.kind === 'kin' ? 1.6 : 1.1);
-        const title = document.createElementNS(NS, 'title');
-        title.textContent = `${a.name} —${e.relation || '关联'}→ ${b.name}`;
-        line.appendChild(title);
-        svg.appendChild(line);
+        },
+        series: [{
+            type: 'graph',
+            layout: 'force',
+            roam: true,
+            draggable: true,
+            force: { repulsion: 260, edgeLength: [50, 105], gravity: 0.14, friction: 0.3 },
+            categories: [
+                { name: '中心', itemStyle: { color: '#c9a44a' } },
+                { name: '群组成员', itemStyle: { color: '#7fb069' } },
+                { name: '关联人物', itemStyle: { color: '#5a8ec7' } }
+            ],
+            data: chartNodes,
+            links: chartLinks,
+            label: { fontSize: 11, color: '#d6d3cd' },
+            labelLayout: { hideOverlap: true },
+            emphasis: { focus: 'adjacency', lineStyle: { width: 2.5 }, label: { fontWeight: 'bold' } }
+        }]
     });
-
-    const showAllLabels = nodes.length <= 45;
-    nodes.forEach(n => {
-        const g = document.createElementNS(NS, 'g');
-        g.style.cursor = 'pointer';
-        const r = n.center ? 13 : 4.5 + Math.min(n.deg, 8) * 0.9;
-        const c = document.createElementNS(NS, 'circle');
-        c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); c.setAttribute('r', r);
-        c.setAttribute('fill', n.center ? 'var(--accent)' : (n.kinEdge ? '#e8b04d' : '#7fa8d9'));
-        if (n.center) { c.setAttribute('stroke', '#fff'); c.setAttribute('stroke-width', '2.5'); }
-        const title = document.createElementNS(NS, 'title');
-        title.textContent = `${n.name}${n.dynasty ? ' · ' + n.dynasty : ''}${n.center ? '（中心）' : ''}`;
-        c.appendChild(title);
-        g.appendChild(c);
-        if (n.center || n.deg >= 2 || showAllLabels) {
-            const tx = document.createElementNS(NS, 'text');
-            tx.setAttribute('x', n.x + r + 4); tx.setAttribute('y', n.y + 4);
-            tx.setAttribute('font-size', n.center ? 13 : 11);
-            tx.setAttribute('fill', n.center ? 'var(--text)' : 'var(--text-muted)');
-            if (n.center) tx.setAttribute('font-weight', '600');
-            tx.textContent = n.name;
-            g.appendChild(tx);
-        }
-        g.addEventListener('click', () => loadCBDBPersonDetail(n.id));
-        g.addEventListener('dblclick', (ev) => { ev.stopPropagation(); loadCBDBNetwork(n.id); });
-        svg.appendChild(g);
+    chart.on('click', p => {
+        if (p.dataType === 'node' && p.data && p.data.id) loadCBDBPersonDetail(Number(p.data.id));
     });
+    chart.on('dblclick', p => {
+        const nid = p.data && p.data.id ? Number(p.data.id) : null;
+        if (p.dataType === 'node' && nid && nid !== centerId) {
+            loadCBDBNetworkAndShow(nid);
+        }
+    });
+    container._echart = chart;
+}
 
-    container.innerHTML = '';
-    container.appendChild(svg);
+// 关系类型筛选（纯前端过滤边，不重新请求）
+function applyNetTypeFilter() {
+    const box = document.getElementById('cbdbNetTypeFilters');
+    const graph = document.getElementById('cbdbNetGraph');
+    const stash = window._cbdbNetData;
+    if (!box || !graph || !stash) return;
+    const on = new Set();
+    box.querySelectorAll('input[data-nettype]:checked').forEach(i => on.add(i.dataset.nettype));
+    const filtered = stash.edges.filter(e => on.has(netEdgeType(e)));
+    const visible = new Set();
+    filtered.forEach(e => { visible.add(e.source); visible.add(e.target); });
+    visible.add(stash.centerId);
+    const filteredNodes = stash.nodes.filter(n => visible.has(n.id));
+    const stat = document.getElementById('cbdbNetFilterStat');
+    if (stat) stat.textContent = '显示 ' + filtered.length + ' / ' + stash.edges.length + ' 条关系 · ' + filteredNodes.length + ' 人';
+    drawNetGraph(graph, filteredNodes, filtered, stash.centerId);
 }
 
 // ── AI 助手 ────────────────────────────────────────────

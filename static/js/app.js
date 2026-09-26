@@ -986,6 +986,7 @@ function renderCBDBToolbar(count, persons) {
     const scopeBtns = (persons && persons.length)
         ? `<button class="btn-secondary cbdb-export-btn" onclick="cbdbSetScopeFromTable()" title="将勾选行（未勾选时为全部）设为查询范围，综合查询/年份检索自动取交集">🔎 设为查询范围</button>
            <button class="btn-secondary cbdb-export-btn" onclick="cbdbExportGeoJSON()" title="导出这些人物的地址坐标点（GeoJSON），可直接拖入 QGIS">🗺️ GeoJSON</button>
+           <button class="btn-secondary cbdb-export-btn" onclick="cbdbShowOnMap()" title="把这些人物带坐标的地址直接标注到史料地图上联动查看，重复点击以新结果替换旧标注">🧭 在地图查看</button>
            <button class="btn-secondary cbdb-export-btn" onclick="cbdbGroupNetwork()" title="将勾选行（未勾选时为全部）作为群体，查看他们彼此之间的社会关系网络（原生社会关系网络窗体）">🕸️ 群体网络</button>
            <button class="btn-secondary cbdb-export-btn" onclick="cbdbGroupData()" title="将勾选行（未勾选时为全部）生成属性总表（原生按人群查询：入仕/官职/社会区分/著作/亲属/社会关系数）">📊 人群属性</button>` : '';
     const csvBtn = window._cbdbExport
@@ -1179,6 +1180,48 @@ async function cbdbExportGeoJSON() {
         setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
         showToast(`GeoJSON 已导出：${n} 个地址点，可直接拖入 QGIS`, 'success', 4000);
     } catch (e) { showToast('导出失败：' + e.message, 'error'); }
+}
+
+// 地图联动：把当前人物列表的地址坐标直接标注到史料地图（复用 persons/geojson，不入文件）
+async function cbdbShowOnMap() {
+    const persons = window._cbdbLastPersons || [];
+    if (!persons.length) { showToast('当前列表没有人物', 'warning'); return; }
+    showToast('正在获取地址坐标…', 'info', 1500);
+    try {
+        const res = await fetch('/api/cbdb/persons/geojson', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: persons.map(p => p.id) })
+        });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        const feats = data.features || [];
+        if (!feats.length) { showToast('这些人物没有带坐标的地址记录', 'warning', 3500); return; }
+        switchTab('map');
+        setTimeout(() => {
+            try {
+                initMap();
+                if (!chgisMap) { showToast('地图初始化失败', 'error'); return; }
+                if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
+                const markers = feats.map(f => {
+                    const x = f.geometry.coordinates[0], y = f.geometry.coordinates[1];
+                    const p = f.properties || {};
+                    const life = (p.birth || p.death) ? `（${p.birth || '?'}–${p.death || '?'}）` : '';
+                    const yrs = (p.firstyear || p.lastyear) ? `<br>地址年份：${p.firstyear || '?'}–${p.lastyear || '?'}` : '';
+                    return L.circleMarker([y, x], {
+                        radius: 5, color: '#ffb84d', weight: 1.5,
+                        fillColor: '#ff9f1a', fillOpacity: 0.8
+                    }).bindPopup(
+                        `<b>${escapeHtml(p.name)}</b>${escapeHtml(life)}<br>` +
+                        `${escapeHtml(p.dynasty)} · ${escapeHtml(p.addr_type)}：${escapeHtml(p.place)}${yrs}` +
+                        `<br><span style="color:#888;font-size:11px">ID ${p.person_id}</span>`);
+                });
+                window.cbdbPersonLayer = L.layerGroup(markers).addTo(chgisMap);
+                chgisMap.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
+                showToast(`已在地图标注 ${feats.length} 个地址点，点击圆点看详情`, 'success', 4000);
+            } catch (e) { showToast('地图标注失败: ' + e.message, 'error'); }
+        }, 300);
+    } catch (e) { showToast('加载失败: ' + e.message, 'error'); }
 }
 
 function setCBDBExport(filename, headers, rows) {

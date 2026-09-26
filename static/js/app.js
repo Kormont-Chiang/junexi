@@ -786,10 +786,20 @@ function renderCBDBSearchArea(type) {
             <div class="cbdb-adv-form">
                 <div class="cbdb-adv-row"><label>年份</label><input type="number" id="cbdbYearInput" placeholder="公历年份（如 1086）" onkeydown="if(event.key==='Enter')searchCBDB()"></div>
                 <div class="cbdb-adv-row"><label>朝代</label><select id="cbdbDynasty"><option value="">全部朝代</option></select></div>
+                <div class="cbdb-adv-row"><label>入仕</label><input type="text" id="cbdbYearEntry" placeholder="可选：入仕方式（如 进士）" autocomplete="off">
+                    <div class="cbdb-ac" id="cbdbYearEntryList"></div></div>
                 <button class="btn-primary" style="width:100%;margin-top:2px" onclick="searchCBDB()">查询</button>
                 <div class="cbdb-hint">检索该年份在世的人物（按生卒年/活跃期判定）</div>
             </div>`;
         loadCBDBDynasties();
+        window._cbdbYearEntry = null;
+        bindCBDBAutocomplete('cbdbYearEntry', 'cbdbYearEntryList',
+            async q => {
+                const res = await fetch(`/api/cbdb/entries/search?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                return (Array.isArray(data) ? data : []).map(e => ({ id: e.code, label: e.name_chn, sub: e.name_eng }));
+            },
+            it => { window._cbdbYearEntry = it; document.getElementById('cbdbYearEntry').value = it.label; });
     } else if (type === 'pair') {
         // 两人关系（原生 Query Pair-wise Associations）：双向社会关系 + 直系亲属直查
         area.innerHTML = `
@@ -1584,6 +1594,8 @@ async function searchCBDB() {
         } else if (window._cbdbType === 'year') {
             const dy = (document.getElementById('cbdbDynasty') || {}).value || '';
             let url = `/api/cbdb/year/people?year=${encodeURIComponent(q)}${dy ? '&dy=' + encodeURIComponent(dy) : ''}`;
+            const yEntry = window._cbdbYearEntry;
+            if (yEntry && yEntry.id) url += `&entry=${encodeURIComponent(yEntry.id)}`;
             // 三期：查询范围取交集
             if (window._cbdbScope && window._cbdbScope.ids.length) {
                 url += `&ids=${window._cbdbScope.ids.join(',')}`;
@@ -1594,8 +1606,9 @@ async function searchCBDB() {
             const persons = data.persons || [];
             if (!persons.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">该年份未找到在世人物</p>'; return; }
             const scopeNote = (window._cbdbScope && window._cbdbScope.ids.length) ? `（∩ 查询范围 ${window._cbdbScope.ids.length} 人）` : '';
+            const entryNote = data.entry_name ? `（入仕：${escapeHtml(data.entry_name)}）` : '';
             cbdbRenderPersons(resultsDiv, persons, {
-                extraMeta: `<div class="cbdb-result-meta" style="margin-top:4px">数据库共 ${data.total} 人，显示前 ${persons.length} 位（按索引年排序）${scopeNote}</div>`,
+                extraMeta: `<div class="cbdb-result-meta" style="margin-top:4px">${data.year || q} 年在世${entryNote}，数据库共 ${data.total} 人，显示前 ${persons.length} 位（按索引年排序）${scopeNote}</div>`,
                 columns: [
                     { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
                     { label: '朝代', render: p => escapeHtml(p.dynasty) },
@@ -2995,15 +3008,23 @@ const CBDB_AI_PROMPT = `你是六月息（CBDB 中国历代人物传记资料库
    {"tab":"text","params":{"q":"著作关键词"}}
 
 7. year（某年在世的人物）
-   {"tab":"year","params":{"year":数字,"dynasty":"朝代中文名（可省略）"}}
+   {"tab":"year","params":{"year":数字,"dynasty":"朝代中文名（可省略）","entry":"入仕方式关键词（可省略，如 进士）"}}
 
 8. pair（两人关系）
    {"tab":"pair","params":{"a":"人名A","b":"人名B"}}
+
+9. social（某人的社会关系/交游/门生故吏）
+   {"tab":"social","params":{"name":"姓名"}}
+
+10. kin（某人的亲属/家族/五服）
+   {"tab":"kin","params":{"name":"姓名"}}
 
 规则：
 - 只输出 JSON，不要输出任何其他文字
 - 额外可选字段： "action":"detail"（用户想看某人详情/人生轨迹/履历时设置）； "explanation":"一句话向用户解释你的理解"
 - 用户说"XX的人生轨迹""XX的经历""XX在N-M岁"时：tab用person，name填XX，action设detail，其他参数全部留空（详情页会显示完整履历）
+- "XX的社会关系""XX和谁交游""XX的门生"→ tab用social；"XX的亲属""XX的家族""XX的五服"→ tab用kin
+- "Y年在世的XX（入仕方式）"：tab用year，year填Y，entry填入仕方式关键词（如 进士、特奏名、恩荫）
 - 年龄换算：如"苏轼30-40岁"，苏轼生于1036年，30-40岁≈1066-1076，把换算后年份填入index_from/index_to，并在explanation中说明
 - 朝代保留中文名（如"宋""唐""北魏"）
 - 不确定的参数不要猜，只输出有把握的`;
@@ -3056,6 +3077,9 @@ async function cbdbAIAssist() {
 async function cbdbAIExecute(parsed) {
     const tab = parsed.tab || 'person';
     const params = parsed.params || {};
+
+    if (tab === 'social') { await cbdbAIShowSocial(params); return; }
+    if (tab === 'kin') { await cbdbAIShowKin(params); return; }
 
     switchCBDBType(tab);
     await new Promise(function(r) { return setTimeout(r, 500); });
@@ -3122,6 +3146,12 @@ async function cbdbAIFillParams(tab, params) {
     } else if (tab === 'year') {
         setVal('cbdbYearInput', params.year);
         selectDynasty(params.dynasty);
+        if (params.entry) {
+            // 后端支持关键词或代码直传；存进 picker 状态让 searchCBDB 带入请求
+            window._cbdbYearEntry = { id: params.entry, label: params.entry };
+            var yeInput = document.getElementById('cbdbYearEntry');
+            if (yeInput) yeInput.value = params.entry;
+        }
     } else if (tab === 'entry' || tab === 'status' || tab === 'text') {
         setVal('cbdbSearchInput', params.q);
     }
@@ -3156,4 +3186,56 @@ function cbdbAIOpenFirstResult() {
     if (!results) return;
     var firstName = results.querySelector('.cbdb-name');
     if (firstName) firstName.click();
+}
+
+// AI 意图：解析姓名 → 第一人（与 cbdbAIExecutePair 同一策略）
+async function cbdbAIResolveFirstPerson(name) {
+    var res = await fetch('/api/cbdb/search?name=' + encodeURIComponent(name));
+    var data = await res.json();
+    return (Array.isArray(data) && data.length) ? data[0] : null;
+}
+
+// AI 意图 social：某人的社会关系列表（ASSOC_DATA 全类型，直接出关系对表格）
+async function cbdbAIShowSocial(params) {
+    if (!params.name) { showToast('AI 解析缺少人名', 'warning'); return; }
+    var p = await cbdbAIResolveFirstPerson(params.name);
+    if (!p) { showToast('未找到人物：' + params.name, 'warning'); return; }
+    var centerName = p.name_chn || p.name;
+    var detail = document.getElementById('cbdbDetailPanel');
+    if (!detail) return;
+    cbdbPushListView();
+    showCBDBDetailView();
+    window._cbdbListView = { type: 'aiSocial', id: p.id, title: centerName + ' 的社会关系' };
+    window._cbdbExport = null;
+    detail.innerHTML = renderCBDBBackBar(centerName + ' 的社会关系') +
+        '<div class="loading" style="margin:20px auto;display:block"></div>';
+    try {
+        var res = await fetch('/api/cbdb/person/' + p.id + '/assoc');
+        var rels = await res.json();
+        var list = Array.isArray(rels) ? rels : [];
+        var rows = list.map(function(r) {
+            return { a_id: p.id, a_name: centerName, relation: r.relation,
+                     b_id: r.id, b_name: r.name_chn, year: r.year, text: r.text_title };
+        });
+        detail.innerHTML = renderCBDBBackBar(centerName + ' 的社会关系') +
+            '<div class="cbdb-subhead">共 ' + list.length + ' 条关系记录（双击人名看详情；想看亲属请用亲属递归）</div>' +
+            (list.length ? cbdbRelationsTableHTML(rows, list.length)
+                         : '<p style="color:var(--text-muted);padding:12px 0">数据库中未记录此人的社会关系。</p>');
+    } catch (e) {
+        detail.innerHTML = renderCBDBBackBar(centerName + ' 的社会关系') +
+            '<p style="color:var(--danger);">加载失败: ' + escapeHtml(e.message) + '</p>';
+    }
+}
+
+// AI 意图 kin：某人亲属递归（默认五服参数 4/4/3/1 直接出结果）
+async function cbdbAIShowKin(params) {
+    if (!params.name) { showToast('AI 解析缺少人名', 'warning'); return; }
+    var p = await cbdbAIResolveFirstPerson(params.name);
+    if (!p) { showToast('未找到人物：' + params.name, 'warning'); return; }
+    loadKinRecursive(p.id, p.name_chn || p.name);
+    setTimeout(function() {
+        var set = function(id, v) { var el = document.getElementById(id); if (el) el.value = v; };
+        set('kinUp', 4); set('kinDown', 4); set('kinCol', 3); set('kinMar', 1);
+        runKinRecursive(p.id);
+    }, 600);
 }

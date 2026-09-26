@@ -594,6 +594,60 @@ class CBDBConnection:
         } for r in cursor.fetchall()]
 
     @classmethod
+    def resolve_entry_code(cls, keyword):
+        """入仕关键词 → 代码。三级策略（每级含简繁变体）：
+        1. 全名精确匹配；
+        2. 类目段锚定（':' 后段以关键词开头，如'进士'→'科舉: 進士(籠統)'），
+           排序：含'(籠統)'泛称标记者优先，其次描述最短者；
+        3. 普通子串，同序。
+        解析失败返回 None。"""
+        conn = cls.get_conn()
+        if not conn or not keyword:
+            return None
+        cursor = conn.cursor()
+        kw = keyword.strip()
+        variants = name_variants(kw)
+        rank = "IIF(c_entry_desc_chn LIKE '%籠統%', 0, 1), LEN(c_entry_desc_chn) ASC"
+        for v in variants:
+            cursor.execute(
+                "SELECT TOP 1 c_entry_code FROM ENTRY_CODES WHERE c_entry_desc_chn = ?",
+                v)
+            row = cursor.fetchone()
+            if row:
+                return row.c_entry_code
+        for v in variants:
+            cursor.execute(
+                f"SELECT TOP 1 c_entry_code FROM ENTRY_CODES "
+                f"WHERE (c_entry_desc_chn LIKE ? OR c_entry_desc_chn LIKE ?) "
+                f"ORDER BY {rank}",
+                f"%: {v}%", f"%:{v}%")
+            row = cursor.fetchone()
+            if row:
+                return row.c_entry_code
+        for v in variants:
+            cursor.execute(
+                f"SELECT TOP 1 c_entry_code FROM ENTRY_CODES "
+                f"WHERE c_entry_desc_chn LIKE ? ORDER BY {rank}",
+                f"%{v}%")
+            row = cursor.fetchone()
+            if row:
+                return row.c_entry_code
+        return None
+
+    @classmethod
+    def entry_code_name(cls, entry_code):
+        """入仕代码 → 中文名（用于结果回显）。"""
+        conn = cls.get_conn()
+        if not conn or not entry_code:
+            return None
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT c_entry_desc_chn FROM ENTRY_CODES WHERE c_entry_code = ?",
+            int(entry_code))
+        row = cursor.fetchone()
+        return safe_decode(row.c_entry_desc_chn) if row else None
+
+    @classmethod
     def persons_by_entry(cls, entry_code, from_year=None, to_year=None, addr_id=None,
                          use_index=False, limit=300):
         """某入仕方式的人物列表（含入仕年、榜次、科场）；可选入仕年区间/入仕地址过滤。
@@ -1085,10 +1139,11 @@ class CBDBConnection:
                 "persons": [seen_ids[i] for i in order]}
 
     @classmethod
-    def persons_by_year(cls, year, dynasty_code=None, person_ids=None, limit=300):
+    def persons_by_year(cls, year, dynasty_code=None, person_ids=None, entry_code=None, limit=300):
         """年份检索（CBDB 原生）：某年在世的人物。
         在世 = 生卒年夹住 Y，或活跃期（flourished）夹住 Y。
-        person_ids 可选：仅在该人物列表范围内检索（跨查询列表传递）。"""
+        person_ids 可选：仅在该人物列表范围内检索（跨查询列表传递）。
+        entry_code 可选：仅某入仕方式（如进士）的人物，ENTRY_DATA EXISTS 子查询。"""
         conn = cls.get_conn()
         if not conn:
             return {"total": 0, "persons": []}
@@ -1103,6 +1158,10 @@ class CBDBConnection:
         if dynasty_code:
             where += " AND b.c_dy = ?"
             params.append(int(dynasty_code))
+        if entry_code:
+            where += (" AND EXISTS (SELECT 1 FROM ENTRY_DATA e "
+                      "WHERE e.c_personid = b.c_personid AND e.c_entry_code = ?)")
+            params.append(int(entry_code))
         if person_ids is not None:
             where += " AND " + _in_clause("b.c_personid", person_ids, params)
 
@@ -2902,8 +2961,8 @@ def cbdb_group_data():
 
 @app.route("/api/cbdb/year/people", methods=["GET"])
 def cbdb_year_people():
-    """年份检索：?year= 公历年份，?dy= 朝代过滤，&ids= 逗号分隔人物ID列表（范围传递）；
-    返回 {total, persons}"""
+    """年份检索：?year= 公历年份，?dy= 朝代过滤，&ids= 逗号分隔人物ID列表（范围传递），
+    &entry= 入仕方式（关键词或代码，如 进士）；返回 {total, persons}，带 entry 元数据回显"""
     if not CBDBConnection.is_available():
         return jsonify({"error": "CBDB 本地数据库未连接"})
     year = request.args.get("year", "").strip()
@@ -2917,7 +2976,21 @@ def cbdb_year_people():
             pids = [int(i) for i in raw_ids.split(",") if i.strip().lstrip("-").isdigit()][:5000]
         except ValueError:
             pids = None
-    return jsonify(CBDBConnection.persons_by_year(int(year), dynasty_code=dy, person_ids=pids))
+    entry_code = None
+    entry_raw = request.args.get("entry", "").strip()
+    if entry_raw:
+        if entry_raw.lstrip("-").isdigit():
+            entry_code = int(entry_raw)
+        else:
+            entry_code = CBDBConnection.resolve_entry_code(entry_raw)
+            if entry_code is None:
+                return jsonify({"error": f"未找到入仕方式：{entry_raw}"})
+    result = CBDBConnection.persons_by_year(
+        int(year), dynasty_code=dy, person_ids=pids, entry_code=entry_code)
+    if entry_code:
+        result["entry_code"] = entry_code
+        result["entry_name"] = CBDBConnection.entry_code_name(entry_code)
+    return jsonify(result)
 
 
 @app.route("/api/cbdb/persons/geojson", methods=["POST"])

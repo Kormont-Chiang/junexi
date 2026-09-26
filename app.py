@@ -2678,6 +2678,20 @@ def cbdb_entry_search():
         return jsonify({"error": "请输入入仕方式"})
     return jsonify(CBDBConnection.search_entry_types(q))
 
+@app.route("/api/cbdb/entries/resolve", methods=["GET"])
+def cbdb_entry_resolve():
+    """入仕关键词 → 代码（复用三级解析器）：?q=关键词或代码 → {code, name}。AI 意图/快捷入口用。"""
+    if not CBDBConnection.is_available():
+        return jsonify({"error": "CBDB 本地数据库未连接"})
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"error": "请输入入仕方式"})
+    code = int(q) if q.lstrip("-").isdigit() else CBDBConnection.resolve_entry_code(q)
+    if code is None:
+        return jsonify({"error": f"未找到入仕方式：{q}"})
+    return jsonify({"code": code, "name": CBDBConnection.entry_code_name(code)})
+
+
 @app.route("/api/cbdb/entries/<int:entry_code>/persons", methods=["GET"])
 def cbdb_entry_persons(entry_code):
     """某入仕方式的人物列表；?from_year=&to_year= 入仕年区间，?addr_id= 入仕地址"""

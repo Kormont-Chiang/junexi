@@ -3019,12 +3019,25 @@ const CBDB_AI_PROMPT = `你是六月息（CBDB 中国历代人物传记资料库
 10. kin（某人的亲属/家族/五服）
    {"tab":"kin","params":{"name":"姓名"}}
 
+11. entry_range（某年号/时期通过某方式入仕的人物）
+   {"tab":"entry_range","params":{"entry":"入仕关键词","from_year":起始年,"to_year":结束年}}
+   用于"XX年间通过YY入仕/做官/中举/及第"。入仕年份必须落在 [from_year, to_year]。
+
+常用年号起止年（换算后填入 from_year/to_year）：
+乾隆1736-1795 雍正1723-1735 康熙1662-1722 嘉庆1796-1820 道光1821-1850 咸丰1851-1861 同治1862-1874 光绪1875-1908
+洪武1368-1398 永乐1403-1424 嘉靖1522-1566 万历1573-1620
+太平兴国976-984 景德1004-1007 天圣1023-1032 熙宁1068-1077 元祐1086-1094 政和1111-1118 绍兴1131-1162 嘉定1208-1224
+贞观627-649 开元713-741 天宝742-756
+太和477-499 正始504-508（北魏）
+表中查不到的年号按你所知换算；确实不知道就不猜，在 explanation 里向用户说明。
+
 规则：
 - 只输出 JSON，不要输出任何其他文字
 - 额外可选字段： "action":"detail"（用户想看某人详情/人生轨迹/履历时设置）； "explanation":"一句话向用户解释你的理解"
 - 用户说"XX的人生轨迹""XX的经历""XX在N-M岁"时：tab用person，name填XX，action设detail，其他参数全部留空（详情页会显示完整履历）
 - "XX的社会关系""XX和谁交游""XX的门生"→ tab用social；"XX的亲属""XX的家族""XX的五服"→ tab用kin
-- "Y年在世的XX（入仕方式）"：tab用year，year填Y，entry填入仕方式关键词（如 进士、特奏名、恩荫）
+- "Y年在世的XX（入仕方式）"（Y是具体数字年份）→ tab用year，year填Y，entry填入仕方式关键词
+- 年号/某年间 + 入仕（如"乾隆年间通过武举做官"）→ tab用entry_range，entry填入仕关键词，from_year/to_year填该年号起止。**严禁取"代表年份"**（如"取乾隆中期1750年"）——year 检索只是"某一年在世"，既不等于入仕时间更不是区间，是错误逻辑
 - 年龄换算：如"苏轼30-40岁"，苏轼生于1036年，30-40岁≈1066-1076，把换算后年份填入index_from/index_to，并在explanation中说明
 - 朝代保留中文名（如"宋""唐""北魏"）
 - 不确定的参数不要猜，只输出有把握的`;
@@ -3080,6 +3093,7 @@ async function cbdbAIExecute(parsed) {
 
     if (tab === 'social') { await cbdbAIShowSocial(params); return; }
     if (tab === 'kin') { await cbdbAIShowKin(params); return; }
+    if (tab === 'entry_range') { await cbdbAIShowEntryRange(params); return; }
 
     switchCBDBType(tab);
     await new Promise(function(r) { return setTimeout(r, 500); });
@@ -3238,4 +3252,18 @@ async function cbdbAIShowKin(params) {
         set('kinUp', 4); set('kinDown', 4); set('kinCol', 3); set('kinMar', 1);
         runKinRecursive(p.id);
     }, 600);
+}
+
+// AI 意图 entry_range：某年号/时期通过某方式入仕的人物（入仕年须落在区间，
+// 取"代表年份"再叠加 year 检索是错误逻辑——那查的是"某一年在世"）
+async function cbdbAIShowEntryRange(params) {
+    if (!params.entry) { showToast('AI 解析缺少入仕方式', 'warning'); return; }
+    if (!params.from_year || !params.to_year) { showToast('AI 解析缺少起止年份', 'warning'); return; }
+    var res = await fetch('/api/cbdb/entries/resolve?q=' + encodeURIComponent(params.entry));
+    var info = await res.json();
+    if (info.error) { showToast(info.error, 'warning'); return; }
+    switchCBDBType('entry');
+    var title = info.name + '（' + params.from_year + '–' + params.to_year + '）';
+    // use_index：入仕年多未标（c_year=0），用索引年兜底——否则无年份记录会漏进其他朝代
+    loadEntryPersons(info.code, title, { from: params.from_year, to: params.to_year, useIndex: true });
 }

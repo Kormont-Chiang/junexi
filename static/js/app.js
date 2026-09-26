@@ -2968,3 +2968,192 @@ document.addEventListener('DOMContentLoaded', () => {
     // 加载仪表盘
     loadDashboard();
 });
+
+
+// ===== CBDB AI 自然语言检索 =====
+
+const CBDB_AI_PROMPT = `你是六月息（CBDB 中国历代人物传记资料库）的检索助手。用户用自然语言描述查询需求，你输出一个 JSON 对象指定检索参数。
+
+可用检索类型及参数：
+
+1. person（人名搜索）
+   {"tab":"person","params":{"name":"姓名","dynasty":"朝代中文名","gender":"0"或"1","birth_from":数字,"birth_to":数字,"death_from":数字,"death_to":数字,"index_from":数字,"index_to":数字}}
+
+2. office（官名搜索）
+   {"tab":"office","params":{"q":"官名关键词","category":"门类（可省略）"}}
+
+3. place（地名搜索）
+   {"tab":"place","params":{"q":"地名","admin_type":"府/州/县/路/省/道/军/郡（可省略）","from_year":数字,"to_year":数字}}
+
+4. entry（入仕方式）
+   {"tab":"entry","params":{"q":"入仕方式关键词"}}
+
+5. status（社会区分）
+   {"tab":"status","params":{"q":"社会区分关键词"}}
+
+6. text（著作检索）
+   {"tab":"text","params":{"q":"著作关键词"}}
+
+7. year（某年在世的人物）
+   {"tab":"year","params":{"year":数字,"dynasty":"朝代中文名（可省略）"}}
+
+8. pair（两人关系）
+   {"tab":"pair","params":{"a":"人名A","b":"人名B"}}
+
+规则：
+- 只输出 JSON，不要输出任何其他文字
+- 额外可选字段： "action":"detail"（用户想看某人详情/人生轨迹/履历时设置）； "explanation":"一句话向用户解释你的理解"
+- 用户说"XX的人生轨迹""XX的经历""XX在N-M岁"时：tab用person，name填XX，action设detail，其他参数全部留空（详情页会显示完整履历）
+- 年龄换算：如"苏轼30-40岁"，苏轼生于1036年，30-40岁≈1066-1076，把换算后年份填入index_from/index_to，并在explanation中说明
+- 朝代保留中文名（如"宋""唐""北魏"）
+- 不确定的参数不要猜，只输出有把握的`;
+
+async function cbdbAIAssist() {
+    const input = document.getElementById('cbdbAIInput');
+    const statusEl = document.getElementById('cbdbAIStatus');
+    const q = input ? input.value.trim() : '';
+    if (!q) return;
+
+    if (statusEl) statusEl.innerHTML = '<span class="cbdb-ai-thinking">&#x1F914; 正在理解你的问题…</span>';
+
+    try {
+        const res = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: [
+                    { role: 'system', content: CBDB_AI_PROMPT },
+                    { role: 'user', content: q }
+                ]
+            })
+        });
+        const data = await res.json();
+        const text = data.response || (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">AI 未能理解这个问题，请换个方式描述</span>';
+            return;
+        }
+
+        let parsed;
+        try { parsed = JSON.parse(jsonMatch[0]); } catch (e) {
+            if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">解析失败，请重试</span>';
+            return;
+        }
+
+        if (statusEl) {
+            const exp = parsed.explanation ? '：' + escapeHtml(parsed.explanation) : '';
+            statusEl.innerHTML = '<span class="cbdb-ai-ok">&#x2713;' + exp + '</span>';
+        }
+
+        await cbdbAIExecute(parsed);
+    } catch (e) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:var(--danger)">请求失败: ' + escapeHtml(e.message) + '</span>';
+    }
+}
+
+async function cbdbAIExecute(parsed) {
+    const tab = parsed.tab || 'person';
+    const params = parsed.params || {};
+
+    switchCBDBType(tab);
+    await new Promise(function(r) { return setTimeout(r, 500); });
+
+    if (tab === 'pair') { await cbdbAIExecutePair(params); return; }
+
+    if (parsed.action === 'detail') {
+        // Detail mode: search by name only, auto-open first result
+        var nameParams = { name: params.name, dynasty: params.dynasty };
+        await cbdbAIFillParams(tab, nameParams);
+        searchCBDB();
+        setTimeout(function() { cbdbAIOpenFirstResult(); }, 3000);
+    } else {
+        await cbdbAIFillParams(tab, params);
+        searchCBDB();
+    }
+}
+
+async function cbdbAIFillParams(tab, params) {
+    function setVal(id, val) {
+        var el = document.getElementById(id);
+        if (el && val !== undefined && val !== null && val !== '') el.value = String(val);
+    }
+    function selectDynasty(dynastyName) {
+        if (!dynastyName) return;
+        setTimeout(function() {
+            var sel = document.getElementById('cbdbDynasty');
+            if (!sel) return;
+            for (var i = 0; i < sel.options.length; i++) {
+                var opt = sel.options[i];
+                if (opt.textContent.trim() === dynastyName.trim() || opt.textContent.indexOf(dynastyName) !== -1) {
+                    sel.value = opt.value;
+                    break;
+                }
+            }
+        }, 600);
+    }
+
+    if (tab === 'person') {
+        setVal('cbdbSearchInput', params.name);
+        setVal('cbdbGender', params.gender);
+        setVal('cbdbBirthFrom', params.birth_from);
+        setVal('cbdbBirthTo', params.birth_to);
+        setVal('cbdbDeathFrom', params.death_from);
+        setVal('cbdbDeathTo', params.death_to);
+        setVal('cbdbIndexFrom', params.index_from);
+        setVal('cbdbIndexTo', params.index_to);
+        selectDynasty(params.dynasty);
+    } else if (tab === 'office') {
+        setVal('cbdbSearchInput', params.q);
+        setVal('cbdbOfficeCat', params.category);
+    } else if (tab === 'place') {
+        setVal('cbdbSearchInput', params.q);
+        setVal('cbdbPlaceFrom', params.from_year);
+        setVal('cbdbPlaceTo', params.to_year);
+        if (params.admin_type) {
+            var sel = document.getElementById('cbdbAdminType');
+            if (sel) {
+                for (var i = 0; i < sel.options.length; i++) {
+                    if (sel.options[i].textContent.indexOf(params.admin_type) !== -1) { sel.value = sel.options[i].value; break; }
+                }
+            }
+        }
+    } else if (tab === 'year') {
+        setVal('cbdbYearInput', params.year);
+        selectDynasty(params.dynasty);
+    } else if (tab === 'entry' || tab === 'status' || tab === 'text') {
+        setVal('cbdbSearchInput', params.q);
+    }
+}
+
+async function cbdbAIExecutePair(params) {
+    if (!params.a || !params.b) { showToast('AI 解析缺少人名', 'warning'); return; }
+
+    async function searchPerson(name) {
+        var res = await fetch('/api/cbdb/search?name=' + encodeURIComponent(name));
+        var data = await res.json();
+        return (Array.isArray(data) && data.length) ? data[0] : null;
+    }
+
+    try {
+        var results = await Promise.all([searchPerson(params.a), searchPerson(params.b)]);
+        var pa = results[0], pb = results[1];
+        if (!pa || !pb) { showToast('未找到对应人物，请手动输入', 'warning'); return; }
+
+        window._cbdbPairState = { a: { id: pa.id, label: pa.name_chn || pa.name }, b: { id: pb.id, label: pb.name_chn || pb.name } };
+        document.getElementById('cbdbPairA').value = pa.name_chn || pa.name;
+        document.getElementById('cbdbPairB').value = pb.name_chn || pb.name;
+
+        runPairQuery();
+    } catch (e) {
+        showToast('人物查找失败: ' + e.message, 'error');
+    }
+}
+
+function cbdbAIOpenFirstResult() {
+    var results = document.getElementById('cbdbResults');
+    if (!results) return;
+    var firstName = results.querySelector('.cbdb-name');
+    if (firstName) firstName.click();
+}

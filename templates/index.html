@@ -7,7 +7,7 @@
     <link rel="icon" href="/static/favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=13">
+    <link rel="stylesheet" href="/static/css/style.css?v=16">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
@@ -766,6 +766,17 @@
                         <button class="cbdb-type-tab" data-type="adv" onclick="switchCBDBType('adv')">综合</button>
                     </div>
                     <div id="cbdbSearchArea"></div>
+
+                    <!-- AI natural-language search -->
+                    <div class="cbdb-ai-box">
+                        <div class="cbdb-ai-input-row">
+                            <span class="cbdb-ai-icon">&#x1F916;</span>
+                            <input type="text" id="cbdbAIInput" placeholder="&#x81EA;&#x7136;&#x8BED;&#x8A00;&#x68C0;&#x7D22;&#xFF0C;&#x5982;&#xFF1A;&#x82CF;&#x8F7C;&#x5728;30-40&#x5C81;&#x65F6;&#x7684;&#x4EBA;&#x751F;&#x8F68;&#x8FF9;" onkeydown="if(event.key==='Enter')cbdbAIAssist()">
+                            <button class="btn-primary cbdb-ai-btn" onclick="cbdbAIAssist()">AI &#x68C0;&#x7D22;</button>
+                        </div>
+                        <div id="cbdbAIStatus" class="cbdb-ai-status"></div>
+                    </div>
+                    
                     <div id="cbdbResults"></div>
                 </div>
                 <div class="panel main-area">
@@ -808,15 +819,15 @@
         </div>
     </main>
 
-    <script src="/static/js/data/era-names.js?v=13"></script>
-    <script src="/static/js/data/officials.js?v=13"></script>
-    <script src="/static/js/data/places.js?v=13"></script>
-    <script src="/static/js/data/taboo.js?v=13"></script>
-    <script src="/static/js/data/phonology.js?v=13"></script>
-    <script src="/static/js/data/versions.js?v=13"></script>
-    <script src="/static/js/data/chgis/chgis-data.js?v=13"></script>
+    <script src="/static/js/data/era-names.js?v=16"></script>
+    <script src="/static/js/data/officials.js?v=16"></script>
+    <script src="/static/js/data/places.js?v=16"></script>
+    <script src="/static/js/data/taboo.js?v=16"></script>
+    <script src="/static/js/data/phonology.js?v=16"></script>
+    <script src="/static/js/data/versions.js?v=16"></script>
+    <script src="/static/js/data/chgis/chgis-data.js?v=16"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="/static/js/lib/echarts.min.js?v=13"></script>
-    <script src="/static/js/app.js?v=13"></script>
+    <script src="/static/js/lib/echarts.min.js?v=16"></script>
+    <script src="/static/js/app.js?v=16"></script>
 </body>
 </html>

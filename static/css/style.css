@@ -1329,3 +1329,48 @@ body {
     #cbdbSearchArea { resize: none; max-height: none; overflow: visible; }
     #cbdbResults { overflow: visible; }
 }
+
+
+/* CBDB AI natural-language search */
+.cbdb-ai-box {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color);
+}
+.cbdb-ai-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.cbdb-ai-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.cbdb-ai-input-row input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 14px;
+}
+.cbdb-ai-input-row input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.cbdb-ai-btn {
+    flex-shrink: 0;
+    padding: 8px 16px;
+    font-size: 13px;
+}
+.cbdb-ai-status {
+    margin-top: 6px;
+    font-size: 12px;
+    min-height: 18px;
+}
+.cbdb-ai-thinking {
+    color: var(--text-muted);
+}
+.cbdb-ai-ok {
+    color: var(--success);
+}

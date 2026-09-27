@@ -2175,26 +2175,30 @@ function renderNetworkPanel(panel, data, centerId, group) {
     const kinCount = edges.filter(e => e.kind === 'kin').length;
     const refetch = group ? 'loadCBDBGroupNetwork()' : `loadCBDBNetwork(${centerId})`;
 
+    const typeCounts = {};
+    edges.forEach(e => { const t = netEdgeType(e); typeCounts[t] = (typeCounts[t] || 0) + 1; });
+
     panel.innerHTML = `
         <div class="cbdb-net-controls">
-            <label><input type="checkbox" ${_cbdbNetState.includeKin ? 'checked' : ''} onchange="_cbdbNetState.includeKin=this.checked;${refetch}"> 混入亲属</label>
+            <label class="cbdb-net-check"><input type="checkbox" ${_cbdbNetState.includeKin ? 'checked' : ''} onchange="_cbdbNetState.includeKin=this.checked;${refetch}"> 混入亲属</label>
             <select id="cbdbNetDy" onchange="_cbdbNetState.dy=this.value;${refetch}">
                 <option value="">全部朝代</option>
             </select>
             <span class="cbdb-net-stat">${group ? '👥 ' + escapeHtml(group.label) + ' · ' : ''}${nodes.length} 节点 · ${edges.length} 边${kinCount ? ` · 亲属 ${kinCount}` : ''}${data.meta && data.meta.kin_expanded ? `（外延 ${data.meta.kin_expanded} 人）` : ''}</span>
         </div>
-        <div id="cbdbNetGraph" class="cbdb-net-graph"></div>
-        <div class="cbdb-net-controls" id="cbdbNetTypeFilters" style="flex-wrap:wrap">
-                ${['血亲', '姻亲', '师友学术', '政治行政', '文学创作', '其他交游'].map(t =>
-                    `<label style="white-space:nowrap"><input type="checkbox" data-nettype="${t}" checked onchange="applyNetTypeFilter()"> <i class="dot" style="background:${NET_TYPE_STYLE[t].color};display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:2px"></i>${t}</label>`
-                ).join('')}
-                <span class="cbdb-net-stat" id="cbdbNetFilterStat"></span>
-            </div>
+        <div class="cbdb-net-graph-wrap">
+            <div id="cbdbNetGraph" class="cbdb-net-graph"></div>
+            <div class="cbdb-net-hint-overlay">滚轮缩放 · 拖拽平移 · 点节点看详情 · 双击以 TA 为中心</div>
+        </div>
+        <div class="net-chips" id="cbdbNetTypeFilters">
+            ${Object.keys(NET_TYPE_STYLE).map(t =>
+                `<button class="net-chip on" data-nettype="${t}" onclick="toggleNetType(this)"><i style="background:${NET_TYPE_STYLE[t].color}"></i>${t}<b>${typeCounts[t] || 0}</b></button>`
+            ).join('')}
+            <span class="cbdb-net-stat" id="cbdbNetFilterStat"></span>
         </div>
         <div class="cbdb-net-legend">
-            ${group ? '<span><i class="dot" style="background:#7fb069"></i>群组成员</span>' : '<span><i class="dot" style="background:#c9a44a"></i>中心</span>'}
-            <span><i class="dot" style="background:#5a8ec7"></i>关联人物</span>
-            <span class="cbdb-net-hint">滚轮缩放 · 拖拽平移 · 悬停高亮 · 点节点看详情 · 双击以TA为中心</span>
+            ${group ? '<span><i class="dot" style="background:#7fb069"></i>群组成员</span>' : '<span><i class="dot" style="background:#d4af6e"></i>中心</span>'}
+            <span><i class="dot" style="background:#6f87a8"></i>关联人物</span>
         </div>`;
 
     // 朝代下拉（异步填充，保留选中）
@@ -2231,12 +2235,12 @@ function netEdgeType(e) {
 }
 
 const NET_TYPE_STYLE = {
-    '血亲':     { color: '#e8912d', type: 'solid'  },
-    '姻亲':     { color: '#d4573b', type: 'dashed' },
-    '师友学术': { color: '#5a8ec7', type: 'solid'  },
-    '政治行政': { color: '#8e6cc7', type: 'solid'  },
-    '文学创作': { color: '#5aa877', type: 'solid'  },
-    '其他交游': { color: '#9aa3ad', type: 'dotted' }
+    '血亲':     { color: '#e2725b', type: 'solid',  width: 2.2 },
+    '姻亲':     { color: '#c97b8e', type: 'dashed', width: 1.8 },
+    '师友学术': { color: '#6a9bd0', type: 'solid',  width: 1.7 },
+    '政治行政': { color: '#9a82d4', type: 'solid',  width: 1.7 },
+    '文学创作': { color: '#6faa84', type: 'solid',  width: 1.6 },
+    '其他交游': { color: '#8a93a0', type: 'solid',  width: 1.1 }
 };
 
 // ECharts 力导向图：roam 缩放平移 / 类型着色 / 边标签 / 点击详情
@@ -2258,29 +2262,59 @@ function drawNetGraph(container, nodes, edges, centerId) {
         a.deg++; b.deg++;
     });
 
-    const chartNodes = nodes.map(n => {
-        const isCenter = n.id === centerId;
+    const n = nodes.length;
+    const repulsion = Math.round(Math.min(Math.max(n * 9, 320), 1400));
+    const edgeLength = n > 90 ? [70, 190] : n > 45 ? [60, 150] : [50, 115];
+    const gravity = n > 90 ? 0.05 : 0.1;
+    const showLabels = n <= 60;
+    const NAME_FONT = '"KaiTi","STKaiti","FZKaiS","STSong","SimSun",serif';
+
+    const chartNodes = nodes.map(nd => {
+        const isCenter = nd.id === centerId;
         return {
-            id: String(n.id),
-            name: n.name_chn || n.name || String(n.id),
-            symbolSize: Math.min(10 + (n.deg || 0) * 2.6, 30),
-            category: isCenter ? 0 : (n.member ? 1 : 2),
-            label: { show: isCenter || (n.deg || 0) >= 2 || nodes.length <= 40 },
-            itemStyle: isCenter ? { borderColor: '#c9a44a', borderWidth: 3 } : undefined,
-            _raw: n
+            id: String(nd.id),
+            name: nd.name_chn || nd.name || String(nd.id),
+            symbolSize: isCenter ? 30 : Math.min(9 + (nd.deg || 0) * 1.6, 24),
+            category: isCenter ? 0 : (nd.member ? 1 : 2),
+            label: {
+                show: isCenter || (showLabels && (nd.deg || 0) >= 2) || n <= 26,
+                fontSize: isCenter ? 14 : 12,
+                fontWeight: isCenter ? 'bold' : 'normal',
+                color: isCenter ? '#ecd9a8' : '#d9d4c8'
+            },
+            itemStyle: isCenter
+                ? { borderColor: 'rgba(255,244,214,0.9)', borderWidth: 2, shadowBlur: 22, shadowColor: 'rgba(212,175,110,0.6)' }
+                : { borderColor: 'rgba(240,238,230,0.28)', borderWidth: 1, shadowBlur: Math.min(4 + (nd.deg || 0) * 1.5, 12), shadowColor: 'rgba(160,190,230,0.28)' },
+            _raw: nd
         };
     });
 
-    const chartLinks = edges.map(e => {
+    const chartLinks = edges.map((e, i) => {
         const t = netEdgeType(e);
         const st = NET_TYPE_STYLE[t];
         return {
             source: String(e.source),
             target: String(e.target),
             _type: t,
-            label: { show: false, formatter: e.relation || '', fontSize: 10, color: '#c8cdd3' },
-            lineStyle: { color: st.color, type: st.type, width: 1.8, curveness: 0.08, opacity: 1 },
-            emphasis: { label: { show: true } }
+            label: {
+                show: false,
+                formatter: e.relation || '',
+                fontSize: 11,
+                color: '#e8e2d4',
+                backgroundColor: 'rgba(14,15,20,0.88)',
+                borderColor: st.color + '66',
+                borderWidth: 1,
+                borderRadius: 4,
+                padding: [2, 5]
+            },
+            lineStyle: {
+                color: st.color,
+                type: st.type,
+                width: st.width,
+                curveness: (i % 2 ? -1 : 1) * 0.05,
+                opacity: 0.5
+            },
+            emphasis: { label: { show: true }, lineStyle: { opacity: 0.95, width: st.width + 1 } }
         };
     });
 
@@ -2288,23 +2322,31 @@ function drawNetGraph(container, nodes, edges, centerId) {
     const chart = echarts.init(container);
     chart.setOption({
         animationDuration: 800,
+        animationDurationUpdate: 300,
+        backgroundColor: 'transparent',
         tooltip: {
-            backgroundColor: 'rgba(30,32,36,0.94)',
-            borderWidth: 0,
+            backgroundColor: 'rgba(22,23,29,0.96)',
+            borderWidth: 1,
+            borderColor: 'rgba(201,169,110,0.25)',
             textStyle: { color: '#e8e4dc', fontSize: 12 },
             formatter: p => {
                 if (p.dataType === 'node') {
-                    const n = (p.data && p.data._raw) || {};
-                    const life = (n.birthyear > 0 || n.deathyear > 0)
-                        ? (n.birthyear > 0 ? n.birthyear : '?') + '–' + (n.deathyear > 0 ? n.deathyear : '?') : '生卒不详';
-                    return '<b>' + escapeHtml(p.data.name) + '</b><br>'
-                        + escapeHtml(n.dynasty || '') + ' · ' + life
-                        + '<br>关系数：' + (n.deg || 0)
-                        + '<br><span style="color:#9aa3ad">点击查看详情</span>';
+                    const raw = (p.data && p.data._raw) || {};
+                    const life = (raw.birthyear > 0 || raw.deathyear > 0)
+                        ? (raw.birthyear > 0 ? raw.birthyear : '?') + '–' + (raw.deathyear > 0 ? raw.deathyear : '?') : '生卒不详';
+                    return '<div style="font-family:' + NAME_FONT + ';font-size:15px;color:#ecd9a8;margin-bottom:2px">' + escapeHtml(p.data.name) + '</div>'
+                        + '<span style="color:#a0a0b0">' + escapeHtml(raw.dynasty || '') + ' · ' + life + ' · 关系数 ' + (raw.deg || 0) + '</span>'
+                        + '<br><span style="color:#6b6b7b;font-size:11px">单击看详情 · 双击以 TA 为中心</span>';
                 }
                 const d = p.data || {};
                 const rel = (d.label && d.label.formatter) || '';
-                return escapeHtml(String(d.source)) + ' — ' + escapeHtml(rel) + ' → ' + escapeHtml(String(d.target));
+                const sa = byId[d.source], tb = byId[d.target];
+                const sn = sa ? (sa.name_chn || sa.name) : d.source;
+                const tn = tb ? (tb.name_chn || tb.name) : d.target;
+                const st = NET_TYPE_STYLE[d._type] || NET_TYPE_STYLE['其他交游'];
+                return '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + st.color + ';margin-right:6px"></span>'
+                    + '<b style="color:#e8e4dc">' + escapeHtml(d._type) + '</b><br>'
+                    + escapeHtml(String(sn)) + ' — ' + escapeHtml(rel) + ' → ' + escapeHtml(String(tn));
             }
         },
         series: [{
@@ -2312,17 +2354,23 @@ function drawNetGraph(container, nodes, edges, centerId) {
             layout: 'force',
             roam: true,
             draggable: true,
-            force: { repulsion: 260, edgeLength: [50, 105], gravity: 0.14, friction: 0.3 },
+            zoom: initZoom,
+            center: ['50%', '47%'],
+            force: { repulsion: repulsion, edgeLength: edgeLength, gravity: gravity, friction: 0.25 },
             categories: [
-                { name: '中心', itemStyle: { color: '#c9a44a' } },
+                { name: '中心', itemStyle: { color: '#d4af6e' } },
                 { name: '群组成员', itemStyle: { color: '#7fb069' } },
-                { name: '关联人物', itemStyle: { color: '#5a8ec7' } }
+                { name: '关联人物', itemStyle: { color: '#6f87a8' } }
             ],
             data: chartNodes,
             links: chartLinks,
-            label: { fontSize: 11, color: '#d6d3cd' },
+            label: {
+                fontFamily: NAME_FONT,
+                textBorderColor: 'rgba(8,9,12,0.85)',
+                textBorderWidth: 3
+            },
             labelLayout: { hideOverlap: true },
-            emphasis: { focus: 'adjacency', lineStyle: { width: 2.5 }, label: { fontWeight: 'bold' } }
+            emphasis: { focus: 'adjacency', lineStyle: { width: 2.6 }, label: { fontWeight: 'bold' } }
         }]
     });
     chart.on('click', p => {
@@ -2337,14 +2385,19 @@ function drawNetGraph(container, nodes, edges, centerId) {
     container._echart = chart;
 }
 
-// 关系类型筛选（纯前端过滤边，不重新请求）
+// 关系类型筛选（纯前端过滤边，不重新请求；图例胶囊即开关）
+function toggleNetType(chip) {
+    chip.classList.toggle('on');
+    applyNetTypeFilter();
+}
+
 function applyNetTypeFilter() {
     const box = document.getElementById('cbdbNetTypeFilters');
     const graph = document.getElementById('cbdbNetGraph');
     const stash = window._cbdbNetData;
     if (!box || !graph || !stash) return;
     const on = new Set();
-    box.querySelectorAll('input[data-nettype]:checked').forEach(i => on.add(i.dataset.nettype));
+    box.querySelectorAll('.net-chip.on').forEach(i => on.add(i.dataset.nettype));
     const filtered = stash.edges.filter(e => on.has(netEdgeType(e)));
     const visible = new Set();
     filtered.forEach(e => { visible.add(e.source); visible.add(e.target); });

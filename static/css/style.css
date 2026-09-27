@@ -1285,14 +1285,26 @@ body {
 .cbdb-table th.cbdb-chk, .cbdb-table td.cbdb-chk { padding: 6px 2px; }
 .cbdb-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
 .cbdb-export-btn { padding: 4px 10px; font-size: 12px; }
-.cbdb-net-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 0 10px; font-size: 13px; }
-.cbdb-net-controls select { max-width: 110px; padding: 4px 6px; font-size: 12px; }
+.cbdb-net-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 4px 0 10px; font-size: 13px; }
+.cbdb-net-controls select { max-width: 120px; padding: 4px 8px; font-size: 12px; background: #17171d; color: #d8d2c4; border: 1px solid #2e2e3a; border-radius: 6px; outline: none; cursor: pointer; }
+.cbdb-net-controls select:focus { border-color: var(--accent-dim); }
+.cbdb-net-check { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); cursor: pointer; user-select: none; }
+.cbdb-net-check input { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; margin: 0; }
 .cbdb-net-stat { color: var(--text-muted); font-size: 12px; margin-left: auto; }
-.cbdb-net-graph { background: rgba(0,0,0,0.18); border-radius: 8px; overflow: hidden; min-height: 360px; }
-.cbdb-net-graph svg { display: block; }
+.cbdb-net-graph-wrap { position: relative; }
+.cbdb-net-graph { background: radial-gradient(1000px 520px at 50% 40%, #1b1b22 0%, #141419 62%, #0f0f13 100%); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; min-height: 360px; }
+.cbdb-net-graph canvas { display: block; }
+.cbdb-net-hint-overlay { position: absolute; right: 10px; bottom: 8px; font-size: 11px; color: rgba(160,160,176,0.75); background: rgba(13,13,17,0.55); padding: 3px 9px; border-radius: 6px; pointer-events: none; letter-spacing: 0.3px; }
+.net-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 2px 2px; }
+.net-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; background: #16161c; border: 1px solid #2a2a35; color: #8f8fa0; font-size: 12px; cursor: pointer; transition: all .18s ease; font-family: inherit; line-height: 1.4; }
+.net-chip i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.net-chip b { font-weight: 600; color: #565664; font-size: 11px; }
+.net-chip:hover { border-color: #41414f; color: #c9c9d4; }
+.net-chip.on { color: #ece8dc; border-color: rgba(201,169,110,0.5); background: #1d1b17; }
+.net-chip.on b { color: #c9a96e; }
+.net-chip:not(.on) i { opacity: 0.3; }
 .cbdb-net-legend { display: flex; gap: 14px; padding: 8px 2px 2px; font-size: 12px; color: var(--text-muted); align-items: center; flex-wrap: wrap; }
-.cbdb-net-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
-.cbdb-net-hint { margin-left: auto; }
+.cbdb-net-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
 
 /* 五期：CBDB 检索框纵向舒展——搜索区可拖拽增高，结果区自适应剩余高度 */
 #cbdb .two-col-layout .sidebar { display: flex; flex-direction: column; }

@@ -724,6 +724,11 @@ body {
     border-radius: 6px;
     font-size: 13px;
     min-width: 0;
+    transition: border-color .15s ease, background .15s ease;
+}
+#cbdbDetailPanel .cbdb-cell:hover {
+    border-color: rgba(201,169,110,0.45);
+    background: rgba(201,169,110,0.06);
 }
 #cbdbDetailPanel .cbdb-cell .cell-years {
     flex-shrink: 0;

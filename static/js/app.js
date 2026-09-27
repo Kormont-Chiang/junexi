@@ -1203,22 +1203,44 @@ async function cbdbShowOnMap() {
                 initMap();
                 if (!chgisMap) { showToast('地图初始化失败', 'error'); return; }
                 if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
+                if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
+                const orbIcon = L.divIcon({
+                    className: 'cbdb-orb-marker',
+                    html: '<div class="cbdb-orb"></div>',
+                    iconSize: [18, 18],
+                    iconAnchor: [9, 9],
+                    popupAnchor: [0, -11]
+                });
                 const markers = feats.map(f => {
                     const x = f.geometry.coordinates[0], y = f.geometry.coordinates[1];
                     const p = f.properties || {};
-                    const life = (p.birth || p.death) ? `（${p.birth || '?'}–${p.death || '?'}）` : '';
-                    const yrs = (p.firstyear || p.lastyear) ? `<br>地址年份：${p.firstyear || '?'}–${p.lastyear || '?'}` : '';
-                    return L.circleMarker([y, x], {
-                        radius: 5, color: '#ffb84d', weight: 1.5,
-                        fillColor: '#ff9f1a', fillOpacity: 0.8
-                    }).bindPopup(
-                        `<b>${escapeHtml(p.name)}</b>${escapeHtml(life)}<br>` +
-                        `${escapeHtml(p.dynasty)} · ${escapeHtml(p.addr_type)}：${escapeHtml(p.place)}${yrs}` +
-                        `<br><span style="color:#888;font-size:11px">ID ${p.person_id}</span>`);
+                    const life = (p.birth || p.death) ? `${p.birth || '?'}–${p.death || '?'}` : '生卒不详';
+                    const yrs = (p.firstyear || p.lastyear) ? `<div class="cbdb-map-popup-line">地址年份：${p.firstyear || '?'}–${p.lastyear || '?'}</div>` : '';
+                    return L.marker([y, x], { icon: orbIcon }).bindPopup(
+                        `<div class="cbdb-map-popup">
+                            <div class="cbdb-map-popup-name">${escapeHtml(p.name)}</div>
+                            <div class="cbdb-map-popup-line">${escapeHtml(p.dynasty)} · ${life}</div>
+                            <div class="cbdb-map-popup-line">${escapeHtml(p.addr_type)}：${escapeHtml(p.place)}</div>
+                            ${yrs}
+                            <a class="cbdb-map-popup-link" onclick="switchTab('cbdb'); loadCBDBPersonDetail(${parseInt(p.person_id) || 0})">在 CBDB 中查看 →</a>
+                        </div>`,
+                        { maxWidth: 260, minWidth: 180 });
                 });
                 window.cbdbPersonLayer = L.layerGroup(markers).addTo(chgisMap);
+                // 清除按钮（右下角悬浮）
+                const clearCtl = L.control({ position: 'bottomright' });
+                clearCtl.onAdd = () => {
+                    const div = L.DomUtil.create('div', 'cbdb-map-clearbtn');
+                    div.innerHTML = `✕ 清除人物标注（${feats.length}）`;
+                    div.onclick = () => {
+                        if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
+                        if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
+                    };
+                    return div;
+                };
+                window.cbdbPersonClearCtl = clearCtl.addTo(chgisMap);
                 chgisMap.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
-                showToast(`已在地图标注 ${feats.length} 个地址点，点击圆点看详情`, 'success', 4000);
+                showToast(`已在地图标注 ${feats.length} 个地址点，点击珠子看详情`, 'success', 4000);
             } catch (e) { showToast('地图标注失败: ' + e.message, 'error'); }
         }, 300);
     } catch (e) { showToast('加载失败: ' + e.message, 'error'); }

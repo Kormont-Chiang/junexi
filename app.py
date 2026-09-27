@@ -76,6 +76,45 @@ def add_no_cache_headers(response):
     response.headers["Cache-Control"] = "no-store"
     return response
 
+@app.before_request
+def fix_raw_non_utf8_query():
+    """宽容修复请求行的原始非 UTF-8 字节（如 PowerShell 把 GBK 字节直发 URL）。
+
+    正常浏览器请求是 percent-encoded UTF-8，字节全是 ASCII，快速放行；
+    原始 GBK 字节经 Werkzeug 多层翻搅后可能变成"双重乱码"（仍是合法 UTF-8），
+    判断依据是解码结果含 U+0080–U+00FF 的 latin-1 高字符——正常中文不会有。
+    还原为 GBK 后再重新 percent-encode 进 environ，下游 request.args 即正确中文。"""
+    raw = request.environ.get("QUERY_STRING", "")
+    if not raw:
+        return
+    b = raw.encode("latin-1")  # WSGI 以 latin-1 暴露，encode 回原始字节
+    try:
+        s1 = b.decode("utf-8")
+    except UnicodeDecodeError:
+        # 原始字节不是 UTF-8：大概率是 GBK 直发
+        try:
+            fixed = b.decode("gbk")
+        except UnicodeDecodeError:
+            return
+    else:
+        if not any(0x80 <= ord(ch) <= 0xFF for ch in s1):
+            return  # ASCII 或干净中文，无需处理
+        # 含 latin-1 高字符（½øÊ¿ ÂÃ 之类）→ 双重乱码，剥一层再按 GBK 还原
+        try:
+            fixed = s1.encode("latin-1").decode("gbk")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            return
+    if any(0x80 <= ord(ch) <= 0xFF for ch in fixed):
+        return  # 还原结果仍含高字符，不敢乱动
+    from urllib.parse import quote, parse_qsl
+    new_qs = quote(fixed, safe="=&?/,;:@+")
+    request.environ["QUERY_STRING"] = new_qs
+    # sans-io Request 在 __init__ 时把 query_string 存为实例属性，且 args 是
+    # cached_property——本 hook 之前可能已被提前解析缓存，这里一并重写
+    request.query_string = new_qs.encode("latin-1")
+    from werkzeug.datastructures import MultiDict
+    request.__dict__["args"] = MultiDict(parse_qsl(new_qs, keep_blank_values=True))
+
 # ── CBDB 本地数据库连接 ─────────────────────────────────
 
 _KIN_MOURNING_RE = None

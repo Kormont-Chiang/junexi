@@ -2263,28 +2263,41 @@ function drawNetGraph(container, nodes, edges, centerId) {
     });
 
     const n = nodes.length;
-    const repulsion = Math.round(Math.min(Math.max(n * 9, 320), 1400));
-    const edgeLength = n > 90 ? [70, 190] : n > 45 ? [60, 150] : [50, 115];
-    const gravity = n > 90 ? 0.05 : 0.1;
-    const showLabels = n <= 60;
+    const repulsion = Math.round(Math.min(Math.max(n * 5, 280), 700));
+    const edgeLength = n > 90 ? [45, 105] : n > 45 ? [48, 110] : [50, 115];
+    const gravity = n > 90 ? 0.16 : 0.12;
+    const initZoom = n > 90 ? 0.7 : 1;
+    // 高度数节点始终标注（叶子太多时按度数取前若干）
+    const degRank = nodes.slice().sort((a, b) => (b.deg || 0) - (a.deg || 0));
+    const labelSet = new Set(degRank.slice(0, n > 60 ? 9 : 18).map(nd => nd.id));
     const NAME_FONT = '"KaiTi","STKaiti","FZKaiS","STSong","SimSun",serif';
+    // 球状渐变节点：比平涂更有质感（中心鎏金 / 成员松绿 / 关联黛蓝）
+    const orb = (c1, c2) => new echarts.graphic.RadialGradient(0.5, 0.36, 0.78, [
+        { offset: 0, color: c1 }, { offset: 1, color: c2 }
+    ]);
+    const ORB = { center: orb('#f9e7b6', '#bd8c3f'), member: orb('#b3d29a', '#5f8a53'), assoc: orb('#c2d6e8', '#5d7fa3') };
 
     const chartNodes = nodes.map(nd => {
         const isCenter = nd.id === centerId;
         return {
             id: String(nd.id),
             name: nd.name_chn || nd.name || String(nd.id),
-            symbolSize: isCenter ? 30 : Math.min(9 + (nd.deg || 0) * 1.6, 24),
+            symbolSize: isCenter ? 28 : Math.min(8 + (nd.deg || 0) * 1.4, 22),
             category: isCenter ? 0 : (nd.member ? 1 : 2),
             label: {
-                show: isCenter || (showLabels && (nd.deg || 0) >= 2) || n <= 26,
+                show: isCenter || n <= 26 || labelSet.has(nd.id),
+                position: isCenter ? 'bottom' : 'right',
+                distance: isCenter ? 7 : 5,
                 fontSize: isCenter ? 14 : 12,
                 fontWeight: isCenter ? 'bold' : 'normal',
                 color: isCenter ? '#ecd9a8' : '#d9d4c8'
             },
-            itemStyle: isCenter
-                ? { borderColor: 'rgba(255,244,214,0.9)', borderWidth: 2, shadowBlur: 22, shadowColor: 'rgba(212,175,110,0.6)' }
-                : { borderColor: 'rgba(240,238,230,0.28)', borderWidth: 1, shadowBlur: Math.min(4 + (nd.deg || 0) * 1.5, 12), shadowColor: 'rgba(160,190,230,0.28)' },
+            itemStyle: Object.assign(
+                { color: isCenter ? ORB.center : (nd.member ? ORB.member : ORB.assoc) },
+                isCenter
+                    ? { borderColor: 'rgba(255,244,214,0.9)', borderWidth: 2, shadowBlur: 24, shadowColor: 'rgba(212,175,110,0.65)' }
+                    : { borderColor: 'rgba(240,238,230,0.3)', borderWidth: 1, shadowBlur: Math.min(4 + (nd.deg || 0) * 1.5, 12), shadowColor: 'rgba(160,190,230,0.3)' }
+            ),
             _raw: nd
         };
     });
@@ -2292,6 +2305,7 @@ function drawNetGraph(container, nodes, edges, centerId) {
     const chartLinks = edges.map((e, i) => {
         const t = netEdgeType(e);
         const st = NET_TYPE_STYLE[t];
+        const weak = t === '其他交游';
         return {
             source: String(e.source),
             target: String(e.target),
@@ -2310,9 +2324,9 @@ function drawNetGraph(container, nodes, edges, centerId) {
             lineStyle: {
                 color: st.color,
                 type: st.type,
-                width: st.width,
+                width: weak ? 1 : st.width,
                 curveness: (i % 2 ? -1 : 1) * 0.05,
-                opacity: 0.5
+                opacity: weak ? 0.3 : 0.48
             },
             emphasis: { label: { show: true }, lineStyle: { opacity: 0.95, width: st.width + 1 } }
         };

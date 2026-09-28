@@ -3040,6 +3040,7 @@ async function cbdbMapClickReverse(e) {
     const t = e.originalEvent && e.originalEvent.target;
     if (t && (t.closest('.leaflet-marker-icon') || t.closest('.leaflet-popup') || t.closest('.leaflet-control-container'))) return;
     cbdbClearRevPin();
+    const seq = (window._cbdbRevSeq = (window._cbdbRevSeq || 0) + 1);  // 竞态令牌：慢响应不得覆盖新点击的弹窗
     const lat = e.latlng.lat, lng = e.latlng.lng;
     const pinIcon = L.divIcon({
         className: 'cbdb-rev-pin',
@@ -3048,14 +3049,21 @@ async function cbdbMapClickReverse(e) {
     });
     _cbdbRevPin = L.marker([lat, lng], { icon: pinIcon, bubblingMouseEvents: false }).addTo(chgisMap);
     _cbdbRevPin.bindPopup('<div class="cbdb-map-popup"><div class="cbdb-map-popup-line">正在查询 CBDB 地名…</div></div>', { maxWidth: 300 }).openPopup();
+    const alive = () => seq === window._cbdbRevSeq && _cbdbRevPin;
+    const failPopup = msg => { if (alive()) _cbdbRevPin.setPopupContent(`<div class="cbdb-map-popup"><div class="cbdb-map-popup-line" style="color:#d98a8a">${escapeHtml(msg)}</div></div>`); };
     try {
         const res = await fetch(`/api/cbdb/places/nearest?x=${lng.toFixed(4)}&y=${lat.toFixed(4)}`);
-        const data = await res.json();
-        if (data.error) {
-            _cbdbRevPin.setPopupContent(`<div class="cbdb-map-popup"><div class="cbdb-map-popup-line" style="color:#d98a8a">${escapeHtml(data.error)}</div></div>`);
+        if (!alive()) return;
+        if (!res.ok) {
+            let msg = `HTTP ${res.status}`;
+            try { const ed = await res.json(); if (ed.error) msg = ed.error; } catch (_) {}
+            failPopup(msg);
             return;
         }
-        if (!data.length) {
+        const data = await res.json();
+        if (!alive()) return;
+        if (data.error) { failPopup(data.error); return; }
+        if (!Array.isArray(data) || !data.length) {
             _cbdbRevPin.setPopupContent('<div class="cbdb-map-popup"><div class="cbdb-map-popup-line">100km 内没有 CBDB 地名记录</div></div>');
             return;
         }
@@ -3072,7 +3080,7 @@ async function cbdbMapClickReverse(e) {
             <div class="cbdb-map-popup-list">${rows}</div></div>`);
         _cbdbRevPin.openPopup();
     } catch (err) {
-        if (_cbdbRevPin) _cbdbRevPin.setPopupContent(`<div class="cbdb-map-popup"><div class="cbdb-map-popup-line" style="color:#d98a8a">查询失败：${escapeHtml(err.message)}</div></div>`);
+        failPopup('查询失败：' + err.message);
     }
 }
 

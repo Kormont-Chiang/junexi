@@ -33,11 +33,20 @@ function initTabs() {
 }
 
 function switchTab(tabId) {
+    // 离开地图页签时停掉进行中的 flyTo 动画：0 尺寸容器上动画每帧抛 Invalid LatLng NaN
+    if (tabId !== 'map' && chgisMap && chgisMap._animating) {
+        try { chgisMap.stop(); } catch (e) { /* 防御 */ }
+    }
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
     document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === tabId));
     // 页面特定初始化
     if (tabId === 'dashboard') loadDashboard();
-    if (tabId === 'map') initMap();
+    if (tabId === 'map') {
+        initMap();
+        // display:none → 显示后 Leaflet 内部 size 仍是 0，flyTo/fitBounds 动画会算 NaN；
+        // 等一帧让 CSS 生效再校正
+        if (chgisMap) setTimeout(() => { try { chgisMap.invalidateSize(); } catch (e) { /* 防御 */ } }, 80);
+    }
     if (tabId === 'workspace') loadWorkspace();
     if (tabId === 'library') loadLibrary();
     if (tabId === 'tools') initToolTabs();
@@ -577,6 +586,19 @@ const CBDB_ADMIN_TYPES = [
     ['Jun', '郡'], ['Dao', '道'], ['Lu', '路'], ['Jiedu', '节度'], ['Dudufu', '都督府'],
     ['Fengjun', '封君'], ['Du', '都'], ['Wei', '卫'], ['Qi', '旗'],
 ];
+// 数据里出现但主表未收的类型补充
+const CBDB_ADMIN_TYPE_EXTRA = {
+    County: '县', Shixiaqu: '市辖区', Mountain: '山', River: '河流', Lake: '湖泊',
+    Island: '岛', Town: '镇', Jing: '京', Guan: '关', Xiang: '乡', Ting: '亭',
+    Yi: '邑', Bao: '堡', Zhai: '寨', Zhou2: '洲', Gang: '岗', Qu: '区'
+};
+// c_admin_type 英译代码 → 中文标签（未知值原样显示，比裸代码友好）
+function cbdbAdminTypeLabel(code) {
+    if (!code) return '—';
+    const hit = CBDB_ADMIN_TYPES.find(t => t[0] === code);
+    if (hit) return hit[1];
+    return CBDB_ADMIN_TYPE_EXTRA[code] || code;
+}
 
 // 渲染各类型对应的检索输入区
 function renderCBDBSearchArea(type) {
@@ -1856,7 +1878,7 @@ async function searchCBDB() {
                         <div class="result-card-title">${escapeHtml(pl.name_chn)} <span style="font-size:12px;color:var(--text-muted)">${escapeHtml(pl.name)}</span></div>
                         <div class="result-card-body">
                             ${pl.firstyear ? `<span class="result-card-badge">${pl.firstyear}${pl.lastyear ? '—' + pl.lastyear : ''}</span>` : ''}
-                            ${pl.admin_type ? `<span class="result-card-badge">${escapeHtml(pl.admin_type)}</span>` : ''}
+                            ${pl.admin_type ? `<span class="result-card-badge">${cbdbAdminTypeLabel(pl.admin_type)}</span>` : ''}
                         </div>
                     </div>`).join('')}`;
         }
@@ -2879,10 +2901,18 @@ async function switchDynasty(dynastyKey) {
         }
     });
 
-    // 信息标签与视野
+    // 信息标签与视野（隐藏容器/无效中心时跳过飞行，否则 flyTo 在动画每帧抛 Invalid LatLng NaN）
     const capNames = capitals.map(c => c.name).join('、');
     if (infoLabel) infoLabel.textContent = `${dynasty.name}（${dynasty.period}）` + (capNames ? ` · 都城：${capNames}` : '');
-    if (dynasty.center) chgisMap.flyTo([dynasty.center[1], dynasty.center[0]], dynasty.zoom || 6, { duration: 1.2 });
+    const ctr = dynasty.center;
+    if (Array.isArray(ctr) && Number.isFinite(ctr[0]) && Number.isFinite(ctr[1]) && chgisMap.getContainer().clientHeight > 0) {
+        chgisMap.flyTo([ctr[1], ctr[0]], dynasty.zoom || 6, { duration: 1.2 });
+    } else if (currentDynastyLayer) {
+        try {
+            const b = currentDynastyLayer.getBounds();
+            if (b.isValid() && chgisMap.getContainer().clientHeight > 0) chgisMap.fitBounds(b.pad(0.1));
+        } catch (e) { /* 隐藏容器下 fitBounds 同样不可用，静默跳过 */ }
+    }
 }
 
 function updateMapMarkers() {
@@ -3081,7 +3111,7 @@ async function cbdbMapClickReverse(e) {
             const life = (p.firstyear || p.lastyear) ? `${p.firstyear || '?'}–${p.lastyear || '?'}` : '存续不详';
             const same = p.same_coord_count > 1 ? ` · 含同址${p.same_coord_count}条` : '';
             return `<a class="cbdb-map-popup-person" onclick="cbdbReverseDig(${p.addr_id}, ${p.x_coord}, ${p.y_coord}, ${p.firstyear || 0}, ${p.lastyear || 0})">`
-                + `${escapeHtml(p.name_chn)}<span>${escapeHtml(p.admin_type || '—')} · ${p.dist_km}km${same} · ${life}</span></a>`;
+                + `${escapeHtml(p.name_chn)}<span>${cbdbAdminTypeLabel(p.admin_type)} · ${p.dist_km}km${same} · ${life}</span></a>`;
         }).join('');
         _cbdbRevPin.setPopupContent(`<div class="cbdb-map-popup">
             <div class="cbdb-map-popup-name">附近 CBDB 地名</div>
@@ -3100,8 +3130,10 @@ async function cbdbReverseDig(addrId, x, y, fy, ly) {
     window._cbdbPlaceCache = window._cbdbPlaceCache || {};
     window._cbdbPlaceCache[addrId] = { name_chn: place.name_chn || ('地名 #' + addrId), x_coord: x, y_coord: y };
     const mid = (fy > 0 && ly > 0) ? Math.round((fy + ly) / 2) : (fy > 0 ? fy : ly);
-    autoSwitchDynastyByYear(mid, null);
+    // 先切页签：autoSwitch 的 flyTo 若在可见地图上起跳、随后容器被隐藏，
+    // Leaflet 在 0 尺寸容器上做动画会每帧抛 Invalid LatLng NaN
     switchTab('cbdb');
+    autoSwitchDynastyByYear(mid, null);
     await loadPlacePersons(addrId, true);
 }
 

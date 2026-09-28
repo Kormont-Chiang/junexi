@@ -28,3 +28,5 @@ packaging/installer/
 # 系统
 Thumbs.db
 .DS_Store
+
+node_modules/

@@ -3567,6 +3567,31 @@ def chgis_regime():
         return jsonify({"error": str(e)}), 500
 
 
+# ── 启动预热 ────────────────────────────────────────────
+def _cbdb_warmup():
+    """后台预热：冷启动后首个 CBDB 查询要 ~79s（Access 打开 613MB mdb 冷文件 +
+    坐标缓存全量加载）。desktop.py 是 `from app import app` 同进程起服务，
+    所以钩子必须在模块级（__main__ 守卫在生产版不会触发）。
+    预热与用户点开窗口的操作重叠，失败不影响使用（首个查询按需加载）。"""
+    import time as _time
+    try:
+        t0 = _time.time()
+        conn = CBDBConnection.get_conn()
+        if not conn:
+            print("[warmup] CBDB 连接失败，跳过预热", flush=True)
+            return
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM ADDR_CODES")
+        cur.fetchone()
+        CBDBConnection._addr_coords()  # 顺便装反查坐标缓存（单飞锁防并发重复）
+        print(f"[warmup] CBDB 预热完成（连接 + 坐标缓存，{_time.time() - t0:.1f}s）", flush=True)
+    except Exception as e:
+        print(f"[warmup] CBDB 预热失败（不影响使用）: {e}", flush=True)
+
+# WERKZEUG_RUN_MAIN 守卫：debug 重载模式下只在子进程预热一次
+if os.environ.get("WERKZEUG_RUN_MAIN") in (None, "true"):
+    threading.Thread(target=_cbdb_warmup, daemon=True).start()
+
 # ── Main ────────────────────────────────────────────────
 
 if __name__ == "__main__":

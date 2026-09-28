@@ -1,19 +1,31 @@
 // E2E 验证：任务2（地图反查）+ 任务3（朝代图层联动）
 const CDP = 'http://127.0.0.1:18690';
 const fs = await import('fs');
-const tabs = await (await fetch(CDP + '/json/list')).json();
-let page = tabs.filter(t => t.type === 'page' && !t.url.startsWith('chrome')).pop();
-if (!page) { page = await (await fetch(CDP + '/json/new?url=about:blank', { method: 'PUT' })).json(); }
-const ws = new WebSocket(page.webSocketDebuggerUrl);
-let id = 0; const pend = {};
-ws.onmessage = e => { const m = JSON.parse(e.data); if (m.id && pend[m.id]) { pend[m.id](m); delete pend[m.id]; } };
-const send = (method, params = {}) => new Promise(res => { const i = ++id; pend[i] = res; ws.send(JSON.stringify({ id: i, method, params })); });
-await new Promise(r => { ws.onopen = r; });
-const evl = async (expr, awaitP = false) => {
-    const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: awaitP, returnByValue: true });
-    if (r.result && r.result.exceptionDetails) return { __err: r.result.exceptionDetails.text + ' ' + JSON.stringify(r.result.exceptionDetails.exception || {}) };
-    return r.result && r.result.result ? r.result.result.value : JSON.stringify(r.result);
-};
+// CDP 连接重试：受管 Edge 可能刚被 browser start 拉起或空闲崩溃后重启
+let page = null, ws, send, evl;
+for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+        const tabs = await (await fetch(CDP + '/json/list')).json();
+        const target = tabs.filter(t => t.type === 'page' && !t.url.startsWith('chrome')).pop()
+            || tabs.filter(t => t.type === 'page').pop();
+        if (!target) throw new Error('无可用 page target');
+        ws = new WebSocket(target.webSocketDebuggerUrl);
+        let id = 0; const pend = {};
+        ws.onmessage = e => { const m = JSON.parse(e.data); if (m.id && pend[m.id]) { pend[m.id](m); delete pend[m.id]; } };
+        await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
+        send = (method, params = {}) => new Promise(res => { const i = ++id; pend[i] = res; ws.send(JSON.stringify({ id: i, method, params })); });
+        evl = async (expr, awaitP = false) => {
+            const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: awaitP, returnByValue: true });
+            if (r.result && r.result.exceptionDetails) return { __err: r.result.exceptionDetails.text + ' ' + JSON.stringify(r.result.exceptionDetails.exception || {}) };
+            return r.result && r.result.result ? r.result.result.value : JSON.stringify(r.result);
+        };
+        break;
+    } catch (e) {
+        console.log(`CDP 连接第 ${attempt} 次失败: ${e.message}，3s 后重试`);
+        await new Promise(r => setTimeout(r, 3000));
+        if (attempt === 5) { console.log('CDP 不可达，放弃'); process.exit(1); }
+    }
+}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
 const t = (label, v) => { if (v && !v.__err) { pass++; console.log('[OK  ]', label); } else { fail++; console.log('[FAIL]', label, v && v.__err ? v.__err : v); } };

@@ -93,6 +93,7 @@ venv\Scripts\python.exe _test_phase6.py   # 四大窗体+群体 16 项
 | `/api/cbdb/offices/search` | GET | 官名→官职字典（门类筛选，简繁转换） |
 | `/api/cbdb/offices/<id>/persons` | GET | 任职者+任期 |
 | `/api/cbdb/places/search` | GET | 地名→ADDR_CODES（层级/坐标/年代） |
+| `/api/cbdb/places/nearest` | GET | **坐标反查地名**（x/y→半径内最近地名+距离km，地图点挖入口） |
 | `/api/cbdb/places/<id>/persons` | GET | 相关人物（籍贯/居址/任职地，同坐标并入） |
 | `/api/cbdb/entries/search` | GET | 入仕方式字典 |
 | `/api/cbdb/entries/<code>/persons` | GET | 该入仕方式的人物 |
@@ -148,6 +149,12 @@ venv\Scripts\python.exe _test_phase6.py   # 四大窗体+群体 16 项
 | `/api/ai/summarize` | POST | AI 摘要 |
 | `/api/ai/analyze` | POST | AI 分析 |
 
+## 地图联动闭环（检索 → 群体 → 时空分布 → 点回去挖人）
+
+- **群体上地图**：任意 CBDB 人物列表「在地图查看」→ 地址坐标聚合标注（≤40 散点金珠，>40 聚簇圆盘）→ 地址类型筛选（全部/籍贯/祖籍/居址/葬·卒地，`addr_types` 参数）→ 聚点名单可整组**回灌 CBDB 列表**
+- **地图反查 CBDB**：地图页「⌖ 点图反查」开关 → 点击任意位置 → 半径内最近 CBDB 地名（含距离/层级/存续期）→ 点地名载入相关人物（同坐标并入）
+- **生卒年 ↔ 朝代图层联动**：群体上地图按平均指数年/众数朝代、反查挖人按地名存续期，自动切换 CHGIS 朝代图层（年份→朝代键取"建立之年归新朝"规则：618→唐、907→五代、1127→南宋）
+
 ## 已知数据边界
 
 - **亲属数据不全**：CBDB 亲属以自我为中心记录（如苏洵的 KIN_DATA 只有苏辙，没有苏轼）。查无记录是忠实呈现，不是 bug。
@@ -155,6 +162,7 @@ venv\Scripts\python.exe _test_phase6.py   # 四大窗体+群体 16 项
 - **姻亲/外亲无五服**：KIN_Mourning 只收本宗血亲 159 键，妹夫/外甥等显示"—"。
 - **性别过滤**：c_female 是 BIT 列，pyodbc 必须绑 bool（绑 int 会被 Access ODBC 静默置否）。
 - **Access 参数上限**：IN 查询分批（CHUNK=500），大范围查询截断 1500 防溢出。
+- **Access 函数不吃参数**：`SQR/COS` 内嵌 `?` 报"无效的过程调用"；坐标反查改为 SQL 曼哈顿粗排（ORDER BY 带参合法）+ Python 端精确距离。
 
 ## 项目结构
 
@@ -171,7 +179,7 @@ historia-server/
 │   └── js/                # app.js + data/（朝代/官名/地名/避讳等字典）
 ├── packaging/june-xi.iss  # Inno Setup 安装包脚本
 ├── tools/                 # 数据工具脚本
-├── _test_phase1-6.py      # 回归测试
+├── _test_phase1-8.py      # 回归测试（含 geojson 筛选与坐标反查）
 └── _archive/              # 历史开发临时文件（不维护）
 ```
 
@@ -191,4 +199,4 @@ historia-server/
 
 ---
 
-*最后更新：2026-09-24（六期全量部署后）*
+*最后更新：2026-09-28（三个地图联动：群体上地图 / 地图反查 / 生卒年-朝代联动）*

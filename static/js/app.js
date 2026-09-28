@@ -1208,7 +1208,9 @@ async function cbdbShowOnMap() {
         if (dn) nameCount[dn] = (nameCount[dn] || 0) + 1;
     });
     const topName = Object.keys(nameCount).sort((a, b) => nameCount[b] - nameCount[a])[0] || null;
-    window._cbdbMapCtx = { year: n ? Math.round(sum / n) : 0, dynastyName: topName };
+    // 众数朝代占多数时名称优先（混合群体平均年可能落入无人属于的朝代），否则按年份优先、名称兜底
+    const majority = topName ? nameCount[topName] > persons.length / 2 : false;
+    window._cbdbMapCtx = { year: n ? Math.round(sum / n) : 0, dynastyName: topName, preferName: majority };
     await cbdbPlotGroupOnMap();
 }
 
@@ -1230,13 +1232,14 @@ async function cbdbPlotGroupOnMap() {
         if (!feats.length) { showToast('这些人物在该筛选下没有带坐标的地址记录', 'warning', 3500); return; }
         switchTab('map');
         const mctx = window._cbdbMapCtx;
-        if (mctx) autoSwitchDynastyByYear(mctx.year || 0, mctx.dynastyName);
+        if (mctx) autoSwitchDynastyByYear(mctx.year || 0, mctx.dynastyName, mctx.preferName);
         setTimeout(() => {
             try {
                 initMap();
                 if (!chgisMap) { showToast('地图初始化失败', 'error'); return; }
                 if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
                 if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
+                window._cbdbMapGroupCache = {};  // 每次重绘清空，防旧弹窗串号
 
                 // 按坐标（0.001°≈111m）聚合
                 const groups = new Map();
@@ -1260,7 +1263,6 @@ async function cbdbPlotGroupOnMap() {
                     )));
                 } else {
                     // 大规模：聚簇圆盘，直径随人数开方增长
-                    window._cbdbMapGroupCache = window._cbdbMapGroupCache || {};
                     gs.forEach((g, gi) => {
                         const n = g.items.length;
                         const d = Math.round(26 + Math.min(30, Math.sqrt(n) * 4));
@@ -1277,7 +1279,7 @@ async function cbdbPlotGroupOnMap() {
                 }
                 window.cbdbPersonLayer = L.layerGroup(markers).addTo(chgisMap);
                 cbdbAddGroupControl(feats.length, gs.length);
-                chgisMap.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
+                chgisMap.fitBounds(L.featureGroup(markers).getBounds().pad(0.15), { maxZoom: 10 });
                 showToast(gs.length <= 40
                     ? `已标注 ${feats.length} 个地址点，点击珠子看详情`
                     : `已聚合 ${gs.length} 个地点（${feats.length} 条地址记录），点圆盘看名单`, 'success', 4000);
@@ -2998,13 +3000,18 @@ function dynastyKeyForYear(year) {
     return best ? best.key : null;
 }
 
-function autoSwitchDynastyByYear(year, dynastyName) {
-    let key = dynastyKeyForYear(year);
+function autoSwitchDynastyByYear(year, dynastyName, preferName) {
+    let key = null;
+    if (preferName && dynastyName) key = CBDB_DYNASTY_NAME_TO_KEY[dynastyName] || null;
+    if (!key) key = dynastyKeyForYear(year);
     if (!key && dynastyName) key = CBDB_DYNASTY_NAME_TO_KEY[dynastyName] || null;
     if (!key) return;
     const cur = document.querySelector('.dynasty-btn.active');
     if (cur && cur.dataset.dynasty === key) return;
     switchDynasty(key);
+    if (typeof CHGIS_DYNASTIES !== 'undefined' && CHGIS_DYNASTIES[key]) {
+        showToast(`朝代图层已联动：${CHGIS_DYNASTIES[key].name}（${CHGIS_DYNASTIES[key].period}）`, 'info', 2600);
+    }
 }
 
 // ── 地图 → CBDB 反查（任务2）────────────────────────────
@@ -3027,6 +3034,7 @@ function cbdbToggleReverse() {
     window._cbdbReverseOn = !window._cbdbReverseOn;
     const chip = document.getElementById('cbdbRevChip');
     if (chip) chip.classList.toggle('active', !!window._cbdbReverseOn);
+    if (chgisMap) chgisMap.getContainer().classList.toggle('cbdb-rev-on', !!window._cbdbReverseOn);
     if (!window._cbdbReverseOn) cbdbClearRevPin();
     showToast(window._cbdbReverseOn ? '反查已开启：点击地图任意位置，找附近 CBDB 地名' : '反查已关闭', 'info', 2200);
 }
@@ -3071,8 +3079,9 @@ async function cbdbMapClickReverse(e) {
         const rows = data.map(p => {
             window._cbdbRevCache[p.addr_id] = p;
             const life = (p.firstyear || p.lastyear) ? `${p.firstyear || '?'}–${p.lastyear || '?'}` : '存续不详';
+            const same = p.same_coord_count > 1 ? ` · 含同址${p.same_coord_count}条` : '';
             return `<a class="cbdb-map-popup-person" onclick="cbdbReverseDig(${p.addr_id}, ${p.x_coord}, ${p.y_coord}, ${p.firstyear || 0}, ${p.lastyear || 0})">`
-                + `${escapeHtml(p.name_chn)}<span>${escapeHtml(p.admin_type || '—')} · ${p.dist_km}km · ${life}</span></a>`;
+                + `${escapeHtml(p.name_chn)}<span>${escapeHtml(p.admin_type || '—')} · ${p.dist_km}km${same} · ${life}</span></a>`;
         }).join('');
         _cbdbRevPin.setPopupContent(`<div class="cbdb-map-popup">
             <div class="cbdb-map-popup-name">附近 CBDB 地名</div>

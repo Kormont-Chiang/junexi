@@ -1446,3 +1446,6 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     box-shadow: 0 0 10px rgba(126,200,227,0.8); }
 .cbdb-rev-pin { animation: cbdb-rev-pulse 1.6s ease-out infinite; }
 @keyframes cbdb-rev-pulse { 0% { transform: scale(0.9); opacity: 1; } 70% { transform: scale(1.5); opacity: 0.3; } 100% { transform: scale(0.9); opacity: 1; } }
+
+/* 反查开启时地图十字光标 */
+.leaflet-container.cbdb-rev-on { cursor: crosshair; }

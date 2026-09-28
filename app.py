@@ -8,6 +8,7 @@ import os
 import re
 import sys
 import json
+import threading
 import requests
 import subprocess
 from datetime import datetime
@@ -516,51 +517,72 @@ class CBDBConnection:
             "y_coord": r.y_coord,
         } for r in rows]
 
+    _ADDR_COORDS_CACHE = None  # ADDR_CODES 坐标全量内存缓存（只读快照，无需失效）
+    _ADDR_COORDS_LOCK = threading.Lock()  # 单飞锁：并发反查等首次加载完成，禁止重复全量扫描
+
     @classmethod
-    def nearest_places(cls, x, y, limit=8, max_km=100.0):
-        """地图反查：给定 WGS84 经纬度，返回半径内最近的 ADDR_CODES 地名（含距离 km）。
-        SQL 端只用 WHERE/ORDER BY 参数（Access 的 SQR/COS 内嵌参数会报"无效的过程调用"），
-        曼哈顿距离粗排取 TOP 400，精确球面距离在 Python 端换算并过滤。"""
-        conn = cls.get_conn()
-        if not conn:
-            return []
-        cursor = conn.cursor()
-        box = max(0.5, min(max_km / 90.0, 8.0))
-        sql = """
-            SELECT TOP 400 c_addr_id, c_name_chn, c_name, c_firstyear, c_lastyear,
-                   c_admin_type, x_coord, y_coord
-            FROM ADDR_CODES
-            WHERE x_coord IS NOT NULL AND y_coord IS NOT NULL
-              AND ABS(x_coord - ?) < ? AND ABS(y_coord - ?) < ?
-            ORDER BY ABS(x_coord - ?) + ABS(y_coord - ?)
-        """
-        cursor.execute(sql, [x, box, y, box, x, y])
-        rows = cursor.fetchall()
-        import math
-        cosf = math.cos(math.radians(y))
-        scored = []
-        for r in rows:
-            dist_km = math.hypot((r.x_coord - x) * cosf, (r.y_coord - y)) * 111.32
-            scored.append((dist_km, r))
-        scored.sort(key=lambda t: t[0])
-        results = []
-        for dist_km, r in scored:
-            if dist_km > max_km:
-                continue
-            results.append({
+    def _addr_coords(cls):
+        """坐标反查的内存缓存：一次性全量加载带坐标地名（约 60k 条），
+        之后每次反查是纯 Python 数学（<0.5s）。Access 逐次函数扫描+排序冷态可达 30s+，不可用。"""
+        if cls._ADDR_COORDS_CACHE is not None:
+            return cls._ADDR_COORDS_CACHE
+        with cls._ADDR_COORDS_LOCK:
+            if cls._ADDR_COORDS_CACHE is not None:  # 双检：等待锁期间别的线程已加载
+                return cls._ADDR_COORDS_CACHE
+            conn = cls.get_conn()
+            if not conn:
+                return []
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT c_addr_id, c_name_chn, c_name, c_firstyear, c_lastyear,
+                       c_admin_type, x_coord, y_coord
+                FROM ADDR_CODES
+                WHERE x_coord IS NOT NULL AND y_coord IS NOT NULL
+            """)
+            cls._ADDR_COORDS_CACHE = [{
                 "addr_id": r.c_addr_id,
                 "name_chn": safe_decode(r.c_name_chn),
                 "name": r.c_name or "",
                 "firstyear": r.c_firstyear or None,
                 "lastyear": r.c_lastyear or None,
                 "admin_type": r.c_admin_type or "",
-                "x_coord": r.x_coord,
-                "y_coord": r.y_coord,
-                "dist_km": round(dist_km, 1),
-            })
-            if len(results) >= limit:
-                break
-        return results
+                "x": float(r.x_coord),
+                "y": float(r.y_coord),
+            } for r in cursor.fetchall()]
+            return cls._ADDR_COORDS_CACHE
+
+    @classmethod
+    def nearest_places(cls, x, y, limit=8, max_km=100.0):
+        """地图反查：给定 WGS84 经纬度，返回半径内最近的 ADDR_CODES 地名（含距离 km）。
+        基于内存坐标缓存做等距圆柱近似（经度差乘 cos(lat)），中国范围内误差可忽略。
+        同一坐标的多个朝代记录合并为一条（与 persons_by_place 的 include_same_coord
+        语义一致，人物端本就按坐标并入）；代表取最早 firstyear 的记录，返回同址计数。"""
+        import math
+        cosf = math.cos(math.radians(y))
+        groups = {}  # (x, y) -> [min_dist, rep, count]
+        for p in cls._addr_coords():
+            d = math.hypot((p["x"] - x) * cosf, p["y"] - y) * 111.32
+            if d > max_km:
+                continue
+            key = (p["x"], p["y"])
+            g = groups.get(key)
+            if g is None:
+                groups[key] = [d, p, 1]
+            else:
+                g[0] = min(g[0], d)
+                g[2] += 1
+                # 代表规则：最早 firstyear（无年份视为极大）优先，再比 addr_id 小
+                a, b = g[1], p
+                ka = (a["firstyear"] if a["firstyear"] is not None else 10**9, a["addr_id"])
+                kb = (b["firstyear"] if b["firstyear"] is not None else 10**9, b["addr_id"])
+                if kb < ka:
+                    g[1] = b
+        scored = sorted(
+            ({**rep, "dist_km": round(d, 1), "same_coord_count": n,
+              "x_coord": rep["x"], "y_coord": rep["y"]}
+             for (d, rep, n) in groups.values()),
+            key=lambda q: q["dist_km"])
+        return scored[:limit]
 
     @classmethod
     def _same_coord_addr_ids(cls, cursor, addr_id):

@@ -517,6 +517,52 @@ class CBDBConnection:
         } for r in rows]
 
     @classmethod
+    def nearest_places(cls, x, y, limit=8, max_km=100.0):
+        """地图反查：给定 WGS84 经纬度，返回半径内最近的 ADDR_CODES 地名（含距离 km）。
+        SQL 端只用 WHERE/ORDER BY 参数（Access 的 SQR/COS 内嵌参数会报"无效的过程调用"），
+        曼哈顿距离粗排取 TOP 400，精确球面距离在 Python 端换算并过滤。"""
+        conn = cls.get_conn()
+        if not conn:
+            return []
+        cursor = conn.cursor()
+        box = max(0.5, min(max_km / 90.0, 8.0))
+        sql = """
+            SELECT TOP 400 c_addr_id, c_name_chn, c_name, c_firstyear, c_lastyear,
+                   c_admin_type, x_coord, y_coord
+            FROM ADDR_CODES
+            WHERE x_coord IS NOT NULL AND y_coord IS NOT NULL
+              AND ABS(x_coord - ?) < ? AND ABS(y_coord - ?) < ?
+            ORDER BY ABS(x_coord - ?) + ABS(y_coord - ?)
+        """
+        cursor.execute(sql, [x, box, y, box, x, y])
+        rows = cursor.fetchall()
+        import math
+        cosf = math.cos(math.radians(y))
+        scored = []
+        for r in rows:
+            dist_km = math.hypot((r.x_coord - x) * cosf, (r.y_coord - y)) * 111.32
+            scored.append((dist_km, r))
+        scored.sort(key=lambda t: t[0])
+        results = []
+        for dist_km, r in scored:
+            if dist_km > max_km:
+                continue
+            results.append({
+                "addr_id": r.c_addr_id,
+                "name_chn": safe_decode(r.c_name_chn),
+                "name": r.c_name or "",
+                "firstyear": r.c_firstyear or None,
+                "lastyear": r.c_lastyear or None,
+                "admin_type": r.c_admin_type or "",
+                "x_coord": r.x_coord,
+                "y_coord": r.y_coord,
+                "dist_km": round(dist_km, 1),
+            })
+            if len(results) >= limit:
+                break
+        return results
+
+    @classmethod
     def _same_coord_addr_ids(cls, cursor, addr_id):
         """同坐标地址并入（CBDB 新版原生功能）：返回含自身的 addr_id 列表"""
         cursor.execute(
@@ -2701,6 +2747,24 @@ def cbdb_place_search():
     return jsonify(CBDBConnection.search_places(
         q, admin_type=admin_type or None, from_year=from_year, to_year=to_year
     ))
+
+@app.route("/api/cbdb/places/nearest", methods=["GET"])
+def cbdb_place_nearest():
+    """地图反查：?x=经度&y=纬度 → 半径内最近的 CBDB 地名（?max_km= 默认 100）"""
+    if not CBDBConnection.is_available():
+        return jsonify({"error": "CBDB 本地数据库未连接"})
+    try:
+        x = float(request.args.get("x", ""))
+        y = float(request.args.get("y", ""))
+    except (ValueError, TypeError):
+        return jsonify({"error": "x/y 参数无效"}), 400
+    if not (73 <= x <= 135 and 18 <= y <= 54):
+        return jsonify({"error": "坐标超出中国历史地图范围"}), 400
+    try:
+        max_km = min(max(float(request.args.get("max_km", 100)), 1.0), 500.0)
+    except (ValueError, TypeError):
+        max_km = 100.0
+    return jsonify(CBDBConnection.nearest_places(x, y, max_km=max_km))
 
 @app.route("/api/cbdb/places/<int:addr_id>/persons", methods=["GET"])
 def cbdb_place_persons(addr_id):

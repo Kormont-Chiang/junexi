@@ -1198,6 +1198,17 @@ async function cbdbShowOnMap() {
     if (!persons.length) { showToast('当前列表没有人物', 'warning'); return; }
     window._cbdbMapLastIds = persons.map(p => p.id);
     window._cbdbMapLastTitle = persons.length + ' 人';
+    // 朝代图层联动（任务3）：列表平均指数年/生年 + 众数朝代名作为图层上下文
+    let sum = 0, n = 0;
+    const nameCount = {};
+    persons.forEach(p => {
+        const y = p.index_year || (p.birthyear > 0 ? p.birthyear : 0);
+        if (y > 0) { sum += y; n++; }
+        const dn = p.dynasty || '';
+        if (dn) nameCount[dn] = (nameCount[dn] || 0) + 1;
+    });
+    const topName = Object.keys(nameCount).sort((a, b) => nameCount[b] - nameCount[a])[0] || null;
+    window._cbdbMapCtx = { year: n ? Math.round(sum / n) : 0, dynastyName: topName };
     await cbdbPlotGroupOnMap();
 }
 
@@ -1218,6 +1229,8 @@ async function cbdbPlotGroupOnMap() {
         const feats = data.features || [];
         if (!feats.length) { showToast('这些人物在该筛选下没有带坐标的地址记录', 'warning', 3500); return; }
         switchTab('map');
+        const mctx = window._cbdbMapCtx;
+        if (mctx) autoSwitchDynastyByYear(mctx.year || 0, mctx.dynastyName);
         setTimeout(() => {
             try {
                 initMap();
@@ -2757,6 +2770,11 @@ function initMap() {
     // 添加图层切换控件
     L.control.layers(window.baseLayers, null, { position: 'topright' }).addTo(chgisMap);
 
+    // 地图 → CBDB 反查开关（任务2）
+    window._cbdbReverseOn = false;
+    cbdbAddReverseControl();
+    chgisMap.on('click', cbdbMapClickReverse);
+
     // 地图加载完成后调整大小
     setTimeout(() => chgisMap.invalidateSize(), 100);
 }
@@ -2924,6 +2942,150 @@ function searchMapPlace() {
 function flyToLocation(lng, lat, zoom) {
     if (!chgisMap) return;
     chgisMap.flyTo([lat, lng], zoom || 10, { duration: 1.5 });
+}
+
+// ── 生卒年 ↔ 朝代图层联动（任务3）────────────────────────
+// CBDB 朝代名 → CHGIS 图层键（名称歧义时年份优先，名称仅兜底）
+const CBDB_DYNASTY_NAME_TO_KEY = {
+    '夏': 'xia', '商': 'shang',
+    '西周': 'zhou_west', '周': 'zhou_west', '东周': 'zhou_east', '春秋': 'zhou_east', '战国': 'zhou_east',
+    '秦': 'qin', '西汉': 'han_west', '汉': 'han_west', '东汉': 'han_east',
+    '曹魏': 'wei', '魏': 'wei', '蜀汉': 'shu', '蜀': 'shu', '孙吴': 'wu', '吴': 'wu',
+    '西晋': 'jin_west', '东晋': 'jin_east', '晋': 'jin_west', '南北朝': 'southern_northern',
+    '隋': 'sui', '唐': 'tang', '五代': 'five_dynasties', '五代十国': 'five_dynasties',
+    '北宋': 'song_north', '宋': 'song_north', '南宋': 'song_south',
+    '元': 'yuan', '明': 'ming', '清': 'qing'
+};
+
+function _parseDynastyPeriod(period) {
+    // "约前2070—前1600" | "前206—公元8" | "25—220" | "618—907" → {from, to}（天文纪年，无 0 年误差可忽略）
+    if (!period) return null;
+    const parts = period.replace(/约|公?元|\s/g, '').split(/[—–～~-]/);
+    if (parts.length < 2) return null;
+    const parse = s => {
+        const neg = s.indexOf('前') === 0;
+        const n = parseInt(s.replace('前', ''), 10);
+        return isNaN(n) ? null : (neg ? -n : n);
+    };
+    const a = parse(parts[0]), b = parse(parts[1]);
+    if (a === null || b === null) return null;
+    return { from: Math.min(a, b), to: Math.max(a, b) };
+}
+
+let _dynastyYearTable = null;
+function dynastyYearTable() {
+    if (_dynastyYearTable) return _dynastyYearTable;
+    _dynastyYearTable = [];
+    if (typeof CHGIS_DYNASTIES === 'undefined') return _dynastyYearTable;
+    Object.keys(CHGIS_DYNASTIES).forEach(key => {
+        const d = CHGIS_DYNASTIES[key];
+        const r = _parseDynastyPeriod(d.period);
+        if (r) _dynastyYearTable.push({ key, name: d.name, from: r.from, to: r.to, span: r.to - r.from });
+    });
+    return _dynastyYearTable;
+}
+
+function dynastyKeyForYear(year) {
+    if (!year || year < -2100 || year > 2026) return null;
+    // 命中多个区间时取 from 最大者（新朝建立之年归新朝：618→唐、907→五代、1127→南宋）；
+    // from 相同再比 span 最小
+    let best = null;
+    dynastyYearTable().forEach(d => {
+        if (year >= d.from && year <= d.to) {
+            if (!best || d.from > best.from || (d.from === best.from && d.span < best.span)) best = d;
+        }
+    });
+    return best ? best.key : null;
+}
+
+function autoSwitchDynastyByYear(year, dynastyName) {
+    let key = dynastyKeyForYear(year);
+    if (!key && dynastyName) key = CBDB_DYNASTY_NAME_TO_KEY[dynastyName] || null;
+    if (!key) return;
+    const cur = document.querySelector('.dynasty-btn.active');
+    if (cur && cur.dataset.dynasty === key) return;
+    switchDynasty(key);
+}
+
+// ── 地图 → CBDB 反查（任务2）────────────────────────────
+let _cbdbRevPin = null;
+
+function cbdbAddReverseControl() {
+    const ctl = L.control({ position: 'bottomleft' });
+    ctl.onAdd = () => {
+        const div = L.DomUtil.create('div', 'cbdb-map-revctl');
+        div.innerHTML = '<span class="cbdb-map-chip" id="cbdbRevChip" title="开启后点击地图任意位置，反查最近的 CBDB 地名，点地名载入相关人物">⌖ 点图反查</span>';
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
+        div.querySelector('#cbdbRevChip').onclick = () => cbdbToggleReverse();
+        return div;
+    };
+    ctl.addTo(chgisMap);
+}
+
+function cbdbToggleReverse() {
+    window._cbdbReverseOn = !window._cbdbReverseOn;
+    const chip = document.getElementById('cbdbRevChip');
+    if (chip) chip.classList.toggle('active', !!window._cbdbReverseOn);
+    if (!window._cbdbReverseOn) cbdbClearRevPin();
+    showToast(window._cbdbReverseOn ? '反查已开启：点击地图任意位置，找附近 CBDB 地名' : '反查已关闭', 'info', 2200);
+}
+
+function cbdbClearRevPin() {
+    if (_cbdbRevPin && chgisMap) { chgisMap.removeLayer(_cbdbRevPin); _cbdbRevPin = null; }
+}
+
+async function cbdbMapClickReverse(e) {
+    if (!window._cbdbReverseOn) return;
+    const t = e.originalEvent && e.originalEvent.target;
+    if (t && (t.closest('.leaflet-marker-icon') || t.closest('.leaflet-popup') || t.closest('.leaflet-control-container'))) return;
+    cbdbClearRevPin();
+    const lat = e.latlng.lat, lng = e.latlng.lng;
+    const pinIcon = L.divIcon({
+        className: 'cbdb-rev-pin',
+        html: '<div class="cbdb-rev-dot"></div>',
+        iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -10]
+    });
+    _cbdbRevPin = L.marker([lat, lng], { icon: pinIcon, bubblingMouseEvents: false }).addTo(chgisMap);
+    _cbdbRevPin.bindPopup('<div class="cbdb-map-popup"><div class="cbdb-map-popup-line">正在查询 CBDB 地名…</div></div>', { maxWidth: 300 }).openPopup();
+    try {
+        const res = await fetch(`/api/cbdb/places/nearest?x=${lng.toFixed(4)}&y=${lat.toFixed(4)}`);
+        const data = await res.json();
+        if (data.error) {
+            _cbdbRevPin.setPopupContent(`<div class="cbdb-map-popup"><div class="cbdb-map-popup-line" style="color:#d98a8a">${escapeHtml(data.error)}</div></div>`);
+            return;
+        }
+        if (!data.length) {
+            _cbdbRevPin.setPopupContent('<div class="cbdb-map-popup"><div class="cbdb-map-popup-line">100km 内没有 CBDB 地名记录</div></div>');
+            return;
+        }
+        window._cbdbRevCache = {};
+        const rows = data.map(p => {
+            window._cbdbRevCache[p.addr_id] = p;
+            const life = (p.firstyear || p.lastyear) ? `${p.firstyear || '?'}–${p.lastyear || '?'}` : '存续不详';
+            return `<a class="cbdb-map-popup-person" onclick="cbdbReverseDig(${p.addr_id}, ${p.x_coord}, ${p.y_coord}, ${p.firstyear || 0}, ${p.lastyear || 0})">`
+                + `${escapeHtml(p.name_chn)}<span>${escapeHtml(p.admin_type || '—')} · ${p.dist_km}km · ${life}</span></a>`;
+        }).join('');
+        _cbdbRevPin.setPopupContent(`<div class="cbdb-map-popup">
+            <div class="cbdb-map-popup-name">附近 CBDB 地名</div>
+            <div class="cbdb-map-popup-line">点任一地名将相关人物载入 CBDB 列表</div>
+            <div class="cbdb-map-popup-list">${rows}</div></div>`);
+        _cbdbRevPin.openPopup();
+    } catch (err) {
+        if (_cbdbRevPin) _cbdbRevPin.setPopupContent(`<div class="cbdb-map-popup"><div class="cbdb-map-popup-line" style="color:#d98a8a">查询失败：${escapeHtml(err.message)}</div></div>`);
+    }
+}
+
+// 反查结果 → CBDB 人物列表（闭环：地图挖人），并按地名存续期中段联动朝代图层
+async function cbdbReverseDig(addrId, x, y, fy, ly) {
+    const place = (window._cbdbRevCache || {})[addrId] || {};
+    cbdbClearRevPin();
+    window._cbdbPlaceCache = window._cbdbPlaceCache || {};
+    window._cbdbPlaceCache[addrId] = { name_chn: place.name_chn || ('地名 #' + addrId), x_coord: x, y_coord: y };
+    const mid = (fy > 0 && ly > 0) ? Math.round((fy + ly) / 2) : (fy > 0 ? fy : ly);
+    autoSwitchDynastyByYear(mid, null);
+    switchTab('cbdb');
+    await loadPlacePersons(addrId, true);
 }
 
 // ── 史学工具 ───────────────────────────────────────────

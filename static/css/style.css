@@ -1439,3 +1439,10 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     font-family: "KaiTi","STKaiti","STSong","SimSun",serif; }
 .cbdb-map-popup-person span { font-size: 11px; color: #8a8a96; font-family: inherit; }
 .cbdb-map-popup-person:hover { background: rgba(201,169,110,0.12); color: #ecd9a8; }
+/* 地图反查：开关容器 + 图钉 */
+.cbdb-map-revctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 999px;
+    padding: 4px 6px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+.cbdb-rev-dot { width: 12px; height: 12px; border-radius: 50%; background: #7ec8e3; border: 2px solid #eaf7ff;
+    box-shadow: 0 0 10px rgba(126,200,227,0.8); }
+.cbdb-rev-pin { animation: cbdb-rev-pulse 1.6s ease-out infinite; }
+@keyframes cbdb-rev-pulse { 0% { transform: scale(0.9); opacity: 1; } 70% { transform: scale(1.5); opacity: 0.3; } 100% { transform: scale(0.9); opacity: 1; } }

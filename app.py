@@ -2333,16 +2333,19 @@ class CBDBConnection:
         return {"nodes": list(nodes.values()), "edges": edges}
 
     @classmethod
-    def persons_geojson(cls, person_ids, limit=2000):
+    def persons_geojson(cls, person_ids, limit=2000, addr_types=None):
         """人物地址 GeoJSON（三期 GIS 导出）：BIOG_ADDR_DATA 中所有带坐标的地址记录
         转为点要素，属性含姓名/朝代/生卒/地址类型/地名。QGIS 可直接加载做空间分析。
-        坐标系 WGS84（x=经度, y=纬度）。"""
+        坐标系 WGS84（x=经度, y=纬度）。addr_types 非空时只保留这些地址类型（如 [1]=籍贯）。"""
         conn = cls.get_conn()
         if not conn:
             return {"type": "FeatureCollection", "features": []}
         cursor = conn.cursor()
         params = []
         in_sql = _in_clause("ba.c_personid", person_ids, params)
+        type_sql = ""
+        if addr_types:
+            type_sql = " AND " + _in_clause("ba.c_addr_type", addr_types, params)
         sql = f"""
             SELECT ba.c_personid, ba.c_addr_type, ba.c_firstyear, ba.c_lastyear,
                    t.c_addr_desc_chn, ac.c_name_chn AS addr_name, ac.x_coord, ac.y_coord,
@@ -2353,7 +2356,7 @@ class CBDBConnection:
             LEFT JOIN ADDR_CODES ac ON ba.c_addr_id = ac.c_addr_id)
             LEFT JOIN BIOG_MAIN b ON ba.c_personid = b.c_personid)
             LEFT JOIN DYNASTIES d ON b.c_dy = d.c_dy
-            WHERE {in_sql} AND ac.x_coord IS NOT NULL AND ac.y_coord IS NOT NULL
+            WHERE {in_sql} AND ac.x_coord IS NOT NULL AND ac.y_coord IS NOT NULL{type_sql}
             ORDER BY ba.c_personid, ba.c_addr_type
         """
         cursor.execute(sql, params)
@@ -3059,7 +3062,11 @@ def cbdb_persons_geojson():
         return jsonify({"error": "ids 参数无效"}), 400
     if not ids:
         return jsonify({"error": "ids 不能为空"}), 400
-    return jsonify(CBDBConnection.persons_geojson(ids))
+    try:
+        addr_types = [int(t) for t in (data.get("addr_types") or [])][:20]
+    except (ValueError, TypeError):
+        addr_types = []
+    return jsonify(CBDBConnection.persons_geojson(ids, addr_types=addr_types))
 
 # ── API: DeepSeek AI ────────────────────────────────────
 

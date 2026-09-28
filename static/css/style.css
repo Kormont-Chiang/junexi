@@ -1413,3 +1413,29 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     font-size: 12px; padding: 5px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap;
     box-shadow: 0 2px 8px rgba(0,0,0,0.5); transition: all .15s ease; }
 .cbdb-map-clearbtn:hover { border-color: #c9a96e; color: #ece8dc; }
+
+/* 群体上地图：聚簇圆盘 + 控制条 */
+.cbdb-cluster { border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 35% 30%, rgba(255,233,184,0.95) 0%, rgba(232,169,60,0.88) 55%, rgba(150,104,32,0.85) 100%);
+    border: 1.5px solid rgba(255,244,214,0.7); color: #241a08; font-weight: 700;
+    box-shadow: 0 0 14px rgba(232,169,60,0.4), 0 1px 4px rgba(0,0,0,0.6);
+    cursor: pointer; transition: transform .15s ease; font-family: inherit; }
+.cbdb-orb-marker:hover .cbdb-cluster { transform: scale(1.12); }
+.cbdb-map-grpctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 14px;
+    padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    display: flex; flex-direction: column; gap: 6px; }
+.cbdb-map-grpctl-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.cbdb-map-chip { padding: 2px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 999px;
+    color: var(--text-secondary); cursor: pointer; white-space: nowrap; transition: all .15s ease; }
+.cbdb-map-chip:hover { border-color: var(--accent-dim); color: var(--text-primary); }
+.cbdb-map-chip.active { background: #c9a96e; border-color: #c9a96e; color: #1a150c; }
+.cbdb-map-grpctl-info { font-size: 11px; color: var(--text-muted); margin-right: auto; padding-left: 2px; }
+.cbdb-map-grpctl-clear { font-size: 12px; color: #d8d2c4; cursor: pointer; padding: 2px 8px;
+    border: 1px solid rgba(201,169,110,0.45); border-radius: 999px; white-space: nowrap; transition: all .15s ease; }
+.cbdb-map-grpctl-clear:hover { border-color: #c9a96e; color: #ece8dc; }
+.cbdb-map-popup-list { max-height: 220px; overflow-y: auto; margin: 6px 0 2px; display: flex; flex-direction: column; gap: 2px; }
+.cbdb-map-popup-person { display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    padding: 3px 6px; border-radius: 5px; font-size: 13px; color: #e8e4d8; cursor: pointer;
+    font-family: "KaiTi","STKaiti","STSong","SimSun",serif; }
+.cbdb-map-popup-person span { font-size: 11px; color: #8a8a96; font-family: inherit; }
+.cbdb-map-popup-person:hover { background: rgba(201,169,110,0.12); color: #ecd9a8; }

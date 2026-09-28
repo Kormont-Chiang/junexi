@@ -1183,20 +1183,40 @@ async function cbdbExportGeoJSON() {
 }
 
 // 地图联动：把当前人物列表的地址坐标直接标注到史料地图（复用 persons/geojson，不入文件）
+// 地图聚点筛选：'all' | 'jiguan' | 'zuji' | 'juzhi' | 'zang'
+window._cbdbMapAddrFilter = window._cbdbMapAddrFilter || 'all';
+const CBDB_MAP_FILTERS = [
+    { key: 'all',   label: '全部',   types: [] },
+    { key: 'jiguan', label: '籍贯',  types: [1] },
+    { key: 'zuji',  label: '祖籍',   types: [5] },
+    { key: 'juzhi', label: '居址',   types: [6, 7] },
+    { key: 'zang',  label: '葬·卒地', types: [9, 10] },
+];
+
 async function cbdbShowOnMap() {
     const persons = window._cbdbLastPersons || [];
     if (!persons.length) { showToast('当前列表没有人物', 'warning'); return; }
+    window._cbdbMapLastIds = persons.map(p => p.id);
+    window._cbdbMapLastTitle = persons.length + ' 人';
+    await cbdbPlotGroupOnMap();
+}
+
+// 群体上地图主流程：取地址 → 按坐标聚合 → 智能渲染（少散珠/多聚簇）
+async function cbdbPlotGroupOnMap() {
+    const ids = window._cbdbMapLastIds || [];
+    if (!ids.length) return;
+    const fdef = CBDB_MAP_FILTERS.find(f => f.key === (window._cbdbMapAddrFilter || 'all')) || CBDB_MAP_FILTERS[0];
     showToast('正在获取地址坐标…', 'info', 1500);
     try {
         const res = await fetch('/api/cbdb/persons/geojson', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: persons.map(p => p.id) })
+            body: JSON.stringify({ ids, addr_types: fdef.types })
         });
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
         const feats = data.features || [];
-        if (!feats.length) { showToast('这些人物没有带坐标的地址记录', 'warning', 3500); return; }
+        if (!feats.length) { showToast('这些人物在该筛选下没有带坐标的地址记录', 'warning', 3500); return; }
         switchTab('map');
         setTimeout(() => {
             try {
@@ -1204,46 +1224,148 @@ async function cbdbShowOnMap() {
                 if (!chgisMap) { showToast('地图初始化失败', 'error'); return; }
                 if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
                 if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
-                const orbIcon = L.divIcon({
-                    className: 'cbdb-orb-marker',
-                    html: '<div class="cbdb-orb"></div>',
-                    iconSize: [18, 18],
-                    iconAnchor: [9, 9],
-                    popupAnchor: [0, -11]
-                });
-                const markers = feats.map(f => {
+
+                // 按坐标（0.001°≈111m）聚合
+                const groups = new Map();
+                feats.forEach(f => {
                     const x = f.geometry.coordinates[0], y = f.geometry.coordinates[1];
-                    const p = f.properties || {};
-                    const life = (p.birth || p.death) ? `${p.birth || '?'}–${p.death || '?'}` : '生卒不详';
-                    const yrs = (p.firstyear || p.lastyear) ? `<div class="cbdb-map-popup-line">地址年份：${p.firstyear || '?'}–${p.lastyear || '?'}</div>` : '';
-                    return L.marker([y, x], { icon: orbIcon }).bindPopup(
-                        `<div class="cbdb-map-popup">
-                            <div class="cbdb-map-popup-name">${escapeHtml(p.name)}</div>
-                            <div class="cbdb-map-popup-line">${escapeHtml(p.dynasty)} · ${life}</div>
-                            <div class="cbdb-map-popup-line">${escapeHtml(p.addr_type)}：${escapeHtml(p.place)}</div>
-                            ${yrs}
-                            <a class="cbdb-map-popup-link" onclick="switchTab('cbdb'); loadCBDBPersonDetail(${parseInt(p.person_id) || 0})">在 CBDB 中查看 →</a>
-                        </div>`,
-                        { maxWidth: 260, minWidth: 180 });
+                    const k = x.toFixed(3) + ',' + y.toFixed(3);
+                    if (!groups.has(k)) groups.set(k, { x, y, items: [] });
+                    groups.get(k).items.push(f.properties);
                 });
+                const gs = [...groups.values()];
+                const markers = [];
+                if (gs.length <= 40) {
+                    // 少量散点：逐条金珠
+                    const orbIcon = L.divIcon({
+                        className: 'cbdb-orb-marker',
+                        html: '<div class="cbdb-orb"></div>',
+                        iconSize: [18, 18], iconAnchor: [9, 9], popupAnchor: [0, -11]
+                    });
+                    gs.forEach(g => g.items.forEach(p => markers.push(
+                        L.marker([g.y, g.x], { icon: orbIcon }).bindPopup(cbdbMapPersonPopup(p), { maxWidth: 260, minWidth: 180 })
+                    )));
+                } else {
+                    // 大规模：聚簇圆盘，直径随人数开方增长
+                    window._cbdbMapGroupCache = window._cbdbMapGroupCache || {};
+                    gs.forEach((g, gi) => {
+                        const n = g.items.length;
+                        const d = Math.round(26 + Math.min(30, Math.sqrt(n) * 4));
+                        const icon = L.divIcon({
+                            className: 'cbdb-orb-marker',
+                            html: `<div class="cbdb-cluster" style="width:${d}px;height:${d}px;font-size:${n >= 100 ? 13 : (n >= 10 ? 12 : 11)}px">${n}</div>`,
+                            iconSize: [d, d], iconAnchor: [d / 2, d / 2], popupAnchor: [0, -d / 2]
+                        });
+                        const place = g.items[0].place || '未知地点';
+                        const key = 'g' + gi + '_' + n;
+                        window._cbdbMapGroupCache[key] = g.items.map(p => p.person_id);
+                        markers.push(L.marker([g.y, g.x], { icon }).bindPopup(cbdbMapGroupPopup(place, g.items, key), { maxWidth: 300, minWidth: 220 }));
+                    });
+                }
                 window.cbdbPersonLayer = L.layerGroup(markers).addTo(chgisMap);
-                // 清除按钮（右下角悬浮）
-                const clearCtl = L.control({ position: 'bottomright' });
-                clearCtl.onAdd = () => {
-                    const div = L.DomUtil.create('div', 'cbdb-map-clearbtn');
-                    div.innerHTML = `✕ 清除人物标注（${feats.length}）`;
-                    div.onclick = () => {
-                        if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
-                        if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
-                    };
-                    return div;
-                };
-                window.cbdbPersonClearCtl = clearCtl.addTo(chgisMap);
+                cbdbAddGroupControl(feats.length, gs.length);
                 chgisMap.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
-                showToast(`已在地图标注 ${feats.length} 个地址点，点击珠子看详情`, 'success', 4000);
+                showToast(gs.length <= 40
+                    ? `已标注 ${feats.length} 个地址点，点击珠子看详情`
+                    : `已聚合 ${gs.length} 个地点（${feats.length} 条地址记录），点圆盘看名单`, 'success', 4000);
             } catch (e) { showToast('地图标注失败: ' + e.message, 'error'); }
         }, 300);
     } catch (e) { showToast('加载失败: ' + e.message, 'error'); }
+}
+
+// 单条地址弹窗（散点模式，属性来自 persons_geojson）
+function cbdbMapPersonPopup(p) {
+    const life = (p.birth || p.death) ? `${p.birth || '?'}–${p.death || '?'}` : '生卒不详';
+    const yrs = (p.firstyear || p.lastyear) ? `<div class="cbdb-map-popup-line">地址年份：${p.firstyear || '?'}–${p.lastyear || '?'}</div>` : '';
+    return `<div class="cbdb-map-popup">
+        <div class="cbdb-map-popup-name">${escapeHtml(p.name)}</div>
+        <div class="cbdb-map-popup-line">${escapeHtml(p.dynasty)} · ${life}</div>
+        <div class="cbdb-map-popup-line">${escapeHtml(p.addr_type)}：${escapeHtml(p.place)}</div>
+        ${yrs}
+        <a class="cbdb-map-popup-link" onclick="switchTab('cbdb'); loadCBDBPersonDetail(${parseInt(p.person_id) || 0})">在 CBDB 中查看 →</a>
+    </div>`;
+}
+
+// 聚簇弹窗：地名 + 名单（可点）+ 回灌 CBDB 列表
+function cbdbMapGroupPopup(place, items, cacheKey) {
+    const shown = items.slice(0, 40);
+    const more = items.length - shown.length;
+    const list = shown.map(p =>
+        `<a class="cbdb-map-popup-person" onclick="switchTab('cbdb'); loadCBDBPersonDetail(${parseInt(p.person_id) || 0})">${escapeHtml(p.name)}<span>${escapeHtml(p.dynasty)} · ${escapeHtml(p.addr_type)}</span></a>`
+    ).join('');
+    return `<div class="cbdb-map-popup">
+        <div class="cbdb-map-popup-name">${escapeHtml(place)}</div>
+        <div class="cbdb-map-popup-line">共 ${items.length} 条人物地址记录</div>
+        <div class="cbdb-map-popup-list">${list}${more > 0 ? `<div class="cbdb-map-popup-line">……另有 ${more} 条</div>` : ''}</div>
+        <a class="cbdb-map-popup-link" onclick="cbdbMapGroupToList('${cacheKey}')">把这 ${items.length} 人载入 CBDB 列表 →</a>
+    </div>`;
+}
+
+// 聚点 → CBDB 统一列表（闭环）
+async function cbdbMapGroupToList(cacheKey) {
+    const ids = (window._cbdbMapGroupCache || {})[cacheKey] || [];
+    if (!ids.length) { showToast('名单缓存已失效，请重新标注', 'warning'); return; }
+    switchTab('cbdb');
+    const resultsDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<div class="loading"></div> 查询中...';
+    try {
+        const res = await fetch('/api/cbdb/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filters: {}, person_ids: ids.slice(0, 5000) })
+        });
+        const data = await res.json();
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配人物</p>'; return; }
+        cbdbRenderPersons(resultsDiv, data, {
+            backTitle: '地图聚点（' + ids.length + ' 人）',
+            columns: [
+                { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
+                { label: '朝代', render: p => escapeHtml(p.dynasty) },
+                { label: '生卒', render: p => (p.birthyear > 0 && p.deathyear > 0) ? p.birthyear + '-' + p.deathyear : '?' },
+                { label: '籍贯', render: p => escapeHtml(p.native_place) || '?' },
+                { label: '指数年', render: p => p.index_year || '?' },
+                { label: '性别', render: p => p.female ? '女' : '男' }
+            ],
+            export: { filename: `cbdb_地图聚点_${ids.length}人.csv`,
+                headers: ['姓名', '朝代', '生卒', '籍贯', '指数年', '性别'],
+                rows: data.map(p => [p.name_chn || p.name, p.dynasty,
+                    p.birthyear > 0 && p.deathyear > 0 ? `${p.birthyear}-${p.deathyear}` : '',
+                    p.native_place || '', p.index_year || '', p.female ? '女' : '男']) }
+        });
+        resultsDiv.scrollTop = 0;
+    } catch (e) {
+        resultsDiv.innerHTML = `<p style="color:var(--danger);">加载失败：${e.message}</p>`;
+    }
+}
+
+// 右下角群体标注控制条：地址类型筛选 + 清除
+function cbdbAddGroupControl(nRec, nPlace) {
+    const ctl = L.control({ position: 'bottomright' });
+    ctl.onAdd = () => {
+        const div = L.DomUtil.create('div', 'cbdb-map-grpctl');
+        const chips = CBDB_MAP_FILTERS.map(f =>
+            `<span class="cbdb-map-chip${f.key === window._cbdbMapAddrFilter ? ' active' : ''}" data-k="${f.key}">${f.label}</span>`
+        ).join('');
+        div.innerHTML = `<div class="cbdb-map-grpctl-row">${chips}</div>
+            <div class="cbdb-map-grpctl-row"><span class="cbdb-map-grpctl-info">${nPlace} 地 · ${nRec} 条</span>
+            <span class="cbdb-map-grpctl-clear">✕ 清除标注</span></div>`;
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
+        div.querySelectorAll('.cbdb-map-chip').forEach(chip => {
+            chip.onclick = () => {
+                if (chip.dataset.k === window._cbdbMapAddrFilter) return;
+                window._cbdbMapAddrFilter = chip.dataset.k;
+                cbdbPlotGroupOnMap();
+            };
+        });
+        div.querySelector('.cbdb-map-grpctl-clear').onclick = () => {
+            if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
+            if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
+        };
+        return div;
+    };
+    window.cbdbPersonClearCtl = ctl.addTo(chgisMap);
 }
 
 function setCBDBExport(filename, headers, rows) {

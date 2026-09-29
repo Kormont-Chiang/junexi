@@ -1263,6 +1263,16 @@ function cbdbTrajCat(code) {
     return CBDB_TRAJ_CATS.find(c => c.codes.includes(code)) ||
         { key: 'other', label: '其他', color: '#999', codes: [] };
 }
+// 聚合节点的代表类别：按叙事意义取最高优先级（任职>出生>死所>葬地>籍贯>居住>游历）。
+// 黄州聚簇里有"前住地+团练副使"，应显示任职朱砂红而不是居住金
+function cbdbTrajTopCat(items) {
+    const order = ['posted', 'birth', 'death', 'burial', 'jiguan', 'reside', 'travel'];
+    const keys = new Set(items.map(p => cbdbTrajCat(p.addr_type_code).key));
+    for (const k of order) {
+        if (keys.has(k)) return CBDB_TRAJ_CATS.find(c => c.key === k);
+    }
+    return cbdbTrajCat(items[0] && items[0].addr_type_code);
+}
 
 async function cbdbPlotTrajectory() {
     const ids = window._cbdbMapLastIds || [];
@@ -1302,39 +1312,61 @@ async function cbdbPlotTrajectory() {
                 });
                 const gs = [...groups.values()];
 
-                // 轨迹序列：有年份的居住/任职类节点，按最早年份排序；同坐标取一次
+                // 轨迹序列：有年份的非游历节点按最早年份排序（同坐标取一次）；其余组渲染为小点
                 const seq = [];
+                const minors = [];
                 gs.forEach(g => {
                     const timed = g.items.filter(p =>
                         (p.firstyear || p.lastyear) &&
                         (cbdbTrajCat(p.addr_type_code).key !== 'travel'));
-                    if (!timed.length) return;
-                    const y0 = Math.min(...timed.map(p => p.firstyear || p.lastyear));
-                    seq.push({ g, y0, items: timed });
+                    if (timed.length) {
+                        const y0 = Math.min(...timed.map(p => p.firstyear || p.lastyear));
+                        seq.push({ g, y0, items: g.items });
+                    } else {
+                        minors.push({ g, items: g.items });
+                    }
                 });
                 seq.sort((a, b) => a.y0 - b.y0);
 
                 const markers = [];
                 const linePts = [];
-                seq.forEach((s, i) => {
-                    const cat = cbdbTrajCat(s.items[0].addr_type_code);
+                const addNode = (s, minor, idx) => {
+                    const cat = cbdbTrajTopCat(s.items);
                     const isStart = s.items.some(p => p.addr_type_code === 8);
                     const isEnd = s.items.some(p => p.addr_type_code === 10);
                     const ll = [s.g.y, s.g.x];
-                    linePts.push(ll);
                     const icon = L.divIcon({
                         className: 'cbdb-traj-wrap',
-                        html: `<div class="cbdb-traj-node${isStart ? ' start' : ''}${isEnd ? ' end' : ''}" style="--c:${cat.color}">
+                        html: `<div class="cbdb-traj-node${isStart ? ' start' : ''}${isEnd ? ' end' : ''}${minor ? ' minor' : ''}${!minor && idx % 2 ? ' alt' : ''}" style="--c:${cat.color}">
                             <div class="cbdb-traj-dot"></div>
-                            <div class="cbdb-traj-yr">${s.y0 < 0 ? '?' : s.y0}</div>
+                            ${minor ? '' : `<div class="cbdb-traj-yr">${s.y0 < 0 ? '?' : s.y0}</div>`}
                             ${isStart ? '<div class="cbdb-traj-tag">始</div>' : ''}
                             ${isEnd ? '<div class="cbdb-traj-tag">终</div>' : ''}
                         </div>`,
                         iconSize: [14, 14], iconAnchor: [7, 7]
                     });
-                    markers.push(L.marker(ll, { icon, zIndexOffset: 500 })
-                        .bindPopup(cbdbTrajPopup(pname, person, s.items), { maxWidth: 320, minWidth: 220 }));
+                    const mk = L.marker(ll, { icon, zIndexOffset: minor ? 0 : 500 })
+                        .bindPopup(cbdbTrajPopup(pname, person, s.items), { maxWidth: 320, minWidth: 220 });
+                    markers.push(mk);
+                    return mk;
+                };
+                seq.forEach((s, i) => {
+                    addNode(s, false, i);
+                    linePts.push([s.g.y, s.g.x]);
                 });
+                minors.forEach(m => addNode(m, true, 0));
+
+                // 年份标签：zoom<5 隐藏（留始终点），奇偶节点交替上下防重叠
+                const syncYrVis = () => {
+                    const z = chgisMap.getZoom();
+                    window.cbdbPersonLayer?.eachLayer(l => {
+                        const el = l.getElement?.();
+                        if (el) el.classList.toggle('show-yr', z >= 5);
+                    });
+                };
+                chgisMap.off('zoomend', window._cbdbTrajZoomH);
+                window._cbdbTrajZoomH = syncYrVis;
+                chgisMap.on('zoomend', syncYrVis);
 
                 // 轨迹线 + 方向小箭头（段中点，按线段方位旋转）
                 const layers = [...markers];
@@ -1366,13 +1398,16 @@ async function cbdbPlotTrajectory() {
     } catch (e) { console.error('轨迹加载失败:', e); showToast('加载失败: ' + e.message, 'error', 6000); }
 }
 
-// 轨迹节点弹窗：聚合同地记录，显示类型/年份/此时官职
+// 轨迹节点弹窗：聚合同地记录，显示类型/年份/此时官职/当时年龄
 function cbdbTrajPopup(pname, person, items) {
     const place = items[0].place || '未知地点';
+    const birth = person.birth || 0;
     const rows = items.map(p => {
         const cat = cbdbTrajCat(p.addr_type_code);
+        let age = '';
+        if (birth > 0 && p.firstyear > 0) age = `（${p.firstyear - birth} 岁）`;
         const yrs = (p.firstyear || p.lastyear)
-            ? `${p.firstyear || '?'}–${p.lastyear || '?'}` : '年份不详';
+            ? `${p.firstyear || '?'}–${p.lastyear || '?'}${age}` : '年份不详';
         let officeLine = '';
         if (p.source === 'posted' && p.office) {
             officeLine = `<div class="cbdb-map-popup-office">官职：${escapeHtml(p.office)}</div>`;
@@ -1427,12 +1462,15 @@ async function cbdbPlotGroupOnMap() {
     if (!ids.length) return;
     const fdef = CBDB_MAP_FILTERS.find(f => f.key === (window._cbdbMapAddrFilter || 'all')) || CBDB_MAP_FILTERS[0];
     const src = window._cbdbMapAddrSource || 'bio';
+    // with_offices 只对散点级小群体开启：散点弹窗才显示"此时官职"，
+    // 大群体走聚簇（弹窗是名单），全量任职匹配是浪费（2000 人×任职记录千万级循环）
+    const wo = src === 'bio' && ids.length <= 50;
     showToast('正在获取地址坐标…', 'info', 1500);
     try {
         const res = await fetch('/api/cbdb/persons/geojson', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids, addr_types: fdef.types, addr_source: src, with_offices: src === 'bio' })
+            body: JSON.stringify({ ids, addr_types: fdef.types, addr_source: src, with_offices: wo })
         });
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }

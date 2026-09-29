@@ -2511,6 +2511,10 @@ class CBDBConnection:
             })
         return out
 
+    # 不做"此时官职"匹配的地址类型：籍贯/出生地/葬地/死所/另一籍贯。
+    # 这些地点的语义不是"仕宦经历"，匹配任职会答非所问（眉山籍贯→鳳翔任职）。
+    _OFFICE_SKIP_TYPES = {1, 8, 9, 10, 14}
+
     @classmethod
     def _match_postings(cls, feats, postings):
         """为 bio 模式 feature 按年份交叠匹配任职记录 → properties.offices。
@@ -2522,6 +2526,9 @@ class CBDBConnection:
         for f in feats:
             props = f.get("properties", {})
             pid = props.get("person_id")
+            if props.get("addr_type_code") in cls._OFFICE_SKIP_TYPES:
+                props["offices"] = []
+                continue
             af = props.get("firstyear") or 0
             al = props.get("lastyear") or 0
             if not af and not al:

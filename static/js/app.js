@@ -1207,6 +1207,13 @@ async function cbdbExportGeoJSON() {
 // 地图联动：把当前人物列表的地址坐标直接标注到史料地图（复用 persons/geojson，不入文件）
 // 地图聚点筛选：'all' | 'jiguan' | 'zuji' | 'juzhi' | 'zang'
 window._cbdbMapAddrFilter = window._cbdbMapAddrFilter || 'all';
+// 十期：地址来源 'bio' 生活地址 | 'posted' 任职地 | 'all' 两者合并（群体模式）
+window._cbdbMapAddrSource = window._cbdbMapAddrSource || 'bio';
+const CBDB_MAP_SOURCES = [
+    { key: 'bio', label: '生活地址' },
+    { key: 'posted', label: '任职地' },
+    { key: 'all', label: '生活+任职' },
+];
 const CBDB_MAP_FILTERS = [
     { key: 'all',   label: '全部',   types: [] },
     { key: 'jiguan', label: '籍贯',  types: [1] },
@@ -1233,7 +1240,185 @@ async function cbdbShowOnMap() {
     // 众数朝代占多数时名称优先（混合群体平均年可能落入无人属于的朝代），否则按年份优先、名称兜底
     const majority = topName ? nameCount[topName] > persons.length / 2 : false;
     window._cbdbMapCtx = { year: n ? Math.round(sum / n) : 0, dynastyName: topName, preferName: majority };
+    if (persons.length === 1) {
+        // 单人 → 人生轨迹模式（生活地址+任职地+年份交叠官职）
+        await cbdbPlotTrajectory();
+        return;
+    }
     await cbdbPlotGroupOnMap();
+}
+
+// ── 十期：人生轨迹（单人物）────────────────────────────
+// 地址类型 → 类别（颜色/标签）。任职地 addr_type_code=100 为posted模式专用。
+const CBDB_TRAJ_CATS = [
+    { key: 'birth',  label: '出生地', color: '#2e7d4f', codes: [8] },
+    { key: 'jiguan', label: '籍贯',   color: '#3a6ea5', codes: [1, 14] },
+    { key: 'death',  label: '死所',   color: '#1a1a1a', codes: [10] },
+    { key: 'burial', label: '葬地',   color: '#7d5a3c', codes: [9] },
+    { key: 'posted', label: '任职地', color: '#b03a2e', codes: [100] },
+    { key: 'reside', label: '居住',   color: '#c9962e', codes: [2, 3, 6, 7, 15, 16, 17, 18, 19] },
+    { key: 'travel', label: '游历',   color: '#8a8a8a', codes: [12, 11, 21] },
+];
+function cbdbTrajCat(code) {
+    return CBDB_TRAJ_CATS.find(c => c.codes.includes(code)) ||
+        { key: 'other', label: '其他', color: '#999', codes: [] };
+}
+
+async function cbdbPlotTrajectory() {
+    const ids = window._cbdbMapLastIds || [];
+    if (ids.length !== 1) return;
+    showToast('正在生成人生轨迹…（生活地址 + 任职履历）', 'info', 2000);
+    try {
+        const res = await fetch('/api/cbdb/persons/geojson', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, addr_source: 'all', with_offices: true })
+        });
+        const data = await res.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        const feats = data.features || [];
+        if (!feats.length) { showToast('此人没有带坐标的地址记录', 'warning', 3500); return; }
+        const person = feats.find(f => f.properties.name)?.properties || {};
+        const pname = person.name || ('人物 ' + ids[0]);
+
+        switchTab('map');
+        const mctx = window._cbdbMapCtx;
+        if (mctx) autoSwitchDynastyByYear(mctx.year || 0, mctx.dynastyName, mctx.preferName);
+        setTimeout(() => {
+            try {
+                initMap();
+                if (!chgisMap) { showToast('地图初始化失败', 'error'); return; }
+                if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
+                if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
+
+                // 按坐标聚合（同地多记录合一），保留类型/年份/官职
+                const groups = new Map();
+                feats.forEach(f => {
+                    const p = f.properties;
+                    const x = f.geometry.coordinates[0], y = f.geometry.coordinates[1];
+                    const k = x.toFixed(3) + ',' + y.toFixed(3);
+                    if (!groups.has(k)) groups.set(k, { x, y, items: [] });
+                    groups.get(k).items.push(p);
+                });
+                const gs = [...groups.values()];
+
+                // 轨迹序列：有年份的居住/任职类节点，按最早年份排序；同坐标取一次
+                const seq = [];
+                gs.forEach(g => {
+                    const timed = g.items.filter(p =>
+                        (p.firstyear || p.lastyear) &&
+                        (cbdbTrajCat(p.addr_type_code).key !== 'travel'));
+                    if (!timed.length) return;
+                    const y0 = Math.min(...timed.map(p => p.firstyear || p.lastyear));
+                    seq.push({ g, y0, items: timed });
+                });
+                seq.sort((a, b) => a.y0 - b.y0);
+
+                const markers = [];
+                const linePts = [];
+                seq.forEach((s, i) => {
+                    const cat = cbdbTrajCat(s.items[0].addr_type_code);
+                    const isStart = s.items.some(p => p.addr_type_code === 8);
+                    const isEnd = s.items.some(p => p.addr_type_code === 10);
+                    const ll = [s.g.y, s.g.x];
+                    linePts.push(ll);
+                    const icon = L.divIcon({
+                        className: 'cbdb-traj-wrap',
+                        html: `<div class="cbdb-traj-node${isStart ? ' start' : ''}${isEnd ? ' end' : ''}" style="--c:${cat.color}">
+                            <div class="cbdb-traj-dot"></div>
+                            <div class="cbdb-traj-yr">${s.y0 < 0 ? '?' : s.y0}</div>
+                            ${isStart ? '<div class="cbdb-traj-tag">始</div>' : ''}
+                            ${isEnd ? '<div class="cbdb-traj-tag">终</div>' : ''}
+                        </div>`,
+                        iconSize: [14, 14], iconAnchor: [7, 7]
+                    });
+                    markers.push(L.marker(ll, { icon, zIndexOffset: 500 })
+                        .bindPopup(cbdbTrajPopup(pname, person, s.items), { maxWidth: 320, minWidth: 220 }));
+                });
+
+                // 轨迹线 + 方向小箭头（段中点，按线段方位旋转）
+                const layers = [...markers];
+                if (linePts.length >= 2) {
+                    const line = L.polyline(linePts, {
+                        color: '#c9962e', weight: 2.5, opacity: 0.8, dashArray: '7 5'
+                    });
+                    layers.push(line);
+                    for (let i = 0; i < linePts.length - 1; i++) {
+                        const a = chgisMap.latLngToLayerPoint(linePts[i]);
+                        const b = chgisMap.latLngToLayerPoint(linePts[i + 1]);
+                        const mid = chgisMap.layerPointToLatLng(a.add(b).divideBy(2));
+                        const deg = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+                        layers.push(L.marker(mid, {
+                            icon: L.divIcon({
+                                className: 'cbdb-traj-arrow',
+                                html: `<div style="transform:rotate(${deg}deg);color:#c9962e">▶</div>`,
+                                iconSize: [12, 12], iconAnchor: [6, 6]
+                            }), interactive: false, keyboard: false
+                        }));
+                    }
+                }
+                window.cbdbPersonLayer = L.layerGroup(layers).addTo(chgisMap);
+                cbdbAddTrajLegend(pname, seq.length, feats.length);
+                chgisMap.fitBounds(L.featureGroup(markers).getBounds().pad(0.18), { maxZoom: 7 });
+                showToast(`${pname} 人生轨迹：${seq.length} 个节点（按时间先后连线，点击节点看详情）`, 'success', 5000);
+            } catch (e) { console.error('轨迹渲染失败:', e); showToast('轨迹渲染失败: ' + e.message, 'error', 6000); }
+        }, 300);
+    } catch (e) { console.error('轨迹加载失败:', e); showToast('加载失败: ' + e.message, 'error', 6000); }
+}
+
+// 轨迹节点弹窗：聚合同地记录，显示类型/年份/此时官职
+function cbdbTrajPopup(pname, person, items) {
+    const place = items[0].place || '未知地点';
+    const rows = items.map(p => {
+        const cat = cbdbTrajCat(p.addr_type_code);
+        const yrs = (p.firstyear || p.lastyear)
+            ? `${p.firstyear || '?'}–${p.lastyear || '?'}` : '年份不详';
+        let officeLine = '';
+        if (p.source === 'posted' && p.office) {
+            officeLine = `<div class="cbdb-map-popup-office">官职：${escapeHtml(p.office)}</div>`;
+        } else if (p.offices && p.offices.length) {
+            const same = p.offices.filter(o => o.place === p.place);
+            const list = (same.length ? same : p.offices).slice(0, 3);
+            officeLine = list.map(o =>
+                `<div class="cbdb-map-popup-office">此时官职：${escapeHtml(o.office)} <span class="cbdb-map-popup-office-yr">${o.firstyear || '?'}-${o.lastyear || '?'}</span></div>`
+            ).join('');
+        }
+        return `<div class="cbdb-traj-popup-row">
+            <span class="cbdb-traj-popup-type" style="background:${cat.color}">${cat.label}</span>
+            <span class="cbdb-traj-popup-yrs">${yrs}</span>
+            ${officeLine}
+        </div>`;
+    }).join('');
+    const life = (person.birth || person.death) ? `${person.birth || '?'}–${person.death || '?'}` : '生卒不详';
+    return `<div class="cbdb-map-popup">
+        <div class="cbdb-map-popup-name">${escapeHtml(pname)}</div>
+        <div class="cbdb-map-popup-line">${escapeHtml(person.dynasty || '')} · ${life} · ${escapeHtml(place)}</div>
+        <div class="cbdb-traj-popup-rows">${rows}</div>
+        <a class="cbdb-map-popup-link" onclick="switchTab('cbdb'); loadCBDBPersonDetail(${parseInt(items[0].person_id) || 0})">在 CBDB 中查看 →</a>
+    </div>`;
+}
+
+// 轨迹图例（左下）
+function cbdbAddTrajLegend(pname, nNodes, nRec) {
+    const ctl = L.control({ position: 'bottomleft' });
+    ctl.onAdd = () => {
+        const div = L.DomUtil.create('div', 'cbdb-map-trajlegend');
+        const items = CBDB_TRAJ_CATS.filter(c => c.key !== 'other').map(c =>
+            `<div class="cbdb-map-trajlegend-item"><span class="cbdb-traj-dot-sm" style="background:${c.color}"></span>${c.label}</div>`
+        ).join('');
+        div.innerHTML = `<div class="cbdb-map-trajlegend-title">${escapeHtml(pname)} · 人生轨迹</div>
+            ${items}
+            <div class="cbdb-map-trajlegend-info">${nNodes} 节点 · ${nRec} 条记录</div>
+            <div class="cbdb-map-trajlegend-clear">✕ 清除标注</div>`;
+        L.DomEvent.disableClickPropagation(div);
+        L.DomEvent.disableScrollPropagation(div);
+        div.querySelector('.cbdb-map-trajlegend-clear').onclick = () => {
+            if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
+            if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
+        };
+        return div;
+    };
+    window.cbdbPersonClearCtl = ctl.addTo(chgisMap);
 }
 
 // 群体上地图主流程：取地址 → 按坐标聚合 → 智能渲染（少散珠/多聚簇）
@@ -1241,12 +1426,13 @@ async function cbdbPlotGroupOnMap() {
     const ids = window._cbdbMapLastIds || [];
     if (!ids.length) return;
     const fdef = CBDB_MAP_FILTERS.find(f => f.key === (window._cbdbMapAddrFilter || 'all')) || CBDB_MAP_FILTERS[0];
+    const src = window._cbdbMapAddrSource || 'bio';
     showToast('正在获取地址坐标…', 'info', 1500);
     try {
         const res = await fetch('/api/cbdb/persons/geojson', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids, addr_types: fdef.types })
+            body: JSON.stringify({ ids, addr_types: fdef.types, addr_source: src, with_offices: src === 'bio' })
         });
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
@@ -1311,14 +1497,27 @@ async function cbdbPlotGroupOnMap() {
 }
 
 // 单条地址弹窗（散点模式，属性来自 persons_geojson）
+// 十期增强：offices 字段（年份交叠匹配的任职记录）+ posted 模式的 office 字段
 function cbdbMapPersonPopup(p) {
     const life = (p.birth || p.death) ? `${p.birth || '?'}–${p.death || '?'}` : '生卒不详';
     const yrs = (p.firstyear || p.lastyear) ? `<div class="cbdb-map-popup-line">地址年份：${p.firstyear || '?'}–${p.lastyear || '?'}</div>` : '';
+    let officeHtml = '';
+    if (p.source === 'posted' && p.office) {
+        officeHtml = `<div class="cbdb-map-popup-office">官职：${escapeHtml(p.office)}</div>`;
+    } else if (p.offices && p.offices.length) {
+        const same = p.offices.filter(o => o.place === p.place);
+        const list = (same.length ? same : p.offices).slice(0, 2);
+        officeHtml = list.map(o =>
+            `<div class="cbdb-map-popup-office">此时官职：${escapeHtml(o.office)} <span class="cbdb-map-popup-office-yr">${o.firstyear || '?'}-${o.lastyear || '?'}</span></div>`
+        ).join('');
+    }
+    const srcBadge = p.source === 'posted' ? '<span class="cbdb-map-popup-badge">任职地</span>' : '';
     return `<div class="cbdb-map-popup">
-        <div class="cbdb-map-popup-name">${escapeHtml(p.name)}</div>
+        <div class="cbdb-map-popup-name">${escapeHtml(p.name)}${srcBadge}</div>
         <div class="cbdb-map-popup-line">${escapeHtml(p.dynasty)} · ${life}</div>
         <div class="cbdb-map-popup-line">${escapeHtml(p.addr_type)}：${escapeHtml(p.place)}</div>
         ${yrs}
+        ${officeHtml}
         <a class="cbdb-map-popup-link" onclick="switchTab('cbdb'); loadCBDBPersonDetail(${parseInt(p.person_id) || 0})">在 CBDB 中查看 →</a>
     </div>`;
 }
@@ -1381,15 +1580,29 @@ function cbdbAddGroupControl(nRec, nPlace) {
     const ctl = L.control({ position: 'bottomright' });
     ctl.onAdd = () => {
         const div = L.DomUtil.create('div', 'cbdb-map-grpctl');
+        const src = window._cbdbMapAddrSource || 'bio';
+        // 来源切换（posted 模式无生活地址类型概念，隐藏筛选 chips）
+        const srcSel = CBDB_MAP_SOURCES.map(s =>
+            `<span class="cbdb-map-chip${s.key === src ? ' active' : ''}" data-src="${s.key}">${s.label}</span>`
+        ).join('');
+        const showFilters = src !== 'posted';
         const chips = CBDB_MAP_FILTERS.map(f =>
             `<span class="cbdb-map-chip${f.key === window._cbdbMapAddrFilter ? ' active' : ''}" data-k="${f.key}">${f.label}</span>`
         ).join('');
-        div.innerHTML = `<div class="cbdb-map-grpctl-row">${chips}</div>
+        div.innerHTML = `<div class="cbdb-map-grpctl-row">${srcSel}</div>
+            ${showFilters ? `<div class="cbdb-map-grpctl-row">${chips}</div>` : ''}
             <div class="cbdb-map-grpctl-row"><span class="cbdb-map-grpctl-info">${nPlace} 地 · ${nRec} 条</span>
             <span class="cbdb-map-grpctl-clear">✕ 清除标注</span></div>`;
         L.DomEvent.disableClickPropagation(div);
         L.DomEvent.disableScrollPropagation(div);
-        div.querySelectorAll('.cbdb-map-chip').forEach(chip => {
+        div.querySelectorAll('.cbdb-map-chip[data-src]').forEach(chip => {
+            chip.onclick = () => {
+                if (chip.dataset.src === (window._cbdbMapAddrSource || 'bio')) return;
+                window._cbdbMapAddrSource = chip.dataset.src;
+                cbdbPlotGroupOnMap();
+            };
+        });
+        div.querySelectorAll('.cbdb-map-chip[data-k]').forEach(chip => {
             chip.onclick = () => {
                 if (chip.dataset.k === window._cbdbMapAddrFilter) return;
                 window._cbdbMapAddrFilter = chip.dataset.k;

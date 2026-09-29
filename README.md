@@ -120,7 +120,7 @@ venv\Scripts\python.exe _test_phase6.py   # 四大窗体+群体 16 项
 | `/api/cbdb/places/<id>/assoc` | GET | **地区关系**（该地区人物间的社会关系） |
 | `/api/cbdb/network/group` | POST | **群体网络**（组内关系边 + 外延 BFS） |
 | `/api/cbdb/group/data` | POST | **人群属性**（一人一行的扁平总表） |
-| `/api/cbdb/persons/geojson` | POST | 人物 GeoJSON 导出（地图联动） |
+| `/api/cbdb/persons/geojson` | POST | 人物 GeoJSON（地图联动；`addr_source`=`bio`/`posted`/`all`，`with_offices`=按年份交叠匹配任职记录） |
 
 ### Obsidian
 | 端点 | 方法 | 说明 |

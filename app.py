@@ -9,6 +9,7 @@ import re
 import sys
 import json
 import threading
+from collections import OrderedDict
 import requests
 import subprocess
 from datetime import datetime
@@ -214,18 +215,28 @@ class CBDBConnection:
             print(f"CBDB connection error: {e}")
             return None
 
+    _avail_cache = {"t": 0, "v": False}
+
     @classmethod
     def is_available(cls):
+        # 可用性探测含 COUNT(*) BIOG_MAIN 全表扫描（Access 上秒级），
+        # 每次请求都调用会把所有检索拖慢 3s+；TTL 60s 缓存探测结果。
+        import time as _time
+        now = _time.time()
+        if now - cls._avail_cache["t"] < 60:
+            return cls._avail_cache["v"]
         conn = cls.get_conn()
-        if conn is None:
-            return False
-        try:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM BIOG_MAIN")
-            cursor.fetchone()
-            return True
-        except:
-            return False
+        v = False
+        if conn is not None:
+            try:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM BIOG_MAIN")
+                cursor.fetchone()
+                v = True
+            except Exception:
+                v = False
+        cls._avail_cache = {"t": now, "v": v}
+        return v
 
     @classmethod
     def search_persons(cls, name, dynasty_code=None, gender=None, addr_id=None, limit=50,
@@ -250,58 +261,162 @@ class CBDBConnection:
         tokens = [t.strip() for t in re.split(r"[\n,，、;；]+", raw) if t.strip()]
         if not tokens:
             return []
-        conditions = []
-        params = []
 
-        for token in tokens:
-            tok_conds, tok_params = [], []
-            # 拼音分支：输入全为 ASCII 字母（可含空格、! 前缀）时走 c_name 罗马字
-            if re.fullmatch(r"!?[A-Za-z ]+", token):
-                body = token[1:] if token.startswith("!") else token
-                body = " ".join(body.split())
-                if token.startswith("!"):
-                    tok_conds.append("b.c_name LIKE ?")
-                    tok_params.append(body + "%")
-                elif body and body[0].isupper():
-                    # 逐字首匹配：每个 token 须出现在词首位置，token 间 AND
-                    # （token 只含字母空格，直接内联，绕开 Access 参数绑定怪癖）
-                    groups = []
-                    for tok in body.split():
-                        groups.append("(" + " OR ".join([
-                            f"b.c_name LIKE '{tok} %'", f"b.c_name LIKE '% {tok} %'",
-                            f"b.c_name LIKE '% {tok}'", f"b.c_name = '{tok}'",
-                        ]) + ")")
-                    tok_conds.append("(" + " AND ".join(groups) + ")")
+        # 单个中文词的快速通道：精确+前缀条件可走索引（实测 0.00s），
+        # 现行模糊条件（首尾通配+EXISTS 别名）要全表扫 3s+/变体。
+        # 快速通道零命中时回退模糊，保证"东坡"搜字號等部分匹配仍能命中。
+        single_cjk = len(tokens) == 1 and not re.fullmatch(r"!?[A-Za-z ]+", tokens[0])
+
+        def _build_conditions(fast):
+            conditions, params = [], []
+            for token in tokens:
+                tok_conds, tok_params = [], []
+                # 拼音分支：输入全为 ASCII 字母（可含空格、! 前缀）时走 c_name 罗马字
+                if re.fullmatch(r"!?[A-Za-z ]+", token):
+                    body = token[1:] if token.startswith("!") else token
+                    body = " ".join(body.split())
+                    if token.startswith("!"):
+                        tok_conds.append("b.c_name LIKE ?")
+                        tok_params.append(body + "%")
+                    elif body and body[0].isupper():
+                        # 逐字首匹配：每个 token 须出现在词首位置，token 间 AND
+                        # （token 只含字母空格，直接内联，绕开 Access 参数绑定怪癖）
+                        groups = []
+                        for tok in body.split():
+                            groups.append("(" + " OR ".join([
+                                f"b.c_name LIKE '{tok} %'", f"b.c_name LIKE '% {tok} %'",
+                                f"b.c_name LIKE '% {tok}'", f"b.c_name = '{tok}'",
+                            ]) + ")")
+                        tok_conds.append("(" + " AND ".join(groups) + ")")
+                    else:
+                        like = f"%{body}%"
+                        tok_conds.append("(b.c_name LIKE ? OR b.c_name LIKE ?)")
+                        tok_params += [like, like]
+                elif fast:
+                    # 快速通道：仅全名列的精确+前缀（实测 0.00s 走索引；
+                    # 三列混合 OR 会退化到 1.4s+，姓/名的部分匹配留给模糊回退）
+                    for variant in name_variants(token):
+                        tok_conds.append("b.c_name_chn = ?")
+                        tok_params.append(variant)
+                        tok_conds.append("b.c_name_chn LIKE ?")
+                        tok_params.append(variant + "%")
                 else:
-                    like = f"%{body}%"
-                    tok_conds.append("(b.c_name LIKE ? OR b.c_name LIKE ?)")
-                    tok_params += [like, like]
-            else:
-                # c_name 是罗马字名；中文全名在 c_name_chn（繁体字库），另支持搜姓/名
-                # 简体输入自动转繁，两组变体 OR 检索，保证简繁都能命中
-                variants = name_variants(token)
-                for column in ("b.c_name", "b.c_name_chn", "b.c_surname_chn", "b.c_mingzi_chn"):
+                    # c_name 是罗马字名；中文全名在 c_name_chn（繁体字库），另支持搜姓/名
+                    # 简体输入自动转繁，两组变体 OR 检索，保证简繁都能命中
+                    variants = name_variants(token)
+                    for column in ("b.c_name", "b.c_name_chn", "b.c_surname_chn", "b.c_mingzi_chn"):
+                        for variant in variants:
+                            tok_conds.append(f"{column} LIKE ?")
+                            tok_params.append(f"%{variant}%")
+                    # 别名（字/號/諡/小字等，ALTNAME_DATA）用 EXISTS 子查询，避免 JOIN 放大行数
                     for variant in variants:
-                        tok_conds.append(f"{column} LIKE ?")
+                        tok_conds.append(
+                            "EXISTS (SELECT 1 FROM ALTNAME_DATA an "
+                            "WHERE an.c_personid = b.c_personid AND an.c_alt_name_chn LIKE ?)"
+                        )
                         tok_params.append(f"%{variant}%")
-                # 别名（字/號/諡/小字等，ALTNAME_DATA）用 EXISTS 子查询，避免 JOIN 放大行数
-                for variant in variants:
-                    tok_conds.append(
-                        "EXISTS (SELECT 1 FROM ALTNAME_DATA an "
-                        "WHERE an.c_personid = b.c_personid AND an.c_alt_name_chn LIKE ?)"
-                    )
-                    tok_params.append(f"%{variant}%")
-            conditions.append("(" + " OR ".join(tok_conds) + ")")
-            params += tok_params
+                conditions.append("(" + " OR ".join(tok_conds) + ")")
+                params += tok_params
+            return conditions, params
 
-        where = "(" + " OR ".join(conditions) + ")"
-        # 纯数字单输入：人物ID 直达置顶
-        pid = tokens[0] if len(tokens) == 1 else ""
-        if pid.isdigit():
-            where = "(b.c_personid = ? OR " + where + ")"
-            params.insert(0, int(pid))
+        def _run(fast):
+            conditions, params = _build_conditions(fast)
+            where = "(" + " OR ".join(conditions) + ")"
+            # 纯数字单输入：人物ID 直达置顶
+            pid = tokens[0] if len(tokens) == 1 else ""
+            if pid.isdigit():
+                where = "(b.c_personid = ? OR " + where + ")"
+                params.insert(0, int(pid))
+            return where, params
 
-        sql = f"""
+        def _decorate(rows):
+            results = []
+            for row in rows:
+                surname = safe_decode(row.c_surname_chn)
+                mingzi = safe_decode(row.c_mingzi_chn)
+                name_chn = safe_decode(row.c_name_chn) or (surname + mingzi)
+                results.append({
+                    "id": row.c_personid,
+                    "name": row.c_name or "",
+                    "name_chn": name_chn,
+                    "surname_chn": surname,
+                    "mingzi_chn": mingzi,
+                    "birthyear": row.c_birthyear,
+                    "deathyear": row.c_deathyear,
+                    "dynasty_code": row.c_dy,
+                    "dynasty": safe_decode(row.c_dynasty_chn) or "未知",
+                    "native_place": safe_decode(getattr(row, "native_place", None)) or ""
+                })
+            return results
+
+        def _apply_filters(sql, params):
+            if dynasty_code:
+                sql += " AND b.c_dy = ?"
+                params.append(int(dynasty_code))
+            if gender is not None and str(gender) in ("0", "1"):
+                sql += " AND b.c_female = ?"
+                params.append(str(gender) == "1")  # BIT 列必须绑 bool
+            if addr_id:
+                sql += (" AND (b.c_index_addr_id = ? OR EXISTS ("
+                        "SELECT 1 FROM BIOG_ADDR_DATA ba "
+                        "WHERE ba.c_personid = b.c_personid AND ba.c_addr_type = 1 AND ba.c_addr_id = ?))")
+                params += [int(addr_id), int(addr_id)]
+            if by_from:
+                sql += " AND b.c_birthyear > 0 AND b.c_birthyear >= ?"
+                params.append(int(by_from))
+            if by_to:
+                sql += " AND b.c_birthyear > 0 AND b.c_birthyear <= ?"
+                params.append(int(by_to))
+            if dy_from:
+                sql += " AND b.c_deathyear > 0 AND b.c_deathyear >= ?"
+                params.append(int(dy_from))
+            if dy_to:
+                sql += " AND b.c_deathyear > 0 AND b.c_deathyear <= ?"
+                params.append(int(dy_to))
+            if index_from:
+                sql += " AND b.c_index_year >= ?"
+                params.append(int(index_from))
+            if index_to:
+                sql += " AND b.c_index_year <= ?"
+                params.append(int(index_to))
+            return sql, params
+
+        def _detail_by_ids(ids):
+            """按主键取详情（朝代名/籍贯），JOIN 只作用于 ≤limit 行。
+            籍贯子查询必须一人一行：同一人可能有多条 c_addr_type=1 记录
+            （籍贯变更/数据重复），JOIN 放大会让 TOP limit 个 id 返回 >limit 行。"""
+            marks = ",".join("?" * len(ids))
+            sql = f"""
+                SELECT b.c_personid, b.c_name, b.c_name_chn, b.c_surname_chn, b.c_mingzi_chn,
+                       b.c_birthyear, b.c_deathyear, b.c_dy, d.c_dynasty_chn, ad.c_name_chn AS native_place
+                FROM ((BIOG_MAIN b
+                LEFT JOIN DYNASTIES d ON b.c_dy = d.c_dy)
+                LEFT JOIN (
+                    SELECT ba.c_personid, MIN(ac.c_name_chn) AS c_name_chn
+                    FROM BIOG_ADDR_DATA ba LEFT JOIN ADDR_CODES ac ON ba.c_addr_id = ac.c_addr_id
+                    WHERE ba.c_addr_type = 1
+                    GROUP BY ba.c_personid
+                ) ad ON b.c_personid = ad.c_personid)
+                WHERE b.c_personid IN ({marks})
+                ORDER BY b.c_personid
+            """
+            cursor.execute(sql, list(ids))
+            return _decorate(cursor.fetchall())
+
+        def _exec(where, params, plain=False):
+            if plain:
+                # 快速通道：无 JOIN 单表按索引取 TOP id（Access 多 JOIN 结构会放弃索引全表扫），
+                # 再按主键取详情。仅用于无 addr_id 过滤时（addr 过滤含 EXISTS，会破坏索引路径）。
+                fsql, fparams = _apply_filters(f"SELECT TOP {limit} c_personid FROM BIOG_MAIN b WHERE {where}", list(params))
+                # 不按 c_personid 排序：索引顺序取前 limit 即可，避免大命中集（如单字姓
+                # "王"数万条）整体物化排序；详情查询再按主键排序保证输出稳定
+                cursor.execute(fsql, fparams)
+                ids = [r.c_personid for r in cursor.fetchall()]
+                if not ids:
+                    return []
+                return _detail_by_ids(ids)
+
+            sql = f"""
             SELECT TOP {limit} b.c_personid, b.c_name, b.c_name_chn, b.c_surname_chn, b.c_mingzi_chn,
                    b.c_birthyear, b.c_deathyear, b.c_dy, d.c_dynasty_chn, ad.c_name_chn AS native_place
             FROM ((BIOG_MAIN b
@@ -314,59 +429,18 @@ class CBDBConnection:
             WHERE {where}
         """
 
-        if dynasty_code:
-            sql += " AND b.c_dy = ?"
-            params.append(int(dynasty_code))
-        if gender is not None and str(gender) in ("0", "1"):
-            sql += " AND b.c_female = ?"
-            params.append(str(gender) == "1")  # BIT 列必须绑 bool
-        if addr_id:
-            sql += (" AND (b.c_index_addr_id = ? OR EXISTS ("
-                    "SELECT 1 FROM BIOG_ADDR_DATA ba "
-                    "WHERE ba.c_personid = b.c_personid AND ba.c_addr_type = 1 AND ba.c_addr_id = ?))")
-            params += [int(addr_id), int(addr_id)]
-        if by_from:
-            sql += " AND b.c_birthyear > 0 AND b.c_birthyear >= ?"
-            params.append(int(by_from))
-        if by_to:
-            sql += " AND b.c_birthyear > 0 AND b.c_birthyear <= ?"
-            params.append(int(by_to))
-        if dy_from:
-            sql += " AND b.c_deathyear > 0 AND b.c_deathyear >= ?"
-            params.append(int(dy_from))
-        if dy_to:
-            sql += " AND b.c_deathyear > 0 AND b.c_deathyear <= ?"
-            params.append(int(dy_to))
-        if index_from:
-            sql += " AND b.c_index_year >= ?"
-            params.append(int(index_from))
-        if index_to:
-            sql += " AND b.c_index_year <= ?"
-            params.append(int(index_to))
+            sql, params = _apply_filters(sql, params)
+            sql += " ORDER BY b.c_personid"
+            cursor.execute(sql, params)
+            return _decorate(cursor.fetchall())
 
-        sql += " ORDER BY b.c_personid"
-
-        cursor.execute(sql, params)
-        rows = cursor.fetchall()
-
-        results = []
-        for row in rows:
-            surname = safe_decode(row.c_surname_chn)
-            mingzi = safe_decode(row.c_mingzi_chn)
-            name_chn = safe_decode(row.c_name_chn) or (surname + mingzi)
-            results.append({
-                "id": row.c_personid,
-                "name": row.c_name or "",
-                "name_chn": name_chn,
-                "surname_chn": surname,
-                "mingzi_chn": mingzi,
-                "birthyear": row.c_birthyear,
-                "deathyear": row.c_deathyear,
-                "dynasty_code": row.c_dy,
-                "dynasty": safe_decode(row.c_dynasty_chn) or "未知",
-                "native_place": safe_decode(getattr(row, "native_place", None)) or ""
-            })
-        return results
+        # 先走索引快速通道；单中文词零命中时回退模糊全扫
+        if single_cjk:
+            results = _exec(*_run(True), plain=not addr_id)
+            if not results:
+                results = _exec(*_run(False))
+            return results
+        return _exec(*_run(False))
 
     @classmethod
     def search_offices(cls, q, category=None, limit=30):
@@ -2401,59 +2475,195 @@ class CBDBConnection:
         return {"nodes": list(nodes.values()), "edges": edges}
 
     @classmethod
-    def persons_geojson(cls, person_ids, limit=2000, addr_types=None):
-        """人物地址 GeoJSON（三期 GIS 导出）：BIOG_ADDR_DATA 中所有带坐标的地址记录
-        转为点要素，属性含姓名/朝代/生卒/地址类型/地名。QGIS 可直接加载做空间分析。
-        坐标系 WGS84（x=经度, y=纬度）。addr_types 非空时只保留这些地址类型（如 [1]=籍贯）。"""
+    def _postings_for_persons(cls, person_ids):
+        """批量拉取任职记录（POSTED_TO_OFFICE_DATA + 官名 + 任职地坐标）。
+        返回 [{person_id, office_id, office, addr_id, place, x, y, firstyear, lastyear}]"""
+        conn = cls.get_conn()
+        if not conn:
+            return []
+        cursor = conn.cursor()
+        params = []
+        in_sql = _in_clause("po.c_personid", person_ids, params)
+        sql = f"""
+            SELECT po.c_personid, po.c_office_id, o.c_office_chn,
+                   po.c_firstyear, po.c_lastyear,
+                   pa.c_addr_id, ac.c_name_chn AS addr_name, ac.x_coord, ac.y_coord
+            FROM (((POSTED_TO_OFFICE_DATA po
+            LEFT JOIN OFFICE_CODES o ON po.c_office_id = o.c_office_id)
+            LEFT JOIN POSTED_TO_ADDR_DATA pa ON po.c_posting_id = pa.c_posting_id)
+            LEFT JOIN ADDR_CODES ac ON pa.c_addr_id = ac.c_addr_id)
+            WHERE {in_sql} AND po.c_office_id > 0
+            ORDER BY po.c_personid, po.c_firstyear
+        """
+        cursor.execute(sql, params)
+        out = []
+        for r in cursor.fetchall():
+            out.append({
+                "person_id": r.c_personid,
+                "office_id": r.c_office_id,
+                "office": safe_decode(r.c_office_chn) or "",
+                "addr_id": r.c_addr_id or 0,
+                "place": safe_decode(getattr(r, "addr_name", None)) or "",
+                "x": float(r.x_coord) if r.x_coord is not None else None,
+                "y": float(r.y_coord) if r.y_coord is not None else None,
+                "firstyear": r.c_firstyear or 0,
+                "lastyear": r.c_lastyear or 0,
+            })
+        return out
+
+    @classmethod
+    def _match_postings(cls, feats, postings):
+        """为 bio 模式 feature 按年份交叠匹配任职记录 → properties.offices。
+        交叠规则：地址区间 [af, al]（缺省用生卒年兜底）、任职区间 [of, ol]（缺 ol 视作单年 of）。
+        双方都无年份则无法匹配。匹配按地名相同优先 + 年份交叠。"""
+        by_person = {}
+        for p in postings:
+            by_person.setdefault(p["person_id"], []).append(p)
+        for f in feats:
+            props = f.get("properties", {})
+            pid = props.get("person_id")
+            af = props.get("firstyear") or 0
+            al = props.get("lastyear") or 0
+            if not af and not al:
+                # 地址无年份：用生卒年兜底（宽限各 2 年）
+                birth = props.get("birth") or 0
+                death = props.get("death") or 0
+                if birth > 0 and death > 0:
+                    af, al = birth - 2, death + 2
+                else:
+                    props["offices"] = []
+                    continue
+            if not al:
+                al = af
+            if not af:
+                af = al
+            matched = []
+            place = props.get("place") or ""
+            for p in by_person.get(pid, []):
+                of, ol = p["firstyear"], p["lastyear"]
+                if not of and not ol:
+                    continue
+                if not ol:
+                    ol = of
+                if not of:
+                    of = ol
+                if max(af, of) <= min(al, ol):
+                    matched.append(p)
+            # 同地名任职排前
+            matched.sort(key=lambda p: (0 if p["place"] == place else 1, -(p["lastyear"] or p["firstyear"])))
+            props["offices"] = [
+                {"office": p["office"], "firstyear": p["firstyear"] or None,
+                 "lastyear": p["lastyear"] or None, "place": p["place"]}
+                for p in matched[:4]
+            ]
+
+    @classmethod
+    def persons_geojson(cls, person_ids, limit=2000, addr_types=None, addr_source="bio", with_offices=False):
+        """人物地址 GeoJSON（三期 GIS 导出 + 十期任职地/官职联动）。
+        addr_source: 'bio'(生活地址,默认) / 'posted'(任职地) / 'all'(两者合并)。
+        with_offices: bio/all 模式下为每条地址按年份交叠匹配任职记录 → properties.offices。
+        坐标系 WGS84。addr_types 仅作用于 bio 模式。"""
         conn = cls.get_conn()
         if not conn:
             return {"type": "FeatureCollection", "features": []}
         cursor = conn.cursor()
-        params = []
-        in_sql = _in_clause("ba.c_personid", person_ids, params)
-        type_sql = ""
-        if addr_types:
-            type_sql = " AND " + _in_clause("ba.c_addr_type", addr_types, params)
-        sql = f"""
-            SELECT ba.c_personid, ba.c_addr_type, ba.c_firstyear, ba.c_lastyear,
-                   t.c_addr_desc_chn, ac.c_name_chn AS addr_name, ac.x_coord, ac.y_coord,
-                   b.c_name, b.c_name_chn, b.c_surname_chn, b.c_mingzi_chn,
-                   b.c_birthyear, b.c_deathyear, d.c_dynasty_chn
-            FROM (((BIOG_ADDR_DATA ba
-            LEFT JOIN BIOG_ADDR_CODES t ON ba.c_addr_type = t.c_addr_type)
-            LEFT JOIN ADDR_CODES ac ON ba.c_addr_id = ac.c_addr_id)
-            LEFT JOIN BIOG_MAIN b ON ba.c_personid = b.c_personid)
-            LEFT JOIN DYNASTIES d ON b.c_dy = d.c_dy
-            WHERE {in_sql} AND ac.x_coord IS NOT NULL AND ac.y_coord IS NOT NULL{type_sql}
-            ORDER BY ba.c_personid, ba.c_addr_type
-        """
-        cursor.execute(sql, params)
-        features = []
-        for r in cursor.fetchall():
-            if r.x_coord is None or r.y_coord is None:
-                continue
-            name_chn = safe_decode(r.c_name_chn) or (
-                safe_decode(r.c_surname_chn) + safe_decode(r.c_mingzi_chn))
-            features.append({
-                "type": "Feature",
-                "geometry": {"type": "Point",
-                             "coordinates": [float(r.x_coord), float(r.y_coord)]},
-                "properties": {
-                    "person_id": r.c_personid,
-                    "name": name_chn or r.c_name or "",
-                    "pinyin": r.c_name or "",
-                    "dynasty": safe_decode(r.c_dynasty_chn) or "",
-                    "birth": r.c_birthyear or None,
-                    "death": r.c_deathyear or None,
-                    "addr_type": safe_decode(r.c_addr_desc_chn) or "",
-                    "place": safe_decode(getattr(r, "addr_name", None)) or "",
-                    "firstyear": r.c_firstyear or None,
-                    "lastyear": r.c_lastyear or None,
-                },
-            })
-            if len(features) >= limit:
-                break
-        return {"type": "FeatureCollection", "features": features}
+        feats = []
+        if addr_source in ("bio", "all"):
+            params = []
+            in_sql = _in_clause("ba.c_personid", person_ids, params)
+            type_sql = ""
+            if addr_types:
+                type_sql = " AND " + _in_clause("ba.c_addr_type", addr_types, params)
+            sql = f"""
+                SELECT ba.c_personid, ba.c_addr_type, ba.c_firstyear, ba.c_lastyear,
+                       t.c_addr_desc_chn, ac.c_name_chn AS addr_name, ac.x_coord, ac.y_coord,
+                       b.c_name, b.c_name_chn, b.c_surname_chn, b.c_mingzi_chn,
+                       b.c_birthyear, b.c_deathyear, d.c_dynasty_chn
+                FROM (((BIOG_ADDR_DATA ba
+                LEFT JOIN BIOG_ADDR_CODES t ON ba.c_addr_type = t.c_addr_type)
+                LEFT JOIN ADDR_CODES ac ON ba.c_addr_id = ac.c_addr_id)
+                LEFT JOIN BIOG_MAIN b ON ba.c_personid = b.c_personid)
+                LEFT JOIN DYNASTIES d ON b.c_dy = d.c_dy
+                WHERE {in_sql} AND ac.x_coord IS NOT NULL AND ac.y_coord IS NOT NULL{type_sql}
+                ORDER BY ba.c_personid, ba.c_addr_type
+            """
+            cursor.execute(sql, params)
+            for r in cursor.fetchall():
+                if r.x_coord is None or r.y_coord is None:
+                    continue
+                name_chn = safe_decode(r.c_name_chn) or (
+                    safe_decode(r.c_surname_chn) + safe_decode(r.c_mingzi_chn))
+                feats.append({
+                    "type": "Feature",
+                    "geometry": {"type": "Point",
+                                 "coordinates": [float(r.x_coord), float(r.y_coord)]},
+                    "properties": {
+                        "person_id": r.c_personid,
+                        "name": name_chn or r.c_name or "",
+                        "pinyin": r.c_name or "",
+                        "dynasty": safe_decode(r.c_dynasty_chn) or "",
+                        "birth": r.c_birthyear or None,
+                        "death": r.c_deathyear or None,
+                        "addr_type": safe_decode(r.c_addr_desc_chn) or "",
+                        "addr_type_code": r.c_addr_type,
+                        "place": safe_decode(getattr(r, "addr_name", None)) or "",
+                        "firstyear": r.c_firstyear or None,
+                        "lastyear": r.c_lastyear or None,
+                        "source": "bio",
+                    },
+                })
+                if len(feats) >= limit:
+                    break
+        if addr_source in ("posted", "all"):
+            posted = cls._postings_for_persons(person_ids)
+            n0 = len(feats)
+            for p in posted:
+                if p["x"] is None or p["y"] is None:
+                    continue
+                feats.append({
+                    "type": "Feature",
+                    "geometry": {"type": "Point",
+                                 "coordinates": [p["x"], p["y"]]},
+                    "properties": {
+                        "person_id": p["person_id"],
+                        "name": "",
+                        "pinyin": "",
+                        "dynasty": "",
+                        "birth": None,
+                        "death": None,
+                        "addr_type": "任职地",
+                        "addr_type_code": 100,
+                        "place": p["place"],
+                        "firstyear": p["firstyear"] or None,
+                        "lastyear": p["lastyear"] or None,
+                        "source": "posted",
+                        "office": p["office"],
+                        "office_id": p["office_id"],
+                    },
+                })
+                if len(feats) - n0 >= limit:
+                    break
+        # bio/all 模式下补充姓名朝代等信息缺失的 posted 要素
+        if addr_source == "all":
+            info = {}
+            for f in feats:
+                pr = f["properties"]
+                if pr.get("source") == "bio" and pr["person_id"] not in info:
+                    info[pr["person_id"]] = {
+                        "name": pr["name"], "dynasty": pr["dynasty"],
+                        "birth": pr["birth"], "death": pr["death"]}
+            for f in feats:
+                pr = f["properties"]
+                if pr.get("source") == "posted":
+                    inf = info.get(pr["person_id"])
+                    if inf:
+                        for k, v in inf.items():
+                            if not pr.get(k):
+                                pr[k] = v
+        if with_offices and addr_source in ("bio", "all"):
+            postings = cls._postings_for_persons(person_ids)
+            cls._match_postings(feats, postings)
+        return {"type": "FeatureCollection", "features": feats}
 
     @classmethod
     def get_dynasty_list(cls):
@@ -2693,12 +2903,24 @@ def update_news():
 
 # ── API: CBDB ───────────────────────────────────────────
 
+# 人物检索结果缓存（CBDB 静态快照，数据不变）：参数键 -> 结果，LRU 300 条
+_SEARCH_CACHE = OrderedDict()
+_SEARCH_CACHE_LOCK = threading.Lock()
+_SEARCH_CACHE_CAP = 300
+
 @app.route("/api/cbdb/search", methods=["GET"])
 def cbdb_search():
     """CBDB 人物搜索（本地数据库）：?name= 必填；可选 &dy=朝代代码 &gender=0男1女 &addr_id=籍贯地址（原生人名查询维度）"""
     name = request.args.get("name", "")
     dynasty = request.args.get("dynasty", "")
     dy = request.args.get("dy", "")
+
+    # 结果缓存：钻取过程中反复查同名人时零等待（CBDB 是静态快照，无需失效）
+    cache_key = tuple(sorted((k, v) for k, v in request.args.items()))
+    with _SEARCH_CACHE_LOCK:
+        if cache_key in _SEARCH_CACHE:
+            _SEARCH_CACHE.move_to_end(cache_key)
+            return jsonify(_SEARCH_CACHE[cache_key])
 
     if not CBDBConnection.is_available():
         return jsonify({"error": "CBDB 本地数据库未连接。请确认数据库文件路径正确。"})
@@ -2730,6 +2952,10 @@ def cbdb_search():
         index_from=request.args.get("index_from", "").strip() or None,
         index_to=request.args.get("index_to", "").strip() or None,
     )
+    with _SEARCH_CACHE_LOCK:
+        _SEARCH_CACHE[cache_key] = results
+        if len(_SEARCH_CACHE) > _SEARCH_CACHE_CAP:
+            _SEARCH_CACHE.popitem(last=False)
     return jsonify(results)
 
 @app.route("/api/cbdb/offices/search", methods=["GET"])
@@ -3137,8 +3363,10 @@ def cbdb_year_people():
 
 @app.route("/api/cbdb/persons/geojson", methods=["POST"])
 def cbdb_persons_geojson():
-    """人物地址批量导出 GeoJSON（三期 GIS 导出）：POST {ids:[...]} → FeatureCollection。
-    每个带坐标的地址记录一个点要素；可直接拖入 QGIS。"""
+    """人物地址批量导出 GeoJSON（三期 GIS 导出 + 十期任职地联动）：
+    POST {ids:[...], addr_source?: 'bio'|'posted'|'all', with_offices?: bool, addr_types?: [...]}
+    → FeatureCollection。每个带坐标的地址记录一个点要素；可直接拖入 QGIS。
+    posted 模式 feature 额外含 office/office_id（任职地+官名）。"""
     if not CBDBConnection.is_available():
         return jsonify({"error": "CBDB 本地数据库未连接"})
     data = request.json or {}
@@ -3152,7 +3380,12 @@ def cbdb_persons_geojson():
         addr_types = [int(t) for t in (data.get("addr_types") or [])][:20]
     except (ValueError, TypeError):
         addr_types = []
-    return jsonify(CBDBConnection.persons_geojson(ids, addr_types=addr_types))
+    addr_source = (data.get("addr_source") or "bio").lower()
+    if addr_source not in ("bio", "posted", "all"):
+        addr_source = "bio"
+    with_offices = bool(data.get("with_offices"))
+    return jsonify(CBDBConnection.persons_geojson(
+        ids, addr_types=addr_types, addr_source=addr_source, with_offices=with_offices))
 
 # ── API: DeepSeek AI ────────────────────────────────────
 

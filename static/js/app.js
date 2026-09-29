@@ -1287,7 +1287,14 @@ async function cbdbPlotTrajectory() {
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
         const feats = data.features || [];
-        if (!feats.length) { showToast('此人没有带坐标的地址记录', 'warning', 3500); return; }
+        const meta = data.meta || {};
+        if (!feats.length) {
+            const noCoord = (meta.addr_total || 0) + (meta.posting_total || 0);
+            showToast(noCoord
+                ? `此人有 ${noCoord} 条地址/任职记录，但均无坐标无法定位（古今地名未考定）`
+                : '此人没有地址与任职记录', 'warning', 6000);
+            return;
+        }
         const person = feats.find(f => f.properties.name)?.properties || {};
         const pname = person.name || ('人物 ' + ids[0]);
 
@@ -1390,9 +1397,17 @@ async function cbdbPlotTrajectory() {
                     }
                 }
                 window.cbdbPersonLayer = L.layerGroup(layers).addTo(chgisMap);
-                cbdbAddTrajLegend(pname, seq.length, feats.length);
+                cbdbAddTrajLegend(pname, seq, minors, feats.length, meta);
                 chgisMap.fitBounds(L.featureGroup(markers).getBounds().pad(0.18), { maxZoom: 7 });
-                showToast(`${pname} 人生轨迹：${seq.length} 个节点（按时间先后连线，点击节点看详情）`, 'success', 5000);
+                // 分级文案：数据不足时诚实说明，不用"轨迹"误导
+                const nMinor = minors.length;
+                if (seq.length >= 2) {
+                    showToast(`${pname} 人生轨迹：${seq.length} 个节点（按时间先后连线，点击节点看详情）`, 'success', 5000);
+                } else if (seq.length === 1) {
+                    showToast(`${pname}：仅 1 处带年份记录（${feats.length - nMinor > 1 ? '另有 ' + (feats.length - nMinor - 1) + ' 处' : ''}无法连成轨迹）——点击节点看详情`, 'warning', 6000);
+                } else {
+                    showToast(`${pname}：${nMinor} 处可定位记录均无年份，先后无法确定（小点）——点击看详情`, 'warning', 6000);
+                }
             } catch (e) { console.error('轨迹渲染失败:', e); showToast('轨迹渲染失败: ' + e.message, 'error', 6000); }
         }, 300);
     } catch (e) { console.error('轨迹加载失败:', e); showToast('加载失败: ' + e.message, 'error', 6000); }
@@ -1433,17 +1448,30 @@ function cbdbTrajPopup(pname, person, items) {
     </div>`;
 }
 
-// 轨迹图例（左下）
-function cbdbAddTrajLegend(pname, nNodes, nRec) {
+// 轨迹图例（左下）：只列实际出现的类别 + 数据覆盖边界说明
+function cbdbAddTrajLegend(pname, seq, minors, nRec, meta) {
     const ctl = L.control({ position: 'bottomleft' });
     ctl.onAdd = () => {
         const div = L.DomUtil.create('div', 'cbdb-map-trajlegend');
-        const items = CBDB_TRAJ_CATS.filter(c => c.key !== 'other').map(c =>
+        // 实际出现的类别（保持 CBDB_TRAJ_CATS 顺序）
+        const present = new Set();
+        seq.concat(minors).forEach(s => s.items.forEach(p =>
+            present.add(cbdbTrajCat(p.addr_type_code).key)));
+        const items = CBDB_TRAJ_CATS.filter(c => present.has(c.key)).map(c =>
             `<div class="cbdb-map-trajlegend-item"><span class="cbdb-traj-dot-sm" style="background:${c.color}"></span>${c.label}</div>`
         ).join('');
+        const minorItem = minors.length
+            ? `<div class="cbdb-map-trajlegend-item"><span class="cbdb-traj-dot-sm" style="background:#777;width:6px;height:6px"></span>无年份</div>` : '';
+        // 数据覆盖：无坐标未显示的记录数（诚实呈现边界）
+        const nocoord = (meta.addr_nocoord || 0) + (meta.posting_nocoord || 0);
+        const lines = [];
+        if (seq.length) lines.push(`${seq.length} 节点`);
+        if (minors.length) lines.push(`${minors.length} 小点`);
+        lines.push(`${nRec} 条有坐标`);
+        if (nocoord) lines.push(`${nocoord} 条无坐标未显示`);
         div.innerHTML = `<div class="cbdb-map-trajlegend-title">${escapeHtml(pname)} · 人生轨迹</div>
-            ${items}
-            <div class="cbdb-map-trajlegend-info">${nNodes} 节点 · ${nRec} 条记录</div>
+            ${items}${minorItem}
+            <div class="cbdb-map-trajlegend-info">${lines.join(' · ')}</div>
             <div class="cbdb-map-trajlegend-clear">✕ 清除标注</div>`;
         L.DomEvent.disableClickPropagation(div);
         L.DomEvent.disableScrollPropagation(div);

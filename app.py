@@ -2670,7 +2670,25 @@ class CBDBConnection:
         if with_offices and addr_source in ("bio", "all"):
             postings = cls._postings_for_persons(person_ids)
             cls._match_postings(feats, postings)
-        return {"type": "FeatureCollection", "features": feats}
+        # meta：数据覆盖统计（含无坐标记录），让前端诚实呈现数据边界
+        meta = {"returned": len(feats), "limit": limit}
+        if addr_source in ("bio", "all"):
+            n_bio_coord = sum(1 for f in feats if f["properties"].get("source") == "bio")
+            try:
+                cur2 = conn.cursor()
+                p2 = []
+                in2 = _in_clause("ba.c_personid", person_ids, p2)
+                cur2.execute(f"SELECT COUNT(*) FROM BIOG_ADDR_DATA ba WHERE {in2}", p2)
+                addr_total = cur2.fetchone()[0]
+                meta["addr_total"] = addr_total
+                meta["addr_nocoord"] = max(0, addr_total - n_bio_coord)
+            except Exception:
+                pass
+        if addr_source in ("posted", "all"):
+            n_posted_coord = sum(1 for f in feats if f["properties"].get("source") == "posted")
+            meta["posting_total"] = len(posted)
+            meta["posting_nocoord"] = max(0, len(posted) - n_posted_coord)
+        return {"type": "FeatureCollection", "features": feats, "meta": meta}
 
     @classmethod
     def get_dynasty_list(cls):

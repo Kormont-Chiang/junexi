@@ -1179,28 +1179,31 @@ async function cbdbGroupData() {
 }
 
 // ── 三期：GeoJSON 导出（QGIS 直读）────────────────────────
+// 十期R4：导出跟随当前地址来源（生活地址/任职地/全部），文件名标注来源
 async function cbdbExportGeoJSON() {
     const persons = window._cbdbLastPersons || [];
     if (!persons.length) { showToast('当前列表没有人物', 'warning'); return; }
+    const src = window._cbdbMapAddrSource || 'bio';
+    const srcLabel = { bio: '生活地址', posted: '任职地', all: '生活+任职' }[src] || '生活地址';
     showToast('正在生成 GeoJSON…', 'info', 1500);
     try {
         const res = await fetch('/api/cbdb/persons/geojson', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: persons.map(p => p.id) })
+            body: JSON.stringify({ ids: persons.map(p => p.id), addr_source: src })
         });
         const data = await res.json();
         if (data.error) { showToast(data.error, 'error'); return; }
         const n = (data.features || []).length;
-        if (!n) { showToast('这些人物没有带坐标的地址记录', 'warning', 3500); return; }
+        if (!n) { showToast('这些人物在该来源下没有带坐标的地址记录', 'warning', 3500); return; }
         const blob = new Blob([JSON.stringify(data)], { type: 'application/geo+json;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `cbdb_人物地址_${new Date().toISOString().slice(0, 10)}.geojson`;
+        a.download = `cbdb_${srcLabel}_${new Date().toISOString().slice(0, 10)}.geojson`;
         document.body.appendChild(a);
         a.click();
         setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-        showToast(`GeoJSON 已导出：${n} 个地址点，可直接拖入 QGIS`, 'success', 4000);
+        showToast(`GeoJSON 已导出：${n} 个${srcLabel}点，可直接拖入 QGIS`, 'success', 4000);
     } catch (e) { showToast('导出失败：' + e.message, 'error'); }
 }
 
@@ -2540,12 +2543,20 @@ async function loadCBDBPersonDetail(id) {
             <div style="margin-top:16px">
                 <button class="btn-primary" onclick="loadCBDBNetworkAndShow(${p.id})">🕸️ 查看关系网络</button>
                 <button class="btn-secondary" style="margin-left:8px" onclick="loadKinRecursive(${p.id}, '${escapeHtml(fullName)}')">👨‍👩‍👧 亲属递归检索</button>
+                <button class="btn-secondary" style="margin-left:8px" title="在史料地图上按时间画出此人的生平轨迹（生活地址+任职地）" onclick="cbdbShowPersonTrajectory(${p.id}, '${escapeHtml(fullName)}', ${p.birthyear || 0}, '${escapeHtml(p.dynasty || '')}')">🗺️ 人生轨迹</button>
             </div>
         `;
         detail.scrollTop = 0;
     } catch (e) {
         detail.innerHTML = renderCBDBBackBar('') + `<p style="color:var(--danger);">加载失败：${e.message}</p>`;
     }
+}
+
+// 详情页"人生轨迹"入口：单人物直接进轨迹模式（生活地址+任职地，朝代图层按生年联动）
+function cbdbShowPersonTrajectory(id, name, birthyear, dynasty) {
+    window._cbdbLastPersons = [{ id, index_year: birthyear || 0, dynasty: dynasty || '' }];
+    window._cbdbMapLastIds = [id];
+    cbdbShowOnMap();
 }
 
 async function loadKinRecursive(id, name) {

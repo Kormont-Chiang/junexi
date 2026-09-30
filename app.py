@@ -2476,8 +2476,11 @@ class CBDBConnection:
 
     @classmethod
     def _postings_for_persons(cls, person_ids):
-        """批量拉取任职记录（POSTED_TO_OFFICE_DATA + 官名 + 任职地坐标）。
-        返回 [{person_id, office_id, office, addr_id, place, x, y, firstyear, lastyear}]"""
+        """批量拉取任职记录（POSTED_TO_OFFICE_DATA + 官名 + 任职地坐标 + 人物基本信息）。
+        JOIN BIOG_MAIN/DYNASTIES：纯 posted 模式的 feature 也要带姓名/朝代/生卒，
+        否则群体切"任职地"来源后弹窗第一行是空白名字。
+        返回 [{person_id, office_id, office, addr_id, place, x, y, firstyear, lastyear,
+                name, dynasty, birth, death}]"""
         conn = cls.get_conn()
         if not conn:
             return []
@@ -2487,17 +2490,23 @@ class CBDBConnection:
         sql = f"""
             SELECT po.c_personid, po.c_office_id, o.c_office_chn,
                    po.c_firstyear, po.c_lastyear,
-                   pa.c_addr_id, ac.c_name_chn AS addr_name, ac.x_coord, ac.y_coord
-            FROM (((POSTED_TO_OFFICE_DATA po
+                   pa.c_addr_id, ac.c_name_chn AS addr_name, ac.x_coord, ac.y_coord,
+                   b.c_name, b.c_name_chn, b.c_surname_chn, b.c_mingzi_chn,
+                   b.c_birthyear, b.c_deathyear, d.c_dynasty_chn
+            FROM ((((POSTED_TO_OFFICE_DATA po
             LEFT JOIN OFFICE_CODES o ON po.c_office_id = o.c_office_id)
             LEFT JOIN POSTED_TO_ADDR_DATA pa ON po.c_posting_id = pa.c_posting_id)
             LEFT JOIN ADDR_CODES ac ON pa.c_addr_id = ac.c_addr_id)
+            LEFT JOIN BIOG_MAIN b ON po.c_personid = b.c_personid)
+            LEFT JOIN DYNASTIES d ON b.c_dy = d.c_dy
             WHERE {in_sql} AND po.c_office_id > 0
             ORDER BY po.c_personid, po.c_firstyear
         """
         cursor.execute(sql, params)
         out = []
         for r in cursor.fetchall():
+            name_chn = safe_decode(r.c_name_chn) or (
+                safe_decode(r.c_surname_chn) + safe_decode(r.c_mingzi_chn))
             out.append({
                 "person_id": r.c_personid,
                 "office_id": r.c_office_id,
@@ -2508,6 +2517,10 @@ class CBDBConnection:
                 "y": float(r.y_coord) if r.y_coord is not None else None,
                 "firstyear": r.c_firstyear or 0,
                 "lastyear": r.c_lastyear or 0,
+                "name": name_chn or r.c_name or "",
+                "dynasty": safe_decode(r.c_dynasty_chn) or "",
+                "birth": r.c_birthyear or None,
+                "death": r.c_deathyear or None,
             })
         return out
 
@@ -2633,11 +2646,11 @@ class CBDBConnection:
                                  "coordinates": [p["x"], p["y"]]},
                     "properties": {
                         "person_id": p["person_id"],
-                        "name": "",
+                        "name": p["name"],
                         "pinyin": "",
-                        "dynasty": "",
-                        "birth": None,
-                        "death": None,
+                        "dynasty": p["dynasty"],
+                        "birth": p["birth"],
+                        "death": p["death"],
                         "addr_type": "任职地",
                         "addr_type_code": 100,
                         "place": p["place"],

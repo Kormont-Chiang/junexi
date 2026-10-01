@@ -1,5 +1,7 @@
-// R5 E2E：初始视野聚焦密集区 + 全览按钮 + 年份标签屏幕碰撞去重
+﻿// R5 E2E：初始视野聚焦密集区 + 全览按钮 + 年份标签屏幕碰撞去重
+// 用法: node _e2e_phase10_r5.mjs  （默认 5055；测安装版用 $env:PORT='49318'）
 import puppeteer from 'puppeteer-core';
+const BASE = 'http://127.0.0.1:' + (process.env.PORT || 5055);
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
@@ -11,7 +13,7 @@ await page.setViewport({ width: 1600, height: 1000 });  // 大屏行布局：地
 await page.setCacheEnabled(false);
 page.on('dialog', async d => { await d.dismiss(); });
 page.on('pageerror', e => errors.push(e.message));
-await page.goto('http://127.0.0.1:5055', { waitUntil: 'networkidle0', timeout: 60000 });
+await page.goto(BASE, { waitUntil: 'networkidle0', timeout: 60000 });
 await sleep(1200);
 
 // T1-T3: 苏轼轨迹（跨海南，大分散样本）
@@ -20,7 +22,10 @@ await page.waitForFunction(() => document.getElementById('cbdbDetailPanel')?.tex
 await page.evaluate(() => {
   [...document.querySelectorAll('#cbdbDetailPanel button')].find(b => b.textContent.includes('人生轨迹'))?.click();
 });
-await sleep(7000);
+// 等轨迹真正渲染出来（安装版 Access 查询时长不稳定，固定 sleep 会假阴性）
+await page.waitForFunction(() => (typeof chgisMap !== 'undefined' && !!chgisMap) &&
+  document.querySelectorAll('.cbdb-traj-node:not(.minor)').length >= 15, { timeout: 120000 });
+await sleep(1500);
 
 const view1 = await page.evaluate(() => {
   const c = chgisMap.getCenter(), z = chgisMap.getZoom();
@@ -34,7 +39,8 @@ check('T3 轨迹节点齐(>=15)', view1.nodes >= 15, `nodes=${view1.nodes}`);
 
 // T4: 点全览后视野扩到海南（map bounds 南缘 < 19.5°N 儋州）
 await page.evaluate(() => document.querySelector('.cbdb-traj-fitall')?.click());
-await sleep(3000);
+await page.waitForFunction(() => chgisMap.getBounds().getSouth() < 19.5, { timeout: 30000 });
+await sleep(1000);
 const view2 = await page.evaluate(() => {
   const b = chgisMap.getBounds();
   return { south: b.getSouth(), north: b.getNorth(), z: chgisMap.getZoom() };
@@ -70,7 +76,12 @@ check('T6 始终点标记保留', tags.start && tags.end, JSON.stringify(tags));
 
 // T7: 普通人(孟猷 20715) 小数据回归——不炸、无全览按钮也正常
 await page.evaluate(() => { window._cbdbLastPersons = [{ id: 20715, index_year: 0, dynasty: '宋' }]; window._cbdbMapLastIds = [20715]; cbdbShowOnMap(); });
-await sleep(7000);
+// 冷机 Access 查询可能 >20s，固定 sleep 不可靠——轮询等孟猷特征出现（1 主节点+4 小点）
+await page.waitForFunction(() => {
+  const main = document.querySelectorAll('.cbdb-traj-node:not(.minor)').length;
+  const minor = document.querySelectorAll('.cbdb-traj-node.minor').length;
+  return main === 1 && minor === 4;
+}, { timeout: 90000 });
 const normal = await page.evaluate(() => ({
   nodes: document.querySelectorAll('.cbdb-traj-node:not(.minor)').length,
   minors: document.querySelectorAll('.cbdb-traj-node.minor').length,
@@ -86,7 +97,11 @@ await page.evaluate(() => {
   window._cbdbMapAddrSource = 'bio';
   cbdbPlotGroupOnMap();
 });
-await sleep(6000);
+await page.waitForFunction(() => {
+  let markers = 0;
+  window.cbdbPersonLayer?.eachLayer(l => { if (l.getLatLng) markers++; });
+  return markers > 0 && !document.querySelector('.cbdb-traj-fitall');
+}, { timeout: 90000 });
 const grp = await page.evaluate(() => ({
   fitallGone: !document.querySelector('.cbdb-traj-fitall'),
   markers: (() => { let n = 0; window.cbdbPersonLayer?.eachLayer(l => { if (l.getLatLng) n++; }); return n; })(),

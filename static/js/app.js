@@ -1310,6 +1310,7 @@ async function cbdbPlotTrajectory() {
                 if (!chgisMap) { showToast('地图初始化失败', 'error'); return; }
                 if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
                 if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
+                if (window._cbdbTrajFitAllCtl) { chgisMap.removeControl(window._cbdbTrajFitAllCtl); window._cbdbTrajFitAllCtl = null; }
 
                 // 按坐标聚合（同地多记录合一），保留类型/年份/官职
                 const groups = new Map();
@@ -1367,11 +1368,25 @@ async function cbdbPlotTrajectory() {
                 minors.forEach(m => addNode(m, true, 0));
 
                 // 年份标签：zoom<5 隐藏（留始终点），奇偶节点交替上下防重叠
+                // R5：屏幕空间碰撞检测——标签矩形相交则隐藏（放大后自动释放），根治开封密集区互相压盖
                 const syncYrVis = () => {
                     const z = chgisMap.getZoom();
+                    const show = z >= 5;
+                    const placed = [];
                     window.cbdbPersonLayer?.eachLayer(l => {
                         const el = l.getElement?.();
-                        if (el) el.classList.toggle('show-yr', z >= 5);
+                        if (!el || !el.classList.contains('cbdb-traj-wrap')) return;
+                        el.classList.toggle('show-yr', show);
+                        const yr = el.querySelector('.cbdb-traj-yr');
+                        if (!yr) return;
+                        if (!show) { yr.style.visibility = ''; return; }
+                        const pt = chgisMap.latLngToLayerPoint(l.getLatLng());
+                        const below = !!el.querySelector('.cbdb-traj-node.alt');
+                        const cx = pt.x, cy = below ? pt.y + 21 : pt.y - 17;
+                        const rect = { x: cx - 18, y: cy - 7, w: 36, h: 14 };
+                        const hit = placed.some(r => rect.x < r.x + r.w && rect.x + rect.w > r.x && rect.y < r.y + r.h && rect.y + rect.h > r.y);
+                        yr.style.visibility = hit ? 'hidden' : 'visible';
+                        if (!hit) placed.push(rect);
                     });
                 };
                 chgisMap.off('zoomend', window._cbdbTrajZoomH);
@@ -1401,11 +1416,49 @@ async function cbdbPlotTrajectory() {
                 }
                 window.cbdbPersonLayer = L.layerGroup(layers).addTo(chgisMap);
                 cbdbAddTrajLegend(pname, seq, minors, feats.length, meta);
-                chgisMap.fitBounds(L.featureGroup(markers).getBounds().pad(0.18), { maxZoom: 7 });
+
+                // R5：初始视野聚焦主要活动区（地理中位数 70% 密集区），离群节点（如海南）给"全览"按钮
+                // 注：始终点不强制入视野—— Anchor 会把 bbox 拉回全国尺度，密集区可读性优先；"全览"兜底看全部
+                // 距离归一化：经度差乘 cos(中位纬度)，否则高纬地区经向距离被高估、离群判定失真
+                // 聚焦门槛 ≥8 个节点：普通人只有 3-6 个地址时"聚焦"无意义，还会误出"全览 1 处远方节点"
+                chgisMap.invalidateSize();
+                const allBounds = L.featureGroup(markers).getBounds();
+                const allPts = gs.map(g => [g.y, g.x]);
+                let initBounds = allBounds, initPad = 0.18, focusNote = '';
+                let focusApplied = false;
+                if (allPts.length >= 8) {
+                    const lats = allPts.map(p => p[0]).sort((a, b) => a - b);
+                    const lngs = allPts.map(p => p[1]).sort((a, b) => a - b);
+                    const med = [lats[Math.floor(lats.length / 2)], lngs[Math.floor(lngs.length / 2)]];
+                    const kx = Math.cos(med[0] * Math.PI / 180);
+                    const d2 = p => (p[0] - med[0]) ** 2 + ((p[1] - med[1]) * kx) ** 2;
+                    const near = [...allPts].sort((a, b) => d2(a) - d2(b));
+                    const nFocus = Math.max(2, Math.ceil(allPts.length * 0.7));
+                    const focusPts = near.slice(0, nFocus);
+                    const fB = L.latLngBounds(focusPts);
+                    const area = b => Math.max((b.getNorth() - b.getSouth()) * (b.getEast() - b.getWest()), 1e-9);
+                    const nOut = allPts.length - nFocus;
+                    if (nOut > 0 && area(fB) < area(allBounds) * 0.65) {
+                        initBounds = fB; initPad = 0.25; focusApplied = true;
+                        focusNote = `，已聚焦主要活动区（右上"全览"看全部 ${allPts.length} 节点）`;
+                        const fctl = L.control({ position: 'topright' });
+                        fctl.onAdd = () => {
+                            const div = L.DomUtil.create('div', 'cbdb-traj-fitall');
+                            div.textContent = `⤢ 全览 ${nOut} 处远方节点`;
+                            L.DomEvent.disableClickPropagation(div);
+                            div.onclick = () => chgisMap.flyToBounds(allBounds.pad(0.15), { maxZoom: 7 });
+                            return div;
+                        };
+                        window._cbdbTrajFitAllCtl = fctl;
+                        fctl.addTo(chgisMap);
+                    }
+                }
+                if (!focusApplied && window._cbdbTrajFitAllCtl) { chgisMap.removeControl(window._cbdbTrajFitAllCtl); window._cbdbTrajFitAllCtl = null; }
+                chgisMap.fitBounds(initBounds.pad(initPad), { maxZoom: 7 });
                 // 分级文案：数据不足时诚实说明，不用"轨迹"误导
                 const nMinor = minors.length;
                 if (seq.length >= 2) {
-                    showToast(`${pname} 人生轨迹：${seq.length} 个节点（按时间先后连线，点击节点看详情）`, 'success', 5000);
+                    showToast(`${pname} 人生轨迹：${seq.length} 个节点（按时间先后连线，点击节点看详情）${focusNote}`, 'success', 5000);
                 } else if (seq.length === 1) {
                     showToast(`${pname}：仅 1 处带年份记录（${feats.length - nMinor > 1 ? '另有 ' + (feats.length - nMinor - 1) + ' 处' : ''}无法连成轨迹）——点击节点看详情`, 'warning', 6000);
                 } else {
@@ -1516,6 +1569,7 @@ async function cbdbPlotGroupOnMap() {
                 if (!chgisMap) { showToast('地图初始化失败', 'error'); return; }
                 if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
                 if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
+                if (window._cbdbTrajFitAllCtl) { chgisMap.removeControl(window._cbdbTrajFitAllCtl); window._cbdbTrajFitAllCtl = null; }
                 window._cbdbMapGroupCache = {};  // 每次重绘清空，防旧弹窗串号
 
                 // 按坐标（0.001°≈111m）聚合
@@ -1681,6 +1735,7 @@ function cbdbAddGroupControl(nRec, nPlace) {
         div.querySelector('.cbdb-map-grpctl-clear').onclick = () => {
             if (window.cbdbPersonLayer) { chgisMap.removeLayer(window.cbdbPersonLayer); window.cbdbPersonLayer = null; }
             if (window.cbdbPersonClearCtl) { chgisMap.removeControl(window.cbdbPersonClearCtl); window.cbdbPersonClearCtl = null; }
+            if (window._cbdbTrajFitAllCtl) { chgisMap.removeControl(window._cbdbTrajFitAllCtl); window._cbdbTrajFitAllCtl = null; }
         };
         return div;
     };

@@ -1493,3 +1493,9 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-map-popup-office-yr { font-size: 10px; color: #8a8a96; }
 .cbdb-map-popup-badge { font-size: 9px; background: #b03a2e; color: #fff; border-radius: 3px;
     padding: 1px 4px; margin-left: 6px; vertical-align: 2px; }
+
+/* R5: 轨迹全览按钮 */
+.cbdb-traj-fitall { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.5);
+    border-radius: 14px; color: #e8dcc0; font-size: 12px; padding: 5px 12px; cursor: pointer;
+    user-select: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+.cbdb-traj-fitall:hover { background: rgba(46,38,28,0.95); border-color: #c9962e; }

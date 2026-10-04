@@ -3863,6 +3863,64 @@ def _cbdb_warmup():
 if os.environ.get("WERKZEUG_RUN_MAIN") in (None, "true"):
     threading.Thread(target=_cbdb_warmup, daemon=True).start()
 
+# ── Zotero 本地联动 ─────────────────────────────────────
+ZOTERO_LOCAL = "http://localhost:23119"
+
+def _zotero_get(path, params=None, timeout=4):
+    import urllib.request, urllib.parse
+    url = ZOTERO_LOCAL + path
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"Zotero-API-Version": "3"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.status, json.loads(r.read().decode("utf-8"))
+
+@app.route("/api/zotero/status", methods=["GET"])
+def zotero_status():
+    import urllib.request
+    try:
+        req = urllib.request.Request(ZOTERO_LOCAL + "/connector/ping", headers={"Zotero-API-Version": "3"})
+        with urllib.request.urlopen(req, timeout=2) as r:
+            return jsonify({"ok": r.status == 200})
+    except Exception as e:
+        return jsonify({"ok": False, "detail": str(e)[:120]})
+
+@app.route("/api/zotero/search", methods=["GET"])
+def zotero_search():
+    q = request.args.get("q", "").strip()
+    limit = min(int(request.args.get("limit", 12)), 25)
+    if not q:
+        return jsonify({"ok": False, "error": "empty q"}), 400
+    try:
+        s, data = _zotero_get("/api/users/0/items", {
+            "q": q, "itemType": "-attachment", "limit": limit,
+            "sort": "dateModified", "direction": "desc",
+        })
+        items = []
+        for it in data:
+            d = it.get("data", {})
+            if d.get("itemType") == "attachment":
+                continue
+            names = []
+            for c in d.get("creators", [])[:3]:
+                nm = (c.get("lastName", "") or "") + (c.get("firstName", "") or "")
+                if nm:
+                    names.append(nm)
+            import re as _re
+            _ym = _re.search(r"(\d{4})", d.get("date") or "")
+            items.append({
+                "key": it.get("key"),
+                "title": d.get("title") or "(无题)",
+                "itemType": d.get("itemType", ""),
+                "year": _ym.group(1) if _ym else "",
+                "creators": "、".join(names),
+                "select": "zotero://select/library/items/%s" % it.get("key"),
+                "url": d.get("url", "") or "",
+            })
+        return jsonify({"ok": True, "total": len(items), "items": items})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:150]})
+
 # ── Main ────────────────────────────────────────────────
 
 if __name__ == "__main__":

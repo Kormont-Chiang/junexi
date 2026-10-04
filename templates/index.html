@@ -28,6 +28,8 @@
             <button class="nav-tab" data-tab="tools">🛠️ 史学工具</button>
             <button class="nav-tab" data-tab="cbdb">🏛️ CBDB</button>
             <button class="nav-tab" data-tab="ai">🤖 AI 助手</button>
+            <span id="navPluginZone" style="display:contents"></span>
+            <button class="nav-tab" data-tab="_plugins">🧩 插件</button>
         </div>
         <div class="nav-right">
             <input type="text" id="globalSearch" placeholder="搜索史料、人物、地名...">
@@ -1244,6 +1246,10 @@
                     <div id="aiChatMessages" class="ai-messages">
                         <div class="ai-message system">你好！我是你的历史学研究助手。我可以帮你摘要史料、梳理论证逻辑、解释历史概念、比较不同史料对同一事件的记载等。有什么可以帮你的？</div>
                     </div>
+                    <div class="ai-model-bar">
+                        <select id="aiModelSelect" onchange="aiModelChange()"><option>加载模型...</option></select>
+                        <span id="aiModelDesc" class="ai-model-desc"></span>
+                    </div>
                     <div class="ai-input-area">
                         <input type="text" id="aiChatInput" placeholder="输入你的问题...">
                         <button id="aiSendBtn" onclick="sendAIChat()">发送</button>
@@ -1254,8 +1260,10 @@
                         <button class="ai-quick-btn" onclick="aiQuickAction('concept')">📖 概念解释</button>
                         <button class="ai-quick-btn" onclick="aiQuickAction('compare')">⚖️ 史料对比</button>
                     </div>
-                    <div class="ai-kbref">
+                    <div class="ai-promptlib" id="aiPromptLibPanel" style="display:none"></div>
+                        <div class="ai-kbref">
                         <div class="ai-kbref-bar">
+                            <button class="ai-quick-btn" onclick="aiPromptLibToggle()">✨ 提示词库</button>
                             <button class="ai-quick-btn" onclick="aiKbRefToggle()">📚 引用知识库</button>
                             <span class="ai-kbref-badge" id="aiKbRefBadge" style="display:none" onclick="aiKbRefClear()" title="点击清除引用"></span>
                         </div>
@@ -1263,6 +1271,10 @@
                     </div>
                 </div>
             </div>
+        </div>
+        <div id="_plugins" class="page">
+            <div class="page-header"><h2>🧩 插件管理</h2><p class="page-sub">插件 = plugins/ 下的一个文件夹（manifest.json + routes.py）。安装：放入文件夹后重启；卸载：删除文件夹。开关写盘即时，加载重启后生效。</p></div>
+            <div id="pluginList" class="plugin-list"><div class="empty-hint">加载中…</div></div>
         </div>
     </main>
 
@@ -1275,7 +1287,7 @@
     <script src="/static/js/data/chgis/chgis-data.js?v=16"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="/static/js/lib/echarts.min.js?v=16"></script>
-    <script src="/static/js/app.js?v=52"></script>
+    <script src="/static/js/app.js?v=53"></script>
     <script src="/static/js/zotero.js?v=5"></script>
     <script src="/static/js/ccts.js?v=2"></script>
     <script src="/static/js/reading.js?v=9"></script>

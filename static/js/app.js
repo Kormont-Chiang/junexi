@@ -32,6 +32,82 @@ function initTabs() {
     });
 }
 
+let _pluginTabs = {}; // tabId -> plugin id
+
+function loadPluginNav() {
+    fetch('/api/plugins').then(r => r.json()).then(d => {
+        const zone = document.getElementById('navPluginZone');
+        if (!zone) return;
+        _pluginTabs = {};
+        zone.innerHTML = (d.nav || []).map(n => {
+            _pluginTabs[n.tab] = n.plugin;
+            return '<button class="nav-tab" data-tab="' + n.tab + '" onclick="switchTab(\'' + n.tab + '\')">' + (n.icon || '🧩') + ' ' + escapeHtml(n.label) + '</button>';
+        }).join('');
+    }).catch(() => {});
+}
+
+async function loadPluginPage(tabId) {
+    const pid = _pluginTabs[tabId];
+    if (!pid) return;
+    let pageEl = document.getElementById(tabId);
+    if (!pageEl) {
+        const main = document.querySelector('main');
+        if (!main) return;
+        pageEl = document.createElement('div');
+        pageEl.id = tabId;
+        pageEl.className = 'page';
+        main.appendChild(pageEl);
+        // 晚于 switchTab 的 class 切换创建: 手动对齐激活状态
+        document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === tabId));
+    }
+    if (pageEl.dataset.loaded === '1') return;
+    try {
+        const res = await fetch('/plugin/' + pid + '/page');
+        pageEl.innerHTML = res.ok
+            ? '<div class="plugin-page-wrap">' + await res.text() + '</div>'
+            : '<div class="empty-hint">插件页面加载失败（HTTP ' + res.status + '）</div>';
+        pageEl.dataset.loaded = '1';
+    } catch (e) {
+        pageEl.innerHTML = '<div class="empty-hint">插件页面加载失败</div>';
+    }
+}
+
+async function loadPluginManager() {
+    const list = document.getElementById('pluginList');
+    if (!list) return;
+    try {
+        const d = await (await fetch('/api/plugins')).json();
+        const ps = d.plugins || [];
+        if (!ps.length) {
+            list.innerHTML = '<div class="empty-hint">plugins/ 目录还没有插件。把插件文件夹放进去后重启即可。</div>';
+            return;
+        }
+        list.innerHTML = ps.map(p => {
+            const status = p.loaded ? '<span class="plugin-badge on">运行中</span>' : (p.enabled ? '<span class="plugin-badge warn">待重启加载</span>' : '<span class="plugin-badge off">已停用</span>');
+            return '<div class="plugin-card">' +
+                '<div class="plugin-card-head"><span class="plugin-name">' + escapeHtml(p.name) + '</span><span class="plugin-ver">v' + escapeHtml(String(p.version)) + '</span>' + status + '</div>' +
+                '<div class="plugin-desc">' + escapeHtml(p.desc || '(无描述)') + '</div>' +
+                (p.skip_reason ? '<div class="plugin-skip">' + escapeHtml(p.skip_reason) + '</div>' : '') +
+                '<label class="plugin-toggle"><input type="checkbox" ' + (p.enabled ? 'checked' : '') + ' onchange="togglePlugin(\'' + p.id + '\')"> 启用</label>' +
+                '</div>';
+        }).join('');
+    } catch (e) {
+        list.innerHTML = '<div class="empty-hint">插件清单加载失败</div>';
+    }
+}
+window.loadPluginManager = loadPluginManager;
+
+async function togglePlugin(pid) {
+    try {
+        const d = await (await fetch('/api/plugins/' + encodeURIComponent(pid) + '/toggle', { method: 'POST' })).json();
+        showToast(d.ok ? (d.enabled ? '已启用，重启后加载' : '已停用，重启后卸载') : ('失败：' + (d.error || '')), d.ok ? 'success' : 'error');
+        loadPluginManager();
+    } catch (e) {
+        showToast('操作失败', 'error');
+    }
+}
+window.togglePlugin = togglePlugin;
+
 function switchTab(tabId) {
     // 离开地图页签时停掉进行中的 flyTo 动画：0 尺寸容器上动画每帧抛 Invalid LatLng NaN
     if (tabId !== 'map' && chgisMap && chgisMap._animating) {
@@ -43,6 +119,8 @@ function switchTab(tabId) {
     // 仪表盘单屏: 激活时锁滚动(要锁 html, Windows 上滚动框在 documentElement), 离开解锁
     document.documentElement.classList.toggle('dash-fit', tabId === 'dashboard');
     document.body.classList.toggle('dash-fit', tabId === 'dashboard');
+    if (tabId === '_plugins') loadPluginManager();
+    if (_pluginTabs && _pluginTabs[tabId]) loadPluginPage(tabId);
     // 页面特定初始化
     if (tabId === 'dashboard') loadDashboard();
     if (tabId === 'map') {
@@ -3670,6 +3748,92 @@ function _kbKbForPrompt(text) {
 }
 
 let _aiKbExtra = ''; // 手动引用的知识库条目(拼接进 system prompt)
+let _aiModel = localStorage.getItem('jx_ai_model') || '';
+
+// ── 历史研究提示词库: 点击填入输入框可编辑(框架主导权: AI 给料,人来改) ──
+const AI_PROMPTS = [
+  { cat: '读史料', items: [
+    { label: '📋 史料摘要', text: '请对以下史料做学术摘要：提取时间、地点、人物、事件，分析其史料价值（成书背景、作者立场、记载可靠性）。史料：' },
+    { label: '📜 古文今译', text: '请把以下史料翻译成现代汉语，保持原意，人名地名官名首次出现括注原文；译后简要说明其中关键的制度或典故。史料：' },
+    { label: '🔎 史料批判', text: '请从史料学角度批判性考察以下记载：它成书于何时、作者可能站在什么立场、有没有讳饰或夸大、与同类史料相比可信度如何？史料：' },
+    { label: '⚖️ 史料对比', text: '以下是对同一事件的两段记载。请逐条比对其异同，分析差异可能反映的史书体例、作者立场或史料来源问题。记载一：\n记载二：' },
+    { label: '🏛️ 职官制度释读', text: '请解释以下史料中涉及的官名、机构及其职掌，说明该职官在当时的政治地位，并提示相关研究可检索的工具书（如《中国历代官制大辞典》、CBDB 职官检索）。史料：' },
+  ]},
+  { cat: '写作与论证', items: [
+    { label: '✏️ 论证分析', text: '请分析以下论证的结构：论点是什么、证据链是否完整、有没有跳跃或循环论证、可补充哪类反证？我的论证：' },
+    { label: '🎯 选题打磨', text: '我在考虑这个论文选题：【 】。请帮我：1）用一句话概括它的学术问题意识；2）列出 3 个可能的创新点或贡献；3）指出最明显的两个薄弱处；4）建议两类必须读的核心研究。' },
+    { label: '🧩 段落逻辑检查', text: '请检查以下段落的论证逻辑：每句在论证链中的功能、有没有重复或断裂、论据与论点的对应关系。要求逐句批注，不要重写原文。段落：' },
+    { label: '📝 引言/结论重写建议', text: '请针对以下引言/结论给出重写建议：1）它目前的问题（空泛/重复/与正文脱节等）；2）一个可行的三段式结构（问题-方法-贡献）；3）要求保留我的核心观点，只动组织方式。文本：' },
+    { label: '📖 概念解释', text: '请解释以下史学概念：它的学术定义、提出者或经典使用、在研究中常见的误用、以及适合进一步阅读的文献。概念：' },
+  ]},
+  { cat: '自检与攻防', items: [
+    { label: '⚔️ 反方质询', text: '请扮演一位严苛的同行评审，对我以下论点提出最有力的 5 条反驳（包括史料反证的可能、概念误用、时代错置），然后给我的应对策略各写一句。论点：' },
+    { label: '🧪 证据充分性检查', text: '我目前的证据链：【 】。请评估：1）核心论点有几条独立证据支撑；2）有没有单源孤证；3）还缺什么类型的材料（传世/出土/文集/方志/域外文献）才能闭环。' },
+    { label: '🔍 时代错置扫描', text: '请扫描以下文字，找出可能的时代错置：用后出的概念/制度/观念描述前代的地方，逐条指出并给出更严谨的替代表述。文本：' },
+    { label: '🗂️ 综述框架', text: '我的研究主题：【 】。请帮我搭一个文献综述框架：1）按问题意识分 3-4 个板块；2）每个板块列出该领域的代表学者与代表作类型；3）指出板块之间的承转逻辑。' },
+  ]},
+  { cat: '语言', items: [
+    { label: '🌐 学术英语润色', text: '请将以下中文学术表述翻译成学术英语（历史学专业），保持术语准确（首次出现括注拉丁转写），句式符合英文学术写作习惯。文本：' },
+    { label: '📰 英文摘要撰写', text: '请基于以下中文摘要撰写英文摘要（150-250 词）：遵循国际史学期刊惯例，包含问题意识、材料、方法、贡献。中文摘要：' },
+    { label: '🇯🇵 日文史料汉读辅助', text: '请帮助阅读以下日文论著（训读体/学术日语）：1）概括作者的核心论点；2）指出关键术语的日文原文与中文对应；3）如有汉文史料引用，说明其与中国史料的异文。文本：' },
+  ]},
+];
+
+function aiPromptLibToggle() {
+    const panel = document.getElementById('aiPromptLibPanel');
+    if (!panel) return;
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    panel.innerHTML = AI_PROMPTS.map((g, gi) =>
+        '<div class="pl-cat"><div class="pl-cat-title">' + g.cat + '</div>' +
+        g.items.map(it => '<div class="pl-item" onclick="aiPromptUse(' + gi + ',\'' + it.label.slice(0,2) + '\', this)">' + it.label + '</div>').join('') + '</div>'
+    ).join('');
+    // 给每项存 index 更稳: 重渲染带 data 属性
+    panel.querySelectorAll('.pl-item').forEach((el, k) => {
+        let flat = [];
+        AI_PROMPTS.forEach(g => g.items.forEach(it => flat.push(it)));
+        el.onclick = () => aiPromptPick(flat[k]);
+    });
+}
+window.aiPromptLibToggle = aiPromptLibToggle;
+
+function aiPromptPick(item) {
+    const input = document.getElementById('aiChatInput');
+    if (input) { input.value = item.text; input.focus(); }
+    const panel = document.getElementById('aiPromptLibPanel');
+    if (panel) panel.style.display = 'none';
+    showToast('提示词已填入,可修改后再发送', 'success');
+}
+window.aiPromptPick = aiPromptPick;
+
+// ── 模型选择 ──
+async function loadAiModels() {
+    const sel = document.getElementById('aiModelSelect');
+    if (!sel) return;
+    try {
+        const d = await (await fetch('/api/ai/models')).json();
+        const models = d.models || [];
+        sel.innerHTML = models.map(m =>
+            '<option value="' + m.id + '"' + (m.id === (window._aiModel || d.default) ? ' selected' : '') + '>' + m.name + '</option>'
+        ).join('');
+        const cur = models.find(m => m.id === (window._aiModel || d.default));
+        const desc = document.getElementById('aiModelDesc');
+        if (desc) desc.textContent = cur ? cur.desc : '';
+        window._aiModel = sel.value;
+    } catch (e) {
+        sel.innerHTML = '<option>模型清单加载失败</option>';
+    }
+}
+window.loadAiModels = loadAiModels;
+
+function aiModelChange() {
+    const sel = document.getElementById('aiModelSelect');
+    if (!sel) return;
+    window._aiModel = sel.value;
+    localStorage.setItem('jx_ai_model', sel.value);
+    showToast('已切换模型', 'success');
+}
+window.aiModelChange = aiModelChange;
 
 
 function aiKbRefToggle() {
@@ -3765,7 +3929,7 @@ async function sendAIChat() {
         const res = await fetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages: msgs })
+            body: JSON.stringify({ messages: msgs, model: window._aiModel || undefined })
         });
         const data = await res.json();
 
@@ -4912,4 +5076,7 @@ window._logActivity = function (type, label) {
     } else {
         bindTopSearch();
     }
+    // 插件 nav 注入: 启动即拉取
+    if (typeof loadPluginNav === 'function') loadPluginNav();
+if (typeof loadAiModels === 'function') loadAiModels();
 })();

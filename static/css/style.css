@@ -12352,3 +12352,12 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .ai-kbref-list { max-height: 180px; overflow-y: auto; scrollbar-width: thin; }
 .ai-kbref-item { font-size: 12px; line-height: 1.7; padding: 5px 8px; border-radius: 6px; cursor: pointer; transition: background .15s; }
 .ai-kbref-item:hover { background: rgba(201, 169, 110, 0.10); }
+
+.ai-model-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.ai-model-bar select { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 5px 10px; font-size: 12px; max-width: 200px; }
+.ai-model-desc { font-size: 11px; opacity: .55; }
+.ai-promptlib { margin-top: 10px; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); max-height: 260px; overflow-y: auto; scrollbar-width: thin; }
+.pl-cat { margin-bottom: 8px; }
+.pl-cat-title { font-size: 11px; letter-spacing: 2px; opacity: .5; margin: 6px 0 4px; }
+.pl-item { display: inline-block; font-size: 12px; padding: 4px 10px; margin: 2px 4px 2px 0; border: 1px solid var(--border-color); border-radius: 12px; cursor: pointer; transition: all .15s; }
+.pl-item:hover { border-color: #c9a96e; color: #c9a96e; }

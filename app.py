@@ -25,7 +25,14 @@ load_dotenv()
 OBSIDIAN_VAULT = "论文写作"
 OBSIDIAN_API_PORT = 27123  # Local REST API 插件默认端口
 OBSIDIAN_API_KEY = os.environ.get("OBSIDIAN_API_KEY", "")
-DEEPSEEK_MODEL = "deepseek-chat"  # 通过 OpenClaw 调用
+DEEPSEEK_MODEL = "deepseek-chat"  # 默认模型
+
+# 可选 AI 模型注册表: chat 端点按客户端传来的 model 分发
+AI_MODELS = [
+    {"id": "deepseek-chat", "name": "DeepSeek 对话", "desc": "日常问答与写作,响应快", "via": "deepseek", "model": "deepseek-chat"},
+    {"id": "deepseek-reasoner", "name": "DeepSeek 深思", "desc": "复杂推理/长链条论证,慢但深", "via": "deepseek", "model": "deepseek-reasoner"},
+    {"id": "openclaw", "name": "OpenClaw 网关", "desc": "走本机网关,模型取决于 OpenClaw 配置", "via": "openclaw", "model": "kimi-coding/k2p6"},
+]
 
 # CBDB 本地数据库路径
 # 数据已从微信接收目录迁移到稳定位置（微信会定期清理旧文件，导致"又打不开"）。
@@ -2747,34 +2754,46 @@ def obsidian_api(method, path, payload=None):
     except Exception as e:
         return {"error": str(e)}
 
-def deepseek_chat(messages, stream=False):
-    """调用 DeepSeek（优先直连 API，fallback OpenClaw gateway）"""
-    # 有 API key 时优先直连，更快更稳
+def _model_cfg(model_id):
+    """按 id 查模型配置; 未知 id 退回默认。"""
+    for m in AI_MODELS:
+        if m["id"] == model_id:
+            return m
+    return AI_MODELS[0]
+
+
+def deepseek_chat(messages, stream=False, model_id=None):
+    """按 model_id 分发: deepseek=直连官方API, openclaw=本机网关。fallback 逻辑保留。"""
+    cfg = _model_cfg(model_id)
+    model_name = cfg.get("model", DEEPSEEK_MODEL)
+    via = cfg.get("via", "deepseek")
+
+    # DeepSeek 官方: 有 API key 时优先直连，更快更稳
     api_key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if api_key:
+    if via == "deepseek" and api_key:
         try:
             r = requests.post("https://api.deepseek.com/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": DEEPSEEK_MODEL, "messages": messages, "stream": stream},
-                timeout=60)
+                json={"model": model_name, "messages": messages, "stream": stream},
+                timeout=120)
             if r.status_code == 200:
                 return r.json()
         except:
             pass
 
-    # fallback：OpenClaw 本地 gateway
+    # OpenClaw 本地 gateway(对 deepseek-reasoner 等也可兜底)
     try:
         r = requests.post("http://127.0.0.1:8642/v1/chat/completions",
-            json={"model": DEEPSEEK_MODEL, "messages": messages, "stream": stream},
-            timeout=15)
+            json={"model": model_name, "messages": messages, "stream": stream},
+            timeout=60)
         if r.status_code == 200:
             return r.json()
     except:
         pass
 
-    if not api_key:
+    if via == "deepseek" and not api_key:
         return {"error": "未配置 DeepSeek API Key"}
-    return {"error": "DeepSeek 服务暂不可用（直连与 gateway 均失败）"}
+    return {"error": "模型服务暂不可用（直连与 gateway 均失败）"}
 
 # ── Routes: 页面 ────────────────────────────────────────
 
@@ -3718,6 +3737,12 @@ def cbdb_persons_geojson():
 
 # ── API: DeepSeek AI ────────────────────────────────────
 
+@app.route("/api/ai/models", methods=["GET"])
+def ai_models():
+    """可用模型清单(健康状态由前端实测, 这里只给注册表+默认)"""
+    return jsonify({"ok": True, "default": AI_MODELS[0]["id"], "models": AI_MODELS})
+
+
 @app.route("/api/ai/chat", methods=["POST"])
 def ai_chat():
     """AI 对话（兼容 {messages} 与 {message, history} 两种请求格式）"""
@@ -3730,7 +3755,7 @@ def ai_chat():
     if not messages:
         return jsonify({"error": "messages 不能为空"})
 
-    result = deepseek_chat(messages, stream)
+    result = deepseek_chat(messages, stream, model_id=data.get("model"))
     # 统一解包：保留 OpenAI 原始结构，同时提供 response 便捷字段
     if isinstance(result, dict) and "choices" in result:
         try:
@@ -4132,6 +4157,48 @@ def chgis_regime():
 # ── 插件加载(骨架: 只注册不改现有路由) ──
 from plugin_loader import load_plugins
 _plugin_nav, _plugin_loaded, _plugin_skipped = load_plugins(app)
+
+
+def _scan_plugin_manifests():
+    """扫描 plugins/ 返回全部插件清单(含未加载/被禁用的), 供管理面板。"""
+    import glob as _glob
+    items = []
+    for mf in sorted(_glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugins", "*", "manifest.json"))):
+        try:
+            m = json.load(open(mf, encoding="utf-8"))
+            pid = m.get("id") or os.path.basename(os.path.dirname(mf))
+            items.append({
+                "id": pid,
+                "name": m.get("name", pid),
+                "version": m.get("version", "?"),
+                "desc": m.get("desc", ""),
+                "enabled": m.get("enabled", True) is not False,
+                "loaded": pid in _plugin_loaded,
+                "skip_reason": dict(_plugin_skipped).get(pid, "") if not m.get("enabled", True) else "",
+            })
+        except Exception as e:
+            items.append({"id": os.path.basename(os.path.dirname(mf)), "name": "?", "version": "?", "desc": "", "enabled": False, "loaded": False, "skip_reason": "manifest 解析失败: %s" % str(e)[:80]})
+    return items
+
+
+@app.route("/api/plugins", methods=["GET"])
+def api_plugins_list():
+    return jsonify({"ok": True, "plugins": _scan_plugin_manifests(), "nav": _plugin_nav})
+
+
+@app.route("/api/plugins/<pid>/toggle", methods=["POST"])
+def api_plugins_toggle(pid):
+    import glob as _glob
+    for mf in _glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugins", "*", "manifest.json")):
+        try:
+            m = json.load(open(mf, encoding="utf-8"))
+            if m.get("id") == pid or os.path.basename(os.path.dirname(mf)) == pid:
+                m["enabled"] = not (m.get("enabled", True) is not False)
+                json.dump(m, open(mf, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+                return jsonify({"ok": True, "id": pid, "enabled": m["enabled"], "note": "重启后生效"})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)[:120]}), 500
+    return jsonify({"ok": False, "error": "插件不存在"}), 404
 
 # ── 启动预热 ────────────────────────────────────────────
 def _cbdb_warmup():

@@ -156,9 +156,54 @@
         });
     }
 
+    function buildRecentPanel() {
+        var dash = document.getElementById('dashboard');
+        if (!dash) return;
+        var cols = dash.querySelectorAll('.dash-col');
+        if (!cols.length) return;
+        if (document.getElementById('zotRecentPanel')) return;
+        var panel = el('div', 'panel');
+        panel.id = 'zotRecentPanel';
+        var head = el('div', 'panel-header');
+        head.innerHTML = '<span class="panel-icon">📚</span> Zotero 最近入库';
+        panel.appendChild(head);
+        var box = el('div');
+        box.id = 'zotRecentList';
+        box.style.padding = '10px 14px';
+        box.innerHTML = '<div class="zot-empty">读取中…</div>';
+        panel.appendChild(box);
+        cols[cols.length - 1].appendChild(panel);
+
+        fetch(API + 'recent?limit=8').then(function (r) { return r.json(); }).then(function (d) {
+            var b = document.getElementById('zotRecentList');
+            if (!b) return;
+            if (!d.ok) { b.innerHTML = '<div class="zot-empty">Zotero 未运行，启动后自动显示</div>'; return; }
+            if (!d.items || !d.items.length) { b.innerHTML = '<div class="zot-empty">库还是空的</div>'; return; }
+            b.innerHTML = '';
+            d.items.forEach(function (it) {
+                var a = el('a', 'zot-item');
+                a.href = it.select;
+                a.title = '在 Zotero 中定位';
+                a.style.padding = '8px 10px';
+                var meta = [];
+                if (it.creators) meta.push(esc(it.creators));
+                if (it.year) meta.push(esc(it.year));
+                a.innerHTML =
+                    '<div class="zot-item-title" style="font-size:12.5px">' + esc(it.title) + '</div>' +
+                    '<div class="zot-item-meta">' + meta.join(' · ') + '</div>';
+                b.appendChild(a);
+            });
+        }).catch(function () {
+            var b = document.getElementById('zotRecentList');
+            if (b) b.innerHTML = '<div class="zot-empty">Zotero 未运行，启动后自动显示</div>';
+        });
+    }
+
     function init() {
         injectStyles();
-        if (buildSection()) checkStatus();
+        buildSection();
+        buildRecentPanel();
+        checkStatus();
     }
 
     if (document.readyState === 'loading') {

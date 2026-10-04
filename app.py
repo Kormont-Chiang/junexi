@@ -3885,6 +3885,42 @@ def zotero_status():
     except Exception as e:
         return jsonify({"ok": False, "detail": str(e)[:120]})
 
+def _zotero_map_items(data):
+    items = []
+    for it in data:
+        d = it.get("data", {})
+        if d.get("itemType") == "attachment":
+            continue
+        names = []
+        for c in d.get("creators", [])[:3]:
+            nm = (c.get("lastName", "") or "") + (c.get("firstName", "") or "")
+            if nm:
+                names.append(nm)
+        import re as _re
+        _ym = _re.search(r"(\d{4})", d.get("date") or "")
+        items.append({
+            "key": it.get("key"),
+            "title": d.get("title") or "(无题)",
+            "itemType": d.get("itemType", ""),
+            "year": _ym.group(1) if _ym else "",
+            "creators": "、".join(names),
+            "select": "zotero://select/library/items/%s" % it.get("key"),
+            "url": d.get("url", "") or "",
+        })
+    return items
+
+@app.route("/api/zotero/recent", methods=["GET"])
+def zotero_recent():
+    limit = min(int(request.args.get("limit", 8)), 20)
+    try:
+        s, data = _zotero_get("/api/users/0/items", {
+            "itemType": "-attachment", "limit": limit,
+            "sort": "dateAdded", "direction": "desc",
+        })
+        return jsonify({"ok": True, "total": len(data), "items": _zotero_map_items(data)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:150]})
+
 @app.route("/api/zotero/search", methods=["GET"])
 def zotero_search():
     q = request.args.get("q", "").strip()
@@ -3896,28 +3932,7 @@ def zotero_search():
             "q": q, "itemType": "-attachment", "limit": limit,
             "sort": "dateModified", "direction": "desc",
         })
-        items = []
-        for it in data:
-            d = it.get("data", {})
-            if d.get("itemType") == "attachment":
-                continue
-            names = []
-            for c in d.get("creators", [])[:3]:
-                nm = (c.get("lastName", "") or "") + (c.get("firstName", "") or "")
-                if nm:
-                    names.append(nm)
-            import re as _re
-            _ym = _re.search(r"(\d{4})", d.get("date") or "")
-            items.append({
-                "key": it.get("key"),
-                "title": d.get("title") or "(无题)",
-                "itemType": d.get("itemType", ""),
-                "year": _ym.group(1) if _ym else "",
-                "creators": "、".join(names),
-                "select": "zotero://select/library/items/%s" % it.get("key"),
-                "url": d.get("url", "") or "",
-            })
-        return jsonify({"ok": True, "total": len(items), "items": items})
+        return jsonify({"ok": True, "total": len(data), "items": _zotero_map_items(data)})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:150]})
 

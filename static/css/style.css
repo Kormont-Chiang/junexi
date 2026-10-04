@@ -12268,3 +12268,84 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .kb-back:hover{background:rgba(201,169,110,.1)}
 .kb-head{font-size:13px;font-weight:600;color:var(--text-primary);padding:4px 8px 8px}
 .kb-pt{font-size:12px;color:var(--text-primary);line-height:1.6;padding:5px 8px;border-left:2px solid rgba(201,169,110,.35);margin:0 4px 8px;background:rgba(201,169,110,.04);border-radius:0 6px 6px 0}
+
+/* ── 学术知识库 · 星辰大海 ─────────────────────────── */
+.kb-toolbar { display: flex; align-items: center; gap: 10px; margin: 2px 0 8px; }
+.kb-search {
+    flex: 1; max-width: 320px; padding: 6px 12px; font-size: 12.5px;
+    background: rgba(201, 169, 110, 0.06); border: 1px solid rgba(201, 169, 110, 0.3);
+    border-radius: 16px; color: var(--text, #e4e0d8); outline: none;
+}
+.kb-search:focus { border-color: #c9a96e; background: rgba(201, 169, 110, 0.1); }
+.kb-search::placeholder { color: #8a8578; }
+.kb-count { font-size: 11px; color: #8a8578; margin-left: auto; white-space: nowrap; }
+.kb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.kb-chip {
+    font-size: 11.5px; padding: 2px 10px; border-radius: 12px; cursor: pointer;
+    border: 1px solid; background: transparent; transition: all .18s; user-select: none;
+}
+.kb-chip:hover { background: rgba(201, 169, 110, 0.12); }
+.kb-chip.on { background: rgba(201, 169, 110, 0.16); font-weight: 600; }
+.kb-stars-wrap { position: relative; width: 100%; }
+#kbSvg { display: block; width: 100%; height: auto; max-height: 400px; min-height: 260px; }
+.kb-constellation { font-size: 13px; font-weight: 600; letter-spacing: 2px; opacity: .85; }
+.kb-star { transition: opacity .25s; }
+.kb-star:hover { stroke: #fff; stroke-width: 1.2; }
+.kb-star-glow { animation: kbTwinkle 3.6s ease-in-out infinite; }
+@keyframes kbTwinkle { 0%, 100% { opacity: .28; } 50% { opacity: .12; } }
+.kb-tip {
+    position: absolute; z-index: 30; width: 240px; padding: 10px 12px; pointer-events: none;
+    background: rgba(24, 22, 18, 0.96); border: 1px solid rgba(201, 169, 110, 0.4);
+    border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.kb-tip-theme { font-size: 11px; font-weight: 600; margin-bottom: 5px; display: flex; justify-content: space-between; gap: 8px; }
+.kb-tip-src { color: #8a8578; font-weight: 400; }
+.kb-tip-text { font-size: 12px; line-height: 1.65; color: var(--text, #e4e0d8); }
+.kb-detail {
+    margin-top: 10px; padding: 14px 16px; border-radius: 12px;
+    background: rgba(201, 169, 110, 0.07); border: 1px solid rgba(201, 169, 110, 0.35);
+    animation: kbIn .22s ease;
+}
+@keyframes kbIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.kb-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.kb-detail-theme { font-size: 12px; font-weight: 700; padding: 1px 10px; border: 1px solid; border-radius: 12px; }
+.kb-detail-src { font-size: 11px; color: #8a8578; }
+.kb-detail-close { margin-left: auto; cursor: pointer; font-size: 18px; color: #8a8578; padding: 0 6px; line-height: 1; }
+.kb-detail-close:hover { color: #c9a96e; }
+.kb-detail-text { font-size: 13px; line-height: 1.85; color: var(--text, #e4e0d8); }
+.kb-detail-nav { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.kb-nav-btn {
+    padding: 4px 12px; font-size: 11.5px; border-radius: 8px; cursor: pointer;
+    border: 1px solid rgba(201, 169, 110, 0.35); background: transparent; color: #c9a96e;
+    max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kb-nav-btn:hover { background: rgba(201, 169, 110, 0.14); }
+
+/* ── 星辰大海 · 全屏漫游层 ─────────────────────────── */
+.kb-sea-btn {
+    padding: 4px 12px; font-size: 11.5px; border-radius: 12px; cursor: pointer;
+    border: 1px solid rgba(201, 169, 110, 0.45); background: rgba(201, 169, 110, 0.08);
+    color: #c9a96e; white-space: nowrap;
+}
+.kb-sea-btn:hover { background: rgba(201, 169, 110, 0.18); }
+.kb-sea-overlay {
+    position: fixed; inset: 0; z-index: 9000; display: flex; flex-direction: column;
+    background: radial-gradient(ellipse at 30% 20%, #171a24 0%, #0b0d14 55%, #07080d 100%);
+    padding: 18px 26px; animation: kbSeaIn .3s ease;
+}
+@keyframes kbSeaIn { from { opacity: 0; } to { opacity: 1; } }
+.kb-sea-head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.kb-sea-title { font-size: 15px; font-weight: 600; color: #c9a96e; letter-spacing: 2px; white-space: nowrap; }
+.kb-sea-close {
+    margin-left: auto; font-size: 22px; line-height: 1; padding: 2px 12px; cursor: pointer;
+    background: transparent; border: 1px solid rgba(201, 169, 110, 0.4); border-radius: 10px; color: #c9a96e;
+}
+.kb-sea-close:hover { background: rgba(201, 169, 110, 0.15); }
+.kb-chips-sea { margin-bottom: 8px; }
+.kb-stars-sea { flex: 1; min-height: 0; }
+.kb-stars-sea #kbSvgSea { width: 100%; height: 100%; max-height: none; min-height: 0; }
+.kb-detail-sea {
+    max-width: 860px; margin: 10px auto 0; width: 100%;
+    background: rgba(20, 22, 30, 0.92); border-color: rgba(201, 169, 110, 0.5);
+}
+.kb-sea-foot { text-align: center; font-size: 11px; color: #6a6558; padding-top: 8px; }

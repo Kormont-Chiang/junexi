@@ -239,24 +239,243 @@ async function loadRecentActivity() {
 
 
 let _kbData = null;
+// ── 学术知识库 · 星辰大海 ────────────────────────────
+let _kbFilterQ = '';
+let _kbFilterTheme = '';
+let _kbSelEntry = null;
+
+function _kbRand(seed) {
+    let s = seed % 2147483647;
+    if (s <= 0) s += 2147483646;
+    return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+}
+
 function renderKbList(container) {
-    container.innerHTML = _kbData.lectures.map((L, i) => `
-        <div class="kb-row" onclick="showKbLecture(${i})">
-            <span class="kb-no">${escapeHtml(L.no)}</span>
-            <span class="kb-title">${escapeHtml(L.title)}</span>
-            <span class="kb-n">${L.points.length}</span>
-        </div>`).join('') + '<div class="tip-refresh">' + escapeHtml(_kbData.source) + '</div>';
+    if (!container) return;
+    const data = _kbData;
+    if (!data || !Array.isArray(data.entries)) {
+        container.innerHTML = '<div class="empty-hint">知识库加载失败</div>';
+        return;
+    }
+    const themes = data.themes || [];
+    const entries = data.entries;
+    const byTheme = {};
+    entries.forEach(e => { (byTheme[e.theme] = byTheme[e.theme] || []).push(e); });
+
+    const chips = themes.map(t => {
+        const n = (byTheme[t.key] || []).length;
+        const on = !_kbFilterTheme || _kbFilterTheme === t.key;
+        return `<span class="kb-chip${(_kbFilterTheme === t.key) ? ' on' : ''}" data-theme="${t.key}" onclick="kbSetTheme('${_kbFilterTheme === t.key ? '' : t.key}')" style="border-color:${t.color};color:${t.color}">${t.icon} ${t.name}·${n}</span>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="kb-toolbar">
+        <input id="kbSearch" class="kb-search" placeholder="在这片星空中检索…" value="${_kbFilterQ.replace(/"/g, '&quot;')}" oninput="kbFilter(this.value)">
+        <button class="kb-sea-btn" onclick="kbOpenSea()" title="全屏漫游星海">⤢ 星海</button>
+        <span class="kb-count" id="kbCount">${entries.length} 颗星辰 · ${themes.length} 个星座</span>
+      </div>
+      <div class="kb-chips">${chips}</div>
+      <div class="kb-stars-wrap"><svg id="kbSvg" viewBox="0 0 1000 470" preserveAspectRatio="xMidYMid meet"></svg><div class="kb-tip" id="kbTip" style="display:none"></div></div>
+      <div class="kb-detail" id="kbDetail" style="display:none"></div>
+      <div class="tip-refresh">${escapeHtml(data.source || '')} · 悬停识星,点击入星海</div>`;
+
+    _kbDrawStars();
 }
-function showKbLecture(i) {
+
+function _kbEntryMatch(e) {
+    if (_kbFilterTheme && e.theme !== _kbFilterTheme) return false;
+    if (_kbFilterQ) {
+        const q = _kbFilterQ.toLowerCase();
+        return (e.text || '').toLowerCase().includes(q) || (e.src || '').toLowerCase().includes(q);
+    }
+    return true;
+}
+
+function _kbDrawStars(svgId) {
+    svgId = svgId || 'kbSvg';
+    const inSea = (svgId === 'kbSvgSea');
+    const svg = document.getElementById(svgId);
+    if (!svg || !_kbData) return;
+    const themes = _kbData.themes || [];
+    const entries = _kbData.entries || [];
+    const byTheme = {};
+    entries.forEach(e => { (byTheme[e.theme] = byTheme[e.theme] || []).push(e); });
+
+    // 星座区: 上排4个 下排3个(居中)
+    const cols = [130, 375, 620, 865];
+    const rows = [128, 348];
+    const positions = [
+        [cols[0], rows[0]], [cols[1], rows[0]], [cols[2], rows[0]], [cols[3], rows[0]],
+        [cols[0] + 122, rows[1]], [cols[1] + 122, rows[1]], [cols[2] + 122, rows[1]]
+    ];
+
+    let html = '';
+    let matchCount = 0;
+    const starPos = {};
+
+    themes.forEach((t, ti) => {
+        const list = byTheme[t.key] || [];
+        const [cx, cy] = positions[ti] || [500, 300];
+        const rnd = _kbRand(t.key.length * 7919 + ti * 104729);
+
+        // 星座名
+        html += `<text x="${cx}" y="${cy}" text-anchor="middle" class="kb-constellation" fill="${t.color}">${t.icon} ${t.name}</text>`;
+
+        // 星位: 环带分布
+        const coords = list.map((e, ei) => {
+            const ring = ei % 2 === 0 ? 1 : 1.62;
+            const baseAng = (ei / Math.max(list.length, 1)) * Math.PI * 2 + ti * 0.7;
+            const ang = baseAng + (rnd() - 0.5) * 0.5;
+            const R = 38 * ring + (rnd() - 0.5) * 12;
+            return { e, x: cx + Math.cos(ang) * R * 1.28, y: cy + Math.sin(ang) * R };
+        });
+
+        // 连线: 近邻成链(星座感)
+        for (let k = 0; k < coords.length; k++) {
+            const a = coords[k], b = coords[(k + 1) % coords.length];
+            const dx = a.x - b.x, dy = a.y - b.y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < 150 || k === coords.length - 1) {
+                const dimA = _kbEntryMatch(a.e), dimB = _kbEntryMatch(b.e);
+                const op = (dimA && dimB) ? 0.32 : 0.05;
+                html += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${t.color}" stroke-width="0.6" opacity="${op}"/>`;
+            }
+        }
+
+        // 星辰
+        coords.forEach(({ e, x, y }) => {
+            const on = _kbEntryMatch(e);
+            if (on) matchCount++;
+            const r = e.text.length > 90 ? 5.4 : (e.text.length > 55 ? 4.4 : 3.5);
+            const op = on ? 0.92 : 0.07;
+            const glowOp = on ? 0.30 : 0.03;
+            starPos[e.id] = { x, y };
+            html += `<circle cx="${x}" cy="${y}" r="${r * 2.2}" fill="${t.color}" opacity="${glowOp}" class="kb-star-glow"/>`;
+            html += `<circle cx="${x}" cy="${y}" r="${r}" fill="${t.color}" opacity="${op}" class="kb-star" data-id="${e.id}" style="cursor:pointer"/>`;
+        });
+    });
+
+    svg.innerHTML = html;
+
+    // 交互
+    const tip = document.getElementById(inSea ? 'kbTipSea' : 'kbTip');
+    svg.querySelectorAll('.kb-star').forEach(el => {
+        const id = parseInt(el.dataset.id, 10);
+        const e = entries.find(x => x.id === id);
+        if (!e) return;
+        const th = themes.find(t => t.key === e.theme) || {};
+        el.addEventListener('mousemove', (ev) => {
+            const wrap = svg.parentElement.getBoundingClientRect();
+            tip.style.display = 'block';
+            tip.style.left = Math.min(ev.clientX - wrap.left + 14, wrap.width - 250) + 'px';
+            tip.style.top = (ev.clientY - wrap.top + 10) + 'px';
+            tip.innerHTML = `<div class="kb-tip-theme" style="color:${th.color || '#c9a96e'}">${th.icon || ''} ${th.name || ''} <span class="kb-tip-src">${escapeHtml(e.src || '')}</span></div><div class="kb-tip-text">${escapeHtml(e.text.slice(0, 72))}${e.text.length > 72 ? '…' : ''}</div>`;
+        });
+        el.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+        el.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            tip.style.display = 'none';
+            kbShowEntry(id, inSea);
+        });
+    });
+
+    const cnt = document.getElementById(inSea ? 'kbCountSea' : 'kbCount');
+    if (cnt) cnt.textContent = (_kbFilterQ || _kbFilterTheme) ? `匹配 ${matchCount} 颗星辰` : `${entries.length} 颗星辰 · ${themes.length} 个星座`;
+}
+
+let _kbFilterTimer = null;
+function kbFilter(v) {
+    _kbFilterQ = (v || '').trim();
+    clearTimeout(_kbFilterTimer);
+    _kbFilterTimer = setTimeout(() => { _kbSelEntry = null; _kbHideDetail(); _kbHideDetail(true); _kbDrawStars(); if (document.getElementById('kbSvgSea')) _kbDrawStars('kbSvgSea'); }, 220);
+}
+
+function kbSetTheme(key) {
+    _kbFilterTheme = key || '';
+    _kbSelEntry = null;
+    _kbHideDetail();
     const container = document.getElementById('papersList');
-    if (!container || !_kbData) return;
-    const L = _kbData.lectures[i];
-    container.innerHTML = '<div class="kb-back" onclick="renderKbList(document.getElementById(\'papersList\'))">← 目录</div>' +
-        '<div class="kb-head">' + escapeHtml(L.no) + ' · ' + escapeHtml(L.title) + '</div>' +
-        L.points.map(pt => '<div class="kb-pt">' + escapeHtml(pt) + '</div>').join('');
-    try { window._logActivity('kb-read', '学术写作知识库：' + (L.no || '') + ' ' + (L.title || '')); } catch (e) {}
+    if (container) renderKbList(container);
 }
-window.showKbLecture = showKbLecture;
+
+function kbShowEntry(id, inSea) {
+    const entries = (_kbData && _kbData.entries) || [];
+    const themes = (_kbData && _kbData.themes) || [];
+    const e = entries.find(x => x.id === id);
+    if (!e) return;
+    _kbSelEntry = id;
+    try { window._logActivity('kb-read', '学术知识库：' + (e.text || '').slice(0, 24)); } catch (err) {}
+    const th = themes.find(t => t.key === e.theme) || {};
+    const detail = document.getElementById(inSea ? 'kbDetailSea' : 'kbDetail');
+    if (!detail) return;
+    // 同星座导航
+    const sibs = entries.filter(x => x.theme === e.theme);
+    const idx = sibs.findIndex(x => x.id === id);
+    const prev = sibs[(idx - 1 + sibs.length) % sibs.length];
+    const next = sibs[(idx + 1) % sibs.length];
+    detail.style.display = 'block';
+    detail.innerHTML = `
+      <div class="kb-detail-head">
+        <span class="kb-detail-theme" style="color:${th.color || '#c9a96e'};border-color:${th.color || '#c9a96e'}">${th.icon || ''} ${th.name || ''}</span>
+        <span class="kb-detail-src">${escapeHtml(e.src || '')}</span>
+        <span class="kb-detail-close" onclick="kbHideDetail()" title="关闭">×</span>
+      </div>
+      <div class="kb-detail-text">${escapeHtml(e.text)}</div>
+      <div class="kb-detail-nav">
+        <button onclick="kbShowEntry(${prev.id}, ${inSea ? 'true' : 'false'})" class="kb-nav-btn">← ${escapeHtml((prev.text || '').slice(0, 14))}…</button>
+        <button onclick="kbHideDetail()" class="kb-nav-btn">收起</button>
+        <button onclick="kbShowEntry(${next.id}, ${inSea ? 'true' : 'false'})" class="kb-nav-btn">${escapeHtml((next.text || '').slice(0, 14))}… →</button>
+      </div>`;
+    detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+window.kbShowEntry = kbShowEntry;
+
+function kbOpenSea() {
+    if (document.getElementById('kbSeaOverlay')) return;
+    const ov = document.createElement('div');
+    ov.id = 'kbSeaOverlay';
+    ov.className = 'kb-sea-overlay';
+    ov.innerHTML = `
+      <div class="kb-sea-head">
+        <span class="kb-sea-title">学术写作知识库 · 星辰大海</span>
+        <input id="kbSearchSea" class="kb-search" placeholder="在这片星空中检索…" value="${_kbFilterQ.replace(/"/g, '&quot;')}" oninput="kbFilter(this.value)">
+        <span class="kb-count" id="kbCountSea"></span>
+        <button class="kb-sea-close" onclick="kbCloseSea()" title="关闭 (ESC)">×</button>
+      </div>
+      <div class="kb-chips kb-chips-sea">${(_kbData.themes || []).map(t => {
+          const n = (_kbData.entries || []).filter(e => e.theme === t.key).length;
+          return `<span class="kb-chip${(_kbFilterTheme === t.key) ? ' on' : ''}" onclick="kbSetTheme('${_kbFilterTheme === t.key ? '' : t.key}')" style="border-color:${t.color};color:${t.color}">${t.icon} ${t.name}·${n}</span>`;
+      }).join('')}</div>
+      <div class="kb-stars-wrap kb-stars-sea"><svg id="kbSvgSea" viewBox="0 0 1000 470" preserveAspectRatio="xMidYMid meet"></svg><div class="kb-tip" id="kbTipSea" style="display:none"></div></div>
+      <div class="kb-detail kb-detail-sea" id="kbDetailSea" style="display:none"></div>
+      <div class="kb-sea-foot">${escapeHtml((_kbData && _kbData.source) || '')} · 悬停识星 · 点击入星海 · ESC 退出</div>`;
+    document.body.appendChild(ov);
+    document.body.style.overflow = 'hidden';
+    _kbDrawStars('kbSvgSea');
+    const cnt = document.getElementById('kbCountSea');
+    if (cnt) cnt.textContent = (_kbData.entries || []).length + ' 颗星辰';
+    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') kbCloseSea(); });
+}
+window.kbOpenSea = kbOpenSea;
+
+function kbCloseSea() {
+    const ov = document.getElementById('kbSeaOverlay');
+    if (ov) ov.remove();
+    document.body.style.overflow = '';
+    _kbHideDetail(true);
+}
+window.kbCloseSea = kbCloseSea;
+
+function kbHideDetail(sea) {
+    _kbSelEntry = null;
+    _kbHideDetail(sea);
+}
+window.kbHideDetail = kbHideDetail;
+function _kbHideDetail(sea) {
+    const detail = document.getElementById(sea ? 'kbDetailSea' : 'kbDetail');
+    if (detail) { detail.style.display = 'none'; detail.innerHTML = ''; }
+}
+
 
 async function loadPapersList() {
     const container = document.getElementById('papersList');

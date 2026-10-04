@@ -197,7 +197,41 @@
         if (!box) return;
         box.innerHTML = '';
         if (!items.length) { box.innerHTML = '<div class="zot-empty">无匹配</div>'; return; }
-        items.forEach(function (it) { box.appendChild(cardHtml(it)); });
+        window._rdItems = window._rdItems || {};
+        items.forEach(function (it) { window._rdItems[it.key] = it; box.appendChild(cardHtml(it)); });
+        tryPending();
+    }
+
+    // 仪表盘"在研论文"点击后带 key 跳来, 自动选中; 独立PDF则直接内嵌打开
+    function tryPending() {
+        try {
+            var pdfKey = sessionStorage.getItem('jx.rd.openpdf');
+            if (pdfKey) {
+                sessionStorage.removeItem('jx.rd.openpdf');
+                openPdfDirect(pdfKey);
+                return;
+            }
+            var key = sessionStorage.getItem('jx.rd.pending');
+            if (!key) return;
+            sessionStorage.removeItem('jx.rd.pending');
+            var it = (window._rdItems || {})[key];
+            if (it) { select(it); return; }
+            var node = document.querySelector('.rd-card[data-key="' + key + '"]');
+            if (node) node.click();
+        } catch (e) {}
+    }
+
+    function openPdfDirect(attKey) {
+        var frame = document.getElementById('rdFrame');
+        var ph = document.getElementById('rdPh');
+        document.getElementById('rdPdfTitle').textContent = '外部 PDF';
+        ph.style.display = 'flex';
+        ph.innerHTML = '<div style="font-size:30px">⏳</div><div>载入 PDF…</div>';
+        frame.onload = function () {
+            frame.style.display = 'block';
+            ph.style.display = 'none';
+        };
+        frame.src = '/api/zotero/pdf/' + attKey;
     }
 
     function loadRecent() {

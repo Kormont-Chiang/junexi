@@ -207,34 +207,24 @@ async function loadNews() {
 async function loadRecentActivity() {
     const container = document.getElementById('activityTimeline');
     if (!container) return;
-    // 从 Obsidian 获取最近修改的文件
+    const ICONS = { read: '📖', note: '✏️', search: '🔍' };
     try {
-        const res = await fetch('/api/obsidian/notes?folder=札记');
+        const res = await fetch('/api/activity/recent?limit=6');
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-            container.innerHTML = data.slice(0, 5).map(f => `
-                <div class="timeline-item">
+        if (data.ok && data.items && data.items.length) {
+            container.innerHTML = data.items.map(a => {
+                const d = new Date(a.t * 1000);
+                const hh = String(d.getHours()).padStart(2, '0'), mm = String(d.getMinutes()).padStart(2, '0');
+                return `<div class="timeline-item">
                     <div class="timeline-dot"></div>
-                    <div class="timeline-content">编辑了 <a onclick="openObsidianURI('${f.path || f}')">${f.basename || f}</a></div>
-                </div>
-            `).join('');
+                    <div class="timeline-content">${ICONS[a.act] || '·'} ${escapeHtml(a.label || '')} <span style="color:var(--text-muted);font-size:11px">${hh}:${mm}</span></div>
+                </div>`;
+            }).join('');
         } else {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">🕐</div>
-                    <div class="empty-state-text">暂无近期活动</div>
-                    <div class="empty-state-hint">在 Obsidian 中编辑文件后自动更新</div>
-                </div>
-            `;
+            container.innerHTML = '<div class="empty-hint">在 JX 里读论文、存笔记、查 CBDB, 足迹自动记在这里</div>';
         }
-    } catch {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">🕐</div>
-                <div class="empty-state-text">无法加载动态</div>
-                <div class="empty-state-hint">请确认 Obsidian 和 Local REST API 插件已启用</div>
-            </div>
-        `;
+    } catch (e) {
+        container.innerHTML = '<div class="empty-hint">读取失败</div>';
     }
 }
 
@@ -242,36 +232,30 @@ async function loadPapersList() {
     const container = document.getElementById('papersList');
     if (!container) return;
     try {
-        const res = await fetch('/api/obsidian/notes?folder=论文');
+        const res = await fetch('/api/zotero/recently-read?limit=5');
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-            container.innerHTML = data.slice(0, 5).map(f => `
-                <div class="doc-item" onclick="switchTab('workspace')" style="cursor:pointer">
+        if (data.ok && data.items && data.items.length) {
+            container.innerHTML = data.items.map(it => `
+                <div class="doc-item" onclick="openReadingItem('${it.key}', '${it.att_key}')" style="cursor:pointer" title="在读文献页打开">
                     <div class="doc-icon">📄</div>
                     <div class="doc-info">
-                        <div class="doc-title">${(f.basename || f).replace('.md', '')}</div>
-                        <div class="doc-meta">在 Obsidian 中查看</div>
+                        <div class="doc-title">${escapeHtml(it.title)}</div>
+                        <div class="doc-meta">${escapeHtml(it.creators || '')}${it.year ? ' · ' + it.year : ''} · 读于 ${it.read_at}</div>
                     </div>
-                </div>
-            `).join('');
+                </div>`).join('');
         } else {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">📄</div>
-                    <div class="empty-state-text">暂无论在研论文</div>
-                    <div class="empty-state-hint">在 Obsidian Vault 的「论文」文件夹中创建笔记</div>
-                </div>
-            `;
+            container.innerHTML = '<div class="empty-hint">在 JX 或 Zotero 里读论文后, 这里自动出现</div>';
         }
-    } catch {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">⚠️</div>
-                <div class="empty-state-text">加载失败</div>
-            </div>
-        `;
+    } catch (e) {
+        container.innerHTML = '<div class="empty-hint">读取失败</div>';
     }
 }
+
+window.openReadingItem = function (key, attKey) {
+    if (key) sessionStorage.setItem('jx.rd.pending', key);
+    else if (attKey) sessionStorage.setItem('jx.rd.openpdf', attKey);
+    switchTab('reading');
+};
 
 // ── 论文工作台 ─────────────────────────────────────────
 

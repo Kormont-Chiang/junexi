@@ -4034,6 +4034,140 @@ def obsidian_zotero_note():
     return jsonify({"ok": True, "path": path, "file": fname, "obsidian": obs_uri})
 
 # ── Zotero 附件 PDF 直读(内嵌阅读器用)────────────────────
+def _activity_path():
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser(r"~\AppData\Local")
+    d = os.path.join(base, "JuneXi")
+    try:
+        os.makedirs(d, exist_ok=True)
+    except Exception:
+        pass
+    return os.path.join(d, "activity.jsonl")
+
+def _log_activity(act, label):
+    """轻量本地足迹: jsonl 追加, 只存本机不外发"""
+    try:
+        rec = {"t": __import__("time").time(), "act": act, "label": (label or "")[:80]}
+        with open(_activity_path(), "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+@app.route("/api/activity/recent", methods=["GET"])
+def activity_recent():
+    limit = min(int(request.args.get("limit", 6)), 20)
+    try:
+        path = _activity_path()
+        if not os.path.isfile(path):
+            return jsonify({"ok": True, "items": []})
+        lines = open(path, encoding="utf-8", errors="ignore").readlines()[-60:]
+        items = []
+        for ln in reversed(lines):
+            ln = ln.strip()
+            if not ln:
+                continue
+            try:
+                items.append(json.loads(ln))
+            except Exception:
+                pass
+            if len(items) >= limit:
+                break
+        return jsonify({"ok": True, "items": items})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:120]})
+
+_RECENTLY_READ_CACHE = {"t": 0, "items": []}
+
+@app.route("/api/zotero/recently-read", methods=["GET"])
+def zotero_recently_read():
+    """最近阅读: 扫描 storage/*/.zotero-reader-state 的 mtime, 映射回 parent 题录。
+    Zotero 本地 API 串行慢(每个~2.7s), 并发查 + 60s 缓存"""
+    limit = min(int(request.args.get("limit", 5)), 10)
+    now = __import__("time").time()
+    if now - _RECENTLY_READ_CACHE["t"] < 60 and _RECENTLY_READ_CACHE["items"]:
+        return jsonify({"ok": True, "items": _RECENTLY_READ_CACHE["items"][:limit], "cached": True})
+    datadir = _zotero_datadir()
+    if not datadir:
+        return jsonify({"ok": False, "error": "no datadir", "items": []})
+    import glob as _glob
+    import datetime as _dt
+    import re as _re
+    from concurrent.futures import ThreadPoolExecutor
+    hits = []
+    for f in _glob.glob(os.path.join(datadir, "storage", "*", ".zotero-reader-state")):
+        try:
+            hits.append((os.stat(f).st_mtime, os.path.basename(os.path.dirname(f))))
+        except Exception:
+            pass
+    hits.sort(reverse=True)
+
+    def _one(hit):
+        mt, att_key = hit
+        try:
+            s, data = _zotero_get("/api/users/0/items/%s" % att_key)
+            ad = data.get("data", {})
+            parent = ad.get("parentItem")
+            if parent:
+                s2, pdata = _zotero_get("/api/users/0/items/%s" % parent)
+                pd = pdata.get("data", {})
+                if pd.get("itemType") == "attachment" or not pd.get("title"):
+                    return None
+                ym = _re.search(r"(1[0-9]{3}|20[0-9]{2})", pd.get("date") or "")
+                names = []
+                for c in pd.get("creators", [])[:2]:
+                    nm = ((c.get("lastName", "") or "") + " " + (c.get("firstName", "") or "")).strip()
+                    if nm:
+                        names.append(nm)
+                return {
+                    "key": parent, "att_key": att_key,
+                    "title": pd.get("title") or "(无题)",
+                    "creators": "、".join(names),
+                    "year": ym.group(1) if ym else "",
+                    "read_at": _dt.datetime.fromtimestamp(mt).strftime("%m-%d %H:%M"),
+                }
+            # standalone attachment(无父条目): 用文件名当标题
+            title = (ad.get("title") or "").strip()
+            if not title:
+                return None
+            return {
+                "key": "", "att_key": att_key,
+                "title": title.replace(".pdf", ""),
+                "creators": "", "year": "",
+                "read_at": _dt.datetime.fromtimestamp(mt).strftime("%m-%d %H:%M"),
+            }
+        except Exception:
+            return None
+
+    pool = hits[:limit * 2]
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        results = list(ex.map(_one, pool))
+    items, seen = [], set()
+    for r in results:
+        if r and r["key"] not in seen:
+            seen.add(r["key"])
+            items.append(r)
+        if len(items) >= limit:
+            break
+    _RECENTLY_READ_CACHE["t"] = now
+    _RECENTLY_READ_CACHE["items"] = items
+    return jsonify({"ok": True, "items": items})
+
+@app.before_request
+def _activity_hook():
+    """CBDB 检索 / 存笔记 自动记足迹(读论文在 pdf 路由里记, 那边有标题)"""
+    try:
+        path = request.path
+        if path == "/api/obsidian/zotero-note" and request.method == "POST":
+            body = request.get_json(force=True, silent=True) or {}
+            _log_activity("note", "存笔记：" + (body.get("title") or "")[:40])
+        elif path == "/api/cbdb/persons" and request.args.get("q"):
+            _log_activity("search", "CBDB 查人：" + request.args.get("q", "")[:30])
+        elif path == "/api/cbdb/offices/search" and request.args.get("q"):
+            _log_activity("search", "CBDB 查官：" + request.args.get("q", "")[:30])
+        elif path == "/api/cbdb/places/search" and request.args.get("q"):
+            _log_activity("search", "CBDB 查地：" + request.args.get("q", "")[:30])
+    except Exception:
+        pass
+
 _ZOTERO_PREF_CACHE = {}
 def _zotero_pref(name):
     if name in _ZOTERO_PREF_CACHE:
@@ -4097,6 +4231,7 @@ def zotero_pdf(att_key):
         fp = _attachment_path(att_key, d)
         if not fp or not os.path.isfile(fp):
             return jsonify({"ok": False, "error": "file not found"}), 404
+        _log_activity("read", (d.get("title") or "PDF").replace(".pdf", "")[:60])
         return send_file(fp, mimetype="application/pdf", conditional=True)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:150]}), 500

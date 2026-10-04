@@ -333,7 +333,14 @@
         <!-- ═══ 史料库 ═══ -->
         <div id="library" class="page">
             <!-- 库内检索 -->
-            <div class="lib-toolbar">
+            <div class="fed-search">
+                            <div class="fed-search-bar">
+                                <input type="text" id="fedQuery" placeholder="🔍 联合检索：一段史料/关键词，同时探 CBDB、Kanripo 汉籍库、ctext…" onkeydown="if(event.key==='Enter')fedSearch()">
+                                <button class="ai-quick-btn" onclick="fedSearch()">多库检索</button>
+                            </div>
+                            <div id="fedResults" class="fed-results" style="display:none"></div>
+                        </div>
+                        <div class="lib-toolbar">
                 <input type="text" id="libSearch" class="lib-search" placeholder="🔍 锁定目标：站名 / 描述 / 板块（如「敦煌」「期刊」「碑刻」）" oninput="filterLibrary(this.value)">
                 <span class="lib-count" id="libCount"></span>
             </div>
@@ -1287,7 +1294,7 @@
     <script src="/static/js/data/chgis/chgis-data.js?v=16"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="/static/js/lib/echarts.min.js?v=16"></script>
-    <script src="/static/js/app.js?v=54"></script>
+    <script src="/static/js/app.js?v=55"></script>
     <script src="/static/js/zotero.js?v=5"></script>
     <script src="/static/js/ccts.js?v=2"></script>
     <script src="/static/js/reading.js?v=9"></script>

@@ -3737,6 +3737,81 @@ def cbdb_persons_geojson():
 
 # ── API: DeepSeek AI ────────────────────────────────────
 
+# ── 联合检索: 一次输入多库并行 ──
+def _ctext_search(q):
+    """ctext API 无全文检索入口(只按书名/URN 取文本), 返回网页搜索 deeplink。"""
+    from urllib.parse import quote as _q
+    return [{"title": "在 ctext 检索「%s」" % q,
+             "link": "https://ctext.org/searchbooks.pl?if=gb&searchu=%s" % _q(q),
+             "source": "ctext", "deeplink": True}]
+
+
+def _kf_search(q):
+    """Kanripo(汉籍 Repository, GitHub): 全库代码搜索, 无 auth 有 rate limit, 容错优先。"""
+    try:
+        r = requests.get("https://api.github.com/search/code",
+                         params={"q": "%s+org:kanripo" % q, "per_page": 5},
+                         headers={"Accept": "application/vnd.github+json"}, timeout=10)
+        if r.status_code != 200:
+            return {"error": "GitHub 速率限制或未命中"}
+        items = r.json().get("items") or []
+        return [{"title": it.get("name", ""), "link": it.get("html_url", ""), "repo": (it.get("repository") or {}).get("full_name", "")} for it in items]
+    except Exception as e:
+        return {"error": str(e)[:80]}
+
+
+def _local_db_counts(q):
+    """本地库命中计数(不拉全文, 只给计数与入口)。"""
+    counts = {}
+    try:
+        counts["cbdb_person"] = _count_query("SELECT COUNT(*) AS n FROM BIOG_MAIN WHERE c_name_chn LIKE ?", ("%" + q + "%",))
+        counts["cbdb_office"] = _count_query("SELECT COUNT(*) AS n FROM OFFICE_CODES WHERE c_office_chn LIKE ?", ("%" + q + "%",))
+        counts["cbdb_place"] = _count_query("SELECT COUNT(*) AS n FROM ADDR_CODES WHERE c_name_chn LIKE ?", ("%" + q + "%",))
+    except Exception as e:
+        counts["error"] = str(e)[:80]
+    return counts
+
+
+def _count_query(sql, params):
+    conn = CBDBConnection.get_conn()
+    if not conn:
+        return -1
+    cur = None
+    try:
+        cur = conn.cursor()
+        cur.execute(sql, params)
+        row = cur.fetchone()
+        return (row and row[0]) or 0
+    except Exception:
+        return -1
+    finally:
+        try:
+            if cur: cur.close()
+            conn.close()
+        except Exception:
+            pass
+
+
+@app.route("/api/federated/search", methods=["GET"])
+def federated_search():
+    """联合检索: ctext + Kanripo 真联通; CBDB 本地计数; 订阅库 deeplink。"""
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"ok": False, "error": "q 不能为空"}), 400
+    results = {"query": q, "ctext": [], "kanripo": None, "local": {}}
+    errors = {}
+
+    t1 = threading.Thread(target=lambda: results.__setitem__("ctext", _ctext_search(q)))
+    t2 = threading.Thread(target=lambda: results.__setitem__("kanripo", _kf_search(q)))
+    t3 = threading.Thread(target=lambda: results.__setitem__("local", _local_db_counts(q)))
+    for t in (t1, t2, t3):
+        t.start()
+    for t in (t1, t2, t3):
+        t.join(timeout=25)
+
+    return jsonify({"ok": True, "results": results})
+
+
 @app.route("/api/ai/models", methods=["GET"])
 def ai_models():
     """可用模型清单(健康状态由前端实测, 这里只给注册表+默认)"""

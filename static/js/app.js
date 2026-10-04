@@ -317,6 +317,66 @@ function _cleanFeedText(s) {
         .trim();
 }
 
+// ── 联合检索: 一次输入, 多库并行 ──
+async function fedSearch() {
+    const inp = document.getElementById('fedQuery');
+    const box = document.getElementById('fedResults');
+    if (!inp || !box) return;
+    const q = inp.value.trim();
+    if (!q) return;
+    box.style.display = '';
+    box.innerHTML = '<div class="fed-loading">正在并行检索各库…</div>';
+    try {
+        const d = await (await fetch('/api/federated/search?q=' + encodeURIComponent(q))).json();
+        if (!d.ok) { box.innerHTML = '<div class="fed-loading">检索失败</div>'; return; }
+        const r = d.results || {};
+        const local = r.local || {};
+        const kr = r.kanripo;
+        let html = '<div class="fed-grid">';
+        // CBDB 本地
+        html += '<div class="fed-cell"><div class="fed-cell-title">🏛️ CBDB 本地库</div>' +
+            '<div class="fed-cell-body">' +
+            '<div class="fed-hit">人物 <b>' + (local.cbdb_person ?? '—') + '</b> · 职官 <b>' + (local.cbdb_office ?? '—') + '</b> · 地名 <b>' + (local.cbdb_place ?? '—') + '</b></div>' +
+            '<button class="tool-src-btn" onclick="fedGoCbdb(\'' + q.replace(/'/g, '') + '\')">在 CBDB 中打开</button>' +
+            '</div></div>';
+        // Kanripo
+        html += '<div class="fed-cell"><div class="fed-cell-title">📚 Kanripo 汉籍库</div><div class="fed-cell-body">';
+        if (kr && kr.error) {
+            html += '<div class="fed-note">' + escapeHtml(kr.error) + '</div>' +
+                '<a class="tool-src-btn" href="https://github.com/search?q=' + encodeURIComponent(q + ' org:kanripo') + '&type=code" target="_blank" rel="noopener">GitHub 打开</a>';
+        } else if (Array.isArray(kr) && kr.length) {
+            html += kr.slice(0, 4).map(it => '<a class="fed-link" href="' + it.link + '" target="_blank" rel="noopener">' + escapeHtml(it.title) + ' <span class="fed-repo">' + escapeHtml(it.repo || '') + '</span></a>').join('');
+        } else {
+            html += '<div class="fed-note">未命中</div>';
+        }
+        html += '</div></div>';
+        // ctext
+        const ct = (r.ctext || [])[0];
+        html += '<div class="fed-cell"><div class="fed-cell-title">📖 中国哲学书电子化计划</div><div class="fed-cell-body">';
+        if (ct) html += '<a class="tool-src-btn" href="' + ct.link + '" target="_blank" rel="noopener">ctext 检索「' + escapeHtml(q.slice(0, 12)) + '」</a><div class="fed-note">机构库,网页版全文检索</div>';
+        html += '</div></div>';
+        // 订阅库 deeplinks
+        html += '<div class="fed-cell"><div class="fed-cell-title">🔐 订阅库(站内打开)</div><div class="fed-cell-body fed-sub">' +
+            '<a class="tool-src-btn" href="https://www.ancientbooks.cn/" target="_blank" rel="noopener">爱如生</a>' +
+            '<a class="tool-src-btn" href="https://www.ancientbooks.cn/" target="_blank" rel="noopener" title="机构订阅,需登录">中华经典古籍库</a>' +
+            '<a class="tool-src-btn" href="https://www.guji.cn/" target="_blank" rel="noopener">籍合网</a>' +
+            '<div class="fed-note">订阅库无公开接口,带词前往检索页</div></div></div>';
+        html += '</div>';
+        box.innerHTML = html;
+    } catch (e) {
+        box.innerHTML = '<div class="fed-loading">检索失败：' + escapeHtml(String(e).slice(0, 60)) + '</div>';
+    }
+}
+window.fedSearch = fedSearch;
+
+function fedGoCbdb(q) {
+    switchTab('cbdb');
+    if (typeof switchCBDBType === 'function') switchCBDBType('person');
+    const inp = document.getElementById('cbdbSearchInput');
+    if (inp) inp.value = q;
+}
+window.fedGoCbdb = fedGoCbdb;
+
 // ── 史料库: 检索 + AI 导购 ──
 function filterLibrary(kw) {
     kw = (kw || '').trim().toLowerCase();

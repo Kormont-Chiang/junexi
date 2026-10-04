@@ -4033,7 +4033,50 @@ def obsidian_zotero_note():
         _up.quote("文献笔记/" + fname))
     return jsonify({"ok": True, "path": path, "file": fname, "obsidian": obs_uri})
 
-# ── 外部协议调起(WebView2 点 zotero:// obsidian:// 不响应, 走后端用系统打开)──
+# ── 外部协议调起(WebView2 点 zotero:// obsidian:// 不响应, 走后端调起系统)──
+def _launch_uri(u):
+    """调起 zotero:// / obsidian://。
+    os.startfile 对部分会话/失效注册表报'找不到应用程序';
+    策略: 注册表 shell\open\command -> 校验 exe 真实存在 -> 失效则常见路径兜底 -> 最后才 startfile。"""
+    import subprocess as _sp
+    import re as _re
+    scheme = u.split(":", 1)[0]
+    exe, args = None, []
+    try:
+        import winreg
+        k = winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, scheme + r"\shell\open\command")
+        tpl = winreg.QueryValue(k, "")
+        m = _re.match(r'"([^"]+)"\s*(.*)', tpl)
+        if m and os.path.isfile(m.group(1)):
+            exe = m.group(1)
+            arg = m.group(2).replace('"%1"', u).replace("%1", u).strip()
+            args = arg.split() if arg else []
+    except Exception:
+        pass
+    if not exe:
+        cands = []
+        if scheme == "zotero":
+            cands = [r"C:\Program Files\Zotero\zotero.exe",
+                     r"C:\Program Files (x86)\Zotero\zotero.exe",
+                     os.path.expanduser(r"~\AppData\Local\Zotero\zotero.exe")]
+        elif scheme == "obsidian":
+            cands = [os.path.expanduser(r"~\AppData\Local\Programs\Obsidian\Obsidian.exe"),
+                     os.path.expanduser(r"~\AppData\Local\Obsidian\Obsidian.exe"),
+                     r"C:\Program Files\Obsidian\Obsidian.exe"]
+        for c in cands:
+            if os.path.isfile(c):
+                exe = c
+                if scheme == "zotero":
+                    args = ["-url", u]
+                else:
+                    args = [u]
+                break
+    if exe:
+        _sp.Popen([exe] + args)
+        return True
+    os.startfile(u)
+    return True
+
 @app.route("/api/open-url", methods=["GET"])
 def open_external_url():
     u = request.args.get("u", "").strip()
@@ -4044,7 +4087,7 @@ def open_external_url():
         return jsonify({"ok": False, "error": "scheme not allowed"}), 400
     try:
         if u.startswith(("zotero://", "obsidian://")):
-            os.startfile(u)
+            _launch_uri(u)
         else:
             import webbrowser
             webbrowser.open(u)

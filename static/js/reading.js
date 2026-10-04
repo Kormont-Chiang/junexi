@@ -1,10 +1,9 @@
-/* 六月息 · 读文献页：Zotero 选文献 → 打开 PDF → 写笔记 → 落盘 Obsidian
- * 数据流: 文献元数据=Zotero, 笔记文件=Obsidian vault, JuneXi 只做操作界面
+/* 六月息 · 读文献页 v5: 顶部缩略图条带选文献, 左栏内嵌PDF, 右栏笔记->Obsidian
+ * 数据流: 文献元数据=Zotero, PDF=本地文件流, 笔记=Obsidian vault, JX 只做窗口
  */
 (function () {
     var API = '/api/';
-    var current = null;   // 选中的 zotero item
-    var atts = [];
+    var current = null;
 
     function el(t, c, h) {
         var e = document.createElement(t);
@@ -15,39 +14,18 @@
     function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
-
-    // 内嵌 PDF 阅读面板(WebView2 内置 PDF viewer, 走后端文件流)
-    function embedPdf(att) {
-        var pane = document.getElementById('rdPdfPane');
-        if (!pane) return;
-        pane.style.display = 'block';
-        pane.innerHTML = '';
-        var head = el('div');
-        head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px';
-        head.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">📄 内嵌阅读（在下方记笔记，数据仍存 Obsidian）</span>';
-        var x = extBtn('', '✕ 收起');
-        x.style.cssText = 'padding:3px 10px;font-size:12px;border-radius:6px;border:1px solid var(--border-color,#3a3f4a);background:transparent;color:var(--text-muted);cursor:pointer';
-        x.addEventListener('click', function () {
-            pane.style.display = 'none';
-            pane.innerHTML = '';
-        });
-        head.appendChild(x);
-        pane.appendChild(head);
-        var frame = el('iframe');
-        frame.src = '/api/zotero/pdf/' + att.key;
-        frame.style.cssText = 'width:100%;height:56vh;border:1px solid var(--border-color,#3a3f4a);border-radius:10px;background:#525659';
-        pane.appendChild(frame);
-    }
-
-    // WebView2 不响应 zotero:// obsidian:// 链接, 统一走后端调起系统
+    // WebView2 不响应 zotero:// obsidian://, 走后端调起系统
     function openExternal(u) {
         fetch('/api/open-url?u=' + encodeURIComponent(u)).catch(function () {});
     }
-    function extBtn(cls, text) {
-        var b = el('button', cls || 'rd-btn', text);
-        b.type = 'button';
-        return b;
+    function fetchTO(url, ms) {
+        return Promise.race([
+            fetch(url),
+            new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, ms); })
+        ]);
     }
+    var TYPE_ZH = { book: '专著', bookSection: '章节', journalArticle: '论文', conferencePaper: '会议', thesis: '学位论文', newspaperArticle: '报刊', document: '文档', blogPost: '博客' };
+    function TYPE(t) { return TYPE_ZH[t] || t || ''; }
 
     function buildPage() {
         if (document.getElementById('readingPage')) return;
@@ -58,52 +36,58 @@
         page.className = 'page';
         page.innerHTML = [
             '<style>',
-            '.rd-layout{display:flex;gap:20px;height:calc(100vh - 100px)}',
-            '.rd-left{width:360px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;overflow-y:auto}',
-            '.rd-right{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0;overflow-y:auto}',
-            '.rd-list{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow-y:auto}',
-            '.rd-item{padding:9px 12px;border:1px solid var(--border-color,#3a3f4a);border-radius:9px;cursor:pointer;transition:border-color .15s}',
-            '.rd-item:hover{border-color:#c9a96e}',
-            '.rd-item.sel{border-color:#c9a96e;background:rgba(201,169,110,.08)}',
-            '.rd-item-t{font-size:13px;font-weight:600;line-height:1.4}',
-            '.rd-item-m{font-size:11.5px;color:var(--text-muted,#999);margin-top:3px}',
-            '.rd-meta{font-size:13px;color:var(--text-muted);line-height:1.9}',
-            '.rd-note{width:100%;min-height:280px;resize:vertical;padding:12px 14px;border:1px solid var(--border-color,#3a3f4a);border-radius:10px;background:var(--bg,#1e2127);color:var(--text,#e4e0d8);font-size:13.5px;line-height:1.8;font-family:inherit;outline:none}',
-            '.rd-note:focus{border-color:#c9a96e}',
-            '.rd-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}',
+            '/* 顶部: 搜索 + 缩略条带 */',
+            '.rd-toolbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border-color,#2a2e37);flex-wrap:nowrap}',
+            '.rd-searchwrap{display:flex;gap:6px;flex-shrink:0}',
+            '#rdSearch{padding:6px 10px;border-radius:7px;border:1px solid var(--border-color,#3a3f4a);background:var(--bg,#1e2127);color:var(--text,#e4e0d8);font-size:12.5px;width:150px;outline:none}',
+            '#rdSearch:focus{border-color:#c9a96e}',
             '.rd-btn{padding:9px 20px;border:none;border-radius:8px;background:#c9a96e;color:#1e2127;font-size:13.5px;cursor:pointer;text-decoration:none;display:inline-block}',
             '.rd-btn.ghost{background:transparent;border:1px solid var(--border-color,#3a3f4a);color:var(--text,#e4e0d8)}',
             '.rd-btn:disabled{opacity:.5;cursor:wait}',
-            '.rd-status{font-size:12.5px;color:var(--text-muted)}',
-            '.rd-status a{color:#c9a96e}',
+            '.rd-btn.sm{padding:6px 12px;font-size:12px}',
+            '.rd-strip{display:flex;gap:8px;overflow-x:auto;flex:1;padding:2px;scrollbar-width:thin}',
+            '.rd-card{flex:0 0 auto;max-width:190px;padding:7px 10px;border:1px solid var(--border-color,#3a3f4a);border-radius:8px;cursor:pointer;transition:border-color .15s;background:var(--panel,#262a32)}',
+            '.rd-card:hover{border-color:#c9a96e}',
+            '.rd-card.sel{border-color:#c9a96e;background:rgba(201,169,110,.12)}',
+            '.rd-card-t{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}',
+            '.rd-card-m{font-size:10.5px;color:var(--text-muted,#8a8f9a);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+            '/* 主体: 左PDF右笔记 */',
+            '.rd-body{display:flex;gap:14px;padding:14px 16px;height:calc(100vh - 168px)}',
+            '.rd-pdf{flex:1.25;display:flex;flex-direction:column;min-width:0;border:1px solid var(--border-color,#2a2e37);border-radius:12px;overflow:hidden;background:var(--panel,#262a32)}',
+            '.rd-note-wrap{flex:1;display:flex;flex-direction:column;min-width:0;border:1px solid var(--border-color,#2a2e37);border-radius:12px;overflow:hidden;background:var(--panel,#262a32)}',
+            '.rd-pane-head{padding:8px 12px;font-size:12.5px;font-weight:600;border-bottom:1px solid var(--border-color,#2a2e37);display:flex;justify-content:space-between;align-items:center;gap:8px}',
+            '.rd-pane-sub{font-size:11px;color:var(--text-muted);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+            '#rdFrame{flex:1;width:100%;border:none;background:#525659;min-height:0}',
+            '.rd-pdf-ph{flex:1;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;flex-direction:column;gap:6px}',
+            '#rdNote{flex:1;width:100%;min-height:0;resize:none;padding:12px 14px;border:none;background:transparent;color:var(--text,#e4e0d8);font-size:13.5px;line-height:1.8;font-family:inherit;outline:none}',
+            '.rd-actions{display:flex;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--border-color,#2a2e37);flex-wrap:wrap}',
+            '.rd-status{font-size:12px;color:var(--text-muted)}',
+            '/* 底部题录条 */',
+            '.rd-meta-bar{display:flex;gap:12px;align-items:center;padding:8px 16px;border-top:1px solid var(--border-color,#2a2e37);font-size:12.5px;color:var(--text-muted);min-height:40px;flex-wrap:wrap}',
             '</style>',
-            '<div class="rd-layout">',
-            '  <div class="rd-left">',
-            '    <div class="map-panel">',
-            '      <div class="map-panel-title">📚 从 Zotero 选文献</div>',
-            '      <div style="display:flex;gap:8px;margin-bottom:10px">',
-            '        <input id="rdSearch" placeholder="搜标题/作者..." style="flex:1;padding:7px 11px;border-radius:7px;border:1px solid var(--border-color,#3a3f4a);background:var(--bg,#1e2127);color:var(--text,#e4e0d8);font-size:13px">',
-            '        <button class="rd-btn" id="rdSearchBtn" style="padding:7px 14px">搜索</button>',
-            '      </div>',
-            '      <div class="rd-list" id="rdList"><div class="zot-empty">载入最近文献…</div></div>',
+            '<div class="rd-toolbar">',
+            '  <div class="rd-searchwrap">',
+            '    <input id="rdSearch" placeholder="搜 Zotero…">',
+            '    <button class="rd-btn sm" id="rdSearchBtn">搜索</button>',
+            '  </div>',
+            '  <div class="rd-strip" id="rdStrip"><div class="zot-empty">载入中…</div></div>',
+            '</div>',
+            '<div class="rd-body">',
+            '  <div class="rd-pdf">',
+            '    <div class="rd-pane-head"><span>📄 论文</span><span class="rd-pane-sub" id="rdPdfTitle">← 从上方条带选文献</span></div>',
+            '    <div class="rd-pdf-ph" id="rdPh"><div style="font-size:34px">📖</div><div>选中后在这里读</div></div>',
+            '    <iframe id="rdFrame" style="display:none"></iframe>',
+            '  </div>',
+            '  <div class="rd-note-wrap">',
+            '    <div class="rd-pane-head"><span>✍️ 笔记</span><span class="rd-pane-sub">保存 → Obsidian 文献笔记/</span></div>',
+            '    <textarea id="rdNote" placeholder="边读边记…&#10;&#10;保存后变成 Obsidian 里 文献笔记/ 下的 .md，带题录和跳回链接，可双链。"></textarea>',
+            '    <div class="rd-actions">',
+            '      <button class="rd-btn sm" id="rdSave" disabled>💾 保存到 Obsidian</button>',
+            '      <span class="rd-status" id="rdStatus"></span>',
             '    </div>',
             '  </div>',
-            '  <div class="rd-right">',
-            '    <div class="map-panel" id="rdDetail">',
-            '      <div class="map-panel-title">📖 文献</div>',
-            '      <div class="rd-meta">← 从左侧选一篇文献开始</div>',
-            '    </div>',
-            '    <div id="rdPdfPane" style="display:none"></div>',
-            '    <div class="map-panel">',
-            '      <div class="map-panel-title">✍️ 笔记（保存在 Obsidian）</div>',
-            '      <textarea id="rdNote" class="rd-note" placeholder="在这里记笔记…\n\n保存后会变成 Obsidian 里 文献笔记/ 下的一个 .md 文件，带题录 frontmatter，可双链。"></textarea>',
-            '      <div class="rd-actions" style="margin-top:10px">',
-            '        <button class="rd-btn" id="rdSave" disabled>💾 保存到 Obsidian</button>',
-            '        <span class="rd-status" id="rdStatus"></span>',
-            '      </div>',
-            '    </div>',
-            '  </div>',
-            '</div>'
+            '</div>',
+            '<div class="rd-meta-bar" id="rdMeta"><span>← 选一篇文献开始；条带可横向滚动</span></div>'
         ].join('\n');
         main.appendChild(page);
 
@@ -115,40 +99,38 @@
         loadRecent();
     }
 
-    function itemHtml(it, cls) {
-        var d = el('div', 'rd-item' + (cls ? ' ' + cls : ''));
+    function cardHtml(it) {
+        var d = el('div', 'rd-card');
         d.dataset.key = it.key;
+        d.title = it.title;
         var meta = [];
-        if (it.creators) meta.push(esc(it.creators));
-        if (it.year) meta.push(esc(it.year));
+        if (it.creators) meta.push(it.creators);
+        if (it.year) meta.push(it.year);
         meta.push(TYPE(it.itemType));
-        d.innerHTML = '<div class="rd-item-t">' + esc(it.title) + '</div>' +
-            '<div class="rd-item-m">' + meta.join(' · ') + '</div>';
+        d.innerHTML = '<div class="rd-card-t">' + esc(it.title) + '</div>' +
+            '<div class="rd-card-m">' + esc(meta.join(' · ')) + '</div>';
         d.addEventListener('click', function () { select(it); });
         return d;
     }
 
-    var TYPE_ZH = { book: '专著', bookSection: '章节', journalArticle: '论文', conferencePaper: '会议', thesis: '学位论文', newspaperArticle: '报刊', document: '文档' };
-    function TYPE(t) { return TYPE_ZH[t] || t || ''; }
-
-    function renderList(items) {
-        var box = document.getElementById('rdList');
+    function renderStrip(items) {
+        var box = document.getElementById('rdStrip');
         if (!box) return;
         box.innerHTML = '';
-        if (!items.length) { box.innerHTML = '<div class="zot-empty">没有匹配文献</div>'; return; }
-        items.forEach(function (it) { box.appendChild(itemHtml(it)); });
+        if (!items.length) { box.innerHTML = '<div class="zot-empty">无匹配</div>'; return; }
+        items.forEach(function (it) { box.appendChild(cardHtml(it)); });
     }
 
     function loadRecent() {
-        var box = document.getElementById('rdList');
+        var box = document.getElementById('rdStrip');
         if (!box) return;
-        box.innerHTML = '<div class="zot-empty">载入最近文献…</div>';
-        fetchWithTimeout(API + 'zotero/recent?limit=15', 8000).then(function (r) { return r.json(); }).then(function (d) {
-            if (d.ok) renderList(d.items || []);
-            else box.innerHTML = '<div class="zot-empty">Zotero 未运行，启动后<a href="#" id="rdRetry" style="color:#c9a96e">重试</a></div>';
+        box.innerHTML = '<div class="zot-empty">载入中…</div>';
+        fetchTO(API + 'zotero/recent?limit=15', 8000).then(function (r) { return r.json(); }).then(function (d) {
+            if (d.ok) renderStrip(d.items || []);
+            else box.innerHTML = '<div class="zot-empty">Zotero 未运行 <a href="#" id="rdRetry" style="color:#c9a96e">重试</a></div>';
             bindRetry();
         }).catch(function () {
-            box.innerHTML = '<div class="zot-empty">读取失败，<a href="#" id="rdRetry" style="color:#c9a96e">点击重试</a></div>';
+            box.innerHTML = '<div class="zot-empty">读取失败 <a href="#" id="rdRetry" style="color:#c9a96e">重试</a></div>';
             bindRetry();
         });
     }
@@ -158,65 +140,72 @@
         if (a) a.addEventListener('click', function (e) { e.preventDefault(); loadRecent(); });
     }
 
-    function fetchWithTimeout(url, ms) {
-        return Promise.race([
-            fetch(url),
-            new Promise(function (_, rej) { setTimeout(function () { rej(new Error('timeout')); }, ms); })
-        ]);
-    }
-
     function doSearch() {
         var q = document.getElementById('rdSearch').value.trim();
         if (!q) { loadRecent(); return; }
-        var box = document.getElementById('rdList');
+        var box = document.getElementById('rdStrip');
         box.innerHTML = '<div class="zot-empty">检索中…</div>';
-        fetch(API + 'zotero/search?q=' + encodeURIComponent(q) + '&limit=20').then(function (r) { return r.json(); }).then(function (d) {
-            renderList(d.ok ? (d.items || []) : []);
-        });
+        fetchTO(API + 'zotero/search?q=' + encodeURIComponent(q) + '&limit=20', 8000).then(function (r) { return r.json(); }).then(function (d) {
+            renderStrip(d.ok ? (d.items || []) : []);
+        }).catch(function () { box.innerHTML = '<div class="zot-empty">检索失败</div>'; });
     }
 
     function select(it) {
         current = it;
-        var oldPane = document.getElementById('rdPdfPane');
-        if (oldPane) { oldPane.style.display = 'none'; oldPane.innerHTML = ''; }
-        document.querySelectorAll('.rd-item').forEach(function (x) { x.classList.remove('sel'); });
-        var node = document.querySelector('.rd-item[data-key="' + it.key + '"]');
+        document.querySelectorAll('.rd-card').forEach(function (x) { x.classList.remove('sel'); });
+        var node = document.querySelector('.rd-card[data-key="' + it.key + '"]');
         if (node) node.classList.add('sel');
-
-        var det = document.getElementById('rdDetail');
-        det.innerHTML = '<div class="map-panel-title">📖 ' + esc(it.title) + '</div>' +
-            '<div class="rd-meta">' +
-            (it.creators ? '作者：' + esc(it.creators) + '<br>' : '') +
-            (it.year ? '年份：' + esc(it.year) + '<br>' : '') +
-            '类型：' + TYPE(it.itemType) + '</div>' +
-            '<div style="margin-top:10px" id="rdPdfRow"><span class="rd-status">查找 PDF…</span></div>';
         document.getElementById('rdSave').disabled = false;
+        document.getElementById('rdStatus').textContent = '';
+        document.getElementById('rdPdfTitle').textContent = it.title;
+        document.getElementById('rdNote').value = '';
 
-        fetchWithTimeout(API + 'zotero/item/' + it.key + '/attachments', 8000).then(function (r) { return r.json(); }).then(function (d) {
-            var row = document.getElementById('rdPdfRow');
-            if (!row) return;
-            atts = (d.ok && d.attachments) || [];
+        // 底部题录条
+        var meta = document.getElementById('rdMeta');
+        meta.innerHTML = '';
+        var info = el('span', null,
+            '<b style="color:var(--text,#e4e0d8)">' + esc(it.title) + '</b>' +
+            (it.creators ? '　' + esc(it.creators) : '') +
+            (it.year ? '　' + esc(it.year) : '') +
+            '　' + TYPE(it.itemType));
+        meta.appendChild(info);
+
+        // PDF 面板: 占位等待
+        var frame = document.getElementById('rdFrame');
+        var ph = document.getElementById('rdPh');
+        frame.style.display = 'none';
+        ph.style.display = 'flex';
+        ph.innerHTML = '<div style="font-size:30px">⏳</div><div>查找 PDF…</div>';
+
+        fetchTO(API + 'zotero/item/' + it.key + '/attachments', 8000).then(function (r) { return r.json(); }).then(function (d) {
+            var atts = (d.ok && d.attachments) || [];
             var pdf = atts.filter(function (a) { return a.isPdf; });
-            if (!pdf.length) { row.innerHTML = '<span class="rd-status">这条没有 PDF 附件（可在 Zotero 里右键找全文）</span>'; return; }
-            row.innerHTML = '';
-            var firstPdf = null;
-            pdf.forEach(function (a) {
-                if (!firstPdf) firstPdf = a;
-                var b = extBtn('rd-btn', '打开 PDF');
-                (function (url) { b.addEventListener('click', function () { openExternal(url); }); })(a.open);
-                b.style.marginRight = '8px';
-                row.appendChild(b);
-            });
-            var zs = extBtn('rd-btn ghost', '在 Zotero 查看');
-            (function (url) { zs.addEventListener('click', function () { openExternal(url); }); })(it.select);
+            var row = document.getElementById('rdMeta');
+            // 外部按钮
+            if (pdf.length) {
+                pdf.forEach(function (a) {
+                    var b = el('button', 'rd-btn sm ghost', '外部打开');
+                    b.type = 'button';
+                    (function (u) { b.addEventListener('click', function () { openExternal(u); }); })(a.open);
+                    row.appendChild(b);
+                });
+            }
+            var zs = el('button', 'rd-btn sm ghost', '在 Zotero 查看');
+            zs.type = 'button';
+            (function (u) { zs.addEventListener('click', function () { openExternal(u); }); })(it.select);
             row.appendChild(zs);
-            // 内嵌阅读: 有 PDF 就在六月息窗口里直接看
-            if (firstPdf) embedPdf(firstPdf);
+
+            if (pdf.length) {
+                frame.src = '/api/zotero/pdf/' + pdf[0].key;
+                frame.onload = function () {
+                    frame.style.display = 'block';
+                    ph.style.display = 'none';
+                };
+            } else {
+                ph.innerHTML = '<div style="font-size:30px">🗋</div><div>这条没有 PDF 附件</div>';
+            }
         }).catch(function () {
-            var row = document.getElementById('rdPdfRow');
-            if (row) row.innerHTML = '<span class="rd-status">附件查询超时，<a href="#" id="rdRetryAtt" style="color:#c9a96e">重试</a></span>';
-            var a2 = document.getElementById('rdRetryAtt');
-            if (a2) a2.addEventListener('click', function (e) { e.preventDefault(); select(it); });
+            ph.innerHTML = '<div style="font-size:30px">⚠️</div><div>附件查询失败，重选试试</div>';
         });
     }
 
@@ -239,9 +228,10 @@
         }).then(function (r) { return r.json(); }).then(function (d) {
             btn.disabled = false;
             if (!d.ok) { st.textContent = '保存失败：' + (d.error || ''); return; }
-            st.innerHTML = '✅ 已存入 Obsidian：' + esc(d.file) + '　';
-            var ob = extBtn('', '在 Obsidian 打开');
-            ob.style.cssText = 'padding:4px 12px;font-size:12px;border-radius:6px;border:1px solid #c9a96e;background:transparent;color:#c9a96e;cursor:pointer';
+            st.innerHTML = '✅ 已存 Obsidian：' + esc(d.file) + '　';
+            var ob = el('button', '', '在 Obsidian 打开');
+            ob.type = 'button';
+            ob.style.cssText = 'padding:3px 10px;font-size:11.5px;border-radius:6px;border:1px solid #c9a96e;background:transparent;color:#c9a96e;cursor:pointer';
             (function (url) { ob.addEventListener('click', function () { openExternal(url); }); })(d.obsidian);
             st.appendChild(ob);
         }).catch(function (e) {

@@ -3936,6 +3936,103 @@ def zotero_search():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:150]})
 
+# ── Obsidian 文件直写（读文献页笔记落盘用；不依赖 Local REST API 插件）──
+def _vault_path():
+    import json as _json
+    cfg = os.path.expanduser(r"~\AppData\Roaming\obsidian\obsidian.json")
+    try:
+        d = _json.load(open(cfg, encoding="utf-8"))
+        best = None
+        for v in d.get("vaults", {}).values():
+            if v.get("path", "").endswith(OBSIDIAN_VAULT):
+                return v["path"]
+            if best is None or v.get("ts", 0) > best.get("ts", 0):
+                best = v
+        return best["path"] if best else None
+    except Exception:
+        return None
+
+def _safe_filename(s):
+    import re as _re
+    s = _re.sub(r'[\\/:*?"<>|\r\n]+', "_", s or "").strip(" .")
+    return s[:80] or "untitled"
+
+@app.route("/api/zotero/item/<key>/attachments", methods=["GET"])
+def zotero_item_attachments(key):
+    try:
+        s, data = _zotero_get("/api/users/0/items/%s/children" % key)
+        atts = []
+        for it in data:
+            d = it.get("data", {})
+            if d.get("itemType") == "attachment":
+                atts.append({
+                    "key": it.get("key"),
+                    "title": d.get("title", ""),
+                    "contentType": d.get("contentType", ""),
+                    "isPdf": d.get("contentType") == "application/pdf",
+                    "open": "zotero://open-pdf/library/items/%s" % it.get("key"),
+                    "select": "zotero://select/library/items/%s" % key,
+                })
+        return jsonify({"ok": True, "attachments": atts})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:150]})
+
+@app.route("/api/obsidian/zotero-note", methods=["POST"])
+def obsidian_zotero_note():
+    payload = request.get_json(force=True, silent=True) or {}
+    title = (payload.get("title") or "").strip()
+    content = payload.get("content") or ""
+    meta = payload.get("meta") or {}
+    if not content.strip():
+        return jsonify({"ok": False, "error": "empty content"}), 400
+    vault = _vault_path()
+    if not vault or not os.path.isdir(vault):
+        return jsonify({"ok": False, "error": "vault not found"}), 500
+    folder = os.path.join(vault, "文献笔记")
+    try:
+        os.makedirs(folder, exist_ok=True)
+    except Exception as e:
+        return jsonify({"ok": False, "error": "mkdir: %s" % e}), 500
+    fname = _safe_filename(title) + ".md"
+    path = os.path.join(folder, fname)
+    import datetime as _dt
+    fm = [
+        "---",
+        "title: \"%s\"" % (title.replace('"', "'")),
+    ]
+    if meta.get("creators"):
+        fm.append("authors: \"%s\"" % meta["creators"].replace('"', "'"))
+    if meta.get("year"):
+        fm.append("year: %s" % meta["year"])
+    if meta.get("itemType"):
+        fm.append("type: %s" % meta["itemType"])
+    if meta.get("zoteroKey"):
+        fm.append("zotero_key: %s" % meta["zoteroKey"])
+        fm.append("zotero: \"zotero://select/library/items/%s\"" % meta["zoteroKey"])
+    fm.append("created: %s" % _dt.datetime.now().strftime("%Y-%m-%d %H:%M"))
+    fm.append("tags: [文献笔记]")
+    fm.append("---")
+    fm.append("")
+    body = "\n".join(fm) + "# " + title + "\n\n"
+    if meta.get("creators") or meta.get("year"):
+        body += "> "
+        if meta.get("creators"):
+            body += meta["creators"]
+        if meta.get("year"):
+            body += (" · " if meta.get("creators") else "") + str(meta["year"])
+        body += "\n\n"
+    body += content.strip() + "\n"
+    try:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(body)
+    except Exception as e:
+        return jsonify({"ok": False, "error": "write: %s" % e}), 500
+    import urllib.parse as _up
+    obs_uri = "obsidian://open?vault=%s&file=%s" % (
+        _up.quote(os.path.basename(vault)),
+        _up.quote("文献笔记/" + fname))
+    return jsonify({"ok": True, "path": path, "file": fname, "obsidian": obs_uri})
+
 # ── Main ────────────────────────────────────────────────
 
 if __name__ == "__main__":

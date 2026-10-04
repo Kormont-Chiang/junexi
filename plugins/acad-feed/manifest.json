@@ -1,0 +1,8 @@
+{
+  "id": "acad-feed",
+  "name": "学术动态",
+  "version": "0.2",
+  "desc": "arXiv + PubMed 认知科学/神经科学 RSS 聚合，30min 缓存+磁盘兜底。面板位于仪表盘。",
+  "enabled": true,
+  "routes": "routes.py:bp"
+}

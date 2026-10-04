@@ -344,6 +344,7 @@
             btn.disabled = false;
             if (!d.ok) { st.textContent = '保存失败：' + (d.error || ''); return; }
             st.innerHTML = '✅ 已存 Obsidian：' + esc(d.file) + '　';
+            try { if (window._logActivity) window._logActivity('note', '文献笔记：' + String((current && current.title) || '').slice(0, 30)); } catch (e) {}
             var ob = el('button', '', '在 Obsidian 打开');
             ob.type = 'button';
             ob.style.cssText = 'padding:3px 10px;font-size:11.5px;border-radius:6px;border:1px solid #c9a96e;background:transparent;color:#c9a96e;cursor:pointer';

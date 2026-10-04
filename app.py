@@ -4193,6 +4193,15 @@ def _log_activity(act, label):
     except Exception:
         pass
 
+@app.route("/api/activity", methods=["POST"])
+def activity_log():
+    """前端轻量上报足迹"""
+    body = request.get_json(force=True, silent=True) or {}
+    act = (body.get("type") or "misc")[:20]
+    label = (body.get("label") or "")[:80]
+    _log_activity(act, label)
+    return jsonify({"ok": True})
+
 @app.route("/api/activity/recent", methods=["GET"])
 def activity_recent():
     limit = min(int(request.args.get("limit", 6)), 20)

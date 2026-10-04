@@ -254,6 +254,7 @@ function showKbLecture(i) {
     container.innerHTML = '<div class="kb-back" onclick="renderKbList(document.getElementById(\'papersList\'))">← 目录</div>' +
         '<div class="kb-head">' + escapeHtml(L.no) + ' · ' + escapeHtml(L.title) + '</div>' +
         L.points.map(pt => '<div class="kb-pt">' + escapeHtml(pt) + '</div>').join('');
+    try { window._logActivity('kb-read', '学术写作知识库：' + (L.no || '') + ' ' + (L.title || '')); } catch (e) {}
 }
 window.showKbLecture = showKbLecture;
 
@@ -350,6 +351,7 @@ async function savePaper() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content })
         });
+        try { window._logActivity('quick-note', '快速笔记 ' + (content || '').slice(0, 30)); } catch (e) {}
         const data = await res.json();
 
         if (!data.error) {
@@ -4107,6 +4109,17 @@ async function cbdbAIShowEntryRange(params) {
     loadEntryPersons(info.code, title, { from: params.from_year, to: params.to_year, useIndex: true });
 }
 
+// ── 活动足迹统一上报(后端 jsonl 追加) ────────────────
+window._logActivity = function (type, label) {
+    try {
+        fetch('/api/activity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type, label: String(label || '').slice(0, 100) })
+        });
+    } catch (e) {}
+};
+
 // 顶部全局搜索: Enter 跳到 CBDB 人名检索
 (function () {
     const bindTopSearch = () => {
@@ -4117,6 +4130,7 @@ async function cbdbAIShowEntryRange(params) {
             if (e.key !== 'Enter') return;
             const q = gs.value.trim();
             if (!q) return;
+            window._logActivity('search', '顶部搜索：' + q);
             switchTab('cbdb');
             if (window._cbdbType !== 'person') switchCBDBType('person');
             const inp = document.getElementById('cbdbSearchInput');

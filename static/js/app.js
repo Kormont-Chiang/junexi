@@ -222,6 +222,110 @@ function feedSetSrc(s) {
 }
 window.feedSetSrc = feedSetSrc;
 
+// ── 史料库: 检索 + AI 导购 ──
+function filterLibrary(kw) {
+    kw = (kw || '').trim().toLowerCase();
+    const cards = document.querySelectorAll('#library .db-card');
+    let shown = 0;
+    document.querySelectorAll('#library .db-section').forEach(sec => {
+        if (sec.querySelector('.lib-ai-panel') || sec.querySelector('#obsidianSearchInput')) return;
+        const secTitle = (sec.querySelector('.db-section-title')?.textContent || '').toLowerCase();
+        let secShown = 0;
+        sec.querySelectorAll('.db-card').forEach(card => {
+            const t = card.textContent.toLowerCase();
+            const ok = !kw || t.includes(kw) || secTitle.includes(kw);
+            card.style.display = ok ? '' : 'none';
+            if (ok) { secShown++; shown++; }
+        });
+        sec.style.display = secShown ? '' : 'none';
+    });
+    const cnt = document.getElementById('libCount');
+    if (cnt) cnt.textContent = kw ? (shown + ' 个匹配') : (cards.length + ' 站');
+    let empty = document.getElementById('libEmpty');
+    if (kw && shown === 0) {
+        if (!empty) {
+            empty = document.createElement('div');
+            empty.id = 'libEmpty';
+            empty.className = 'empty-hint';
+            empty.style.padding = '20px';
+            const grid = document.querySelector('#library .db-grid');
+            if (grid && grid.parentElement) grid.parentElement.appendChild(empty);
+        }
+        empty.textContent = '没有匹配的站点——可以直接问下面的 AI 导购';
+        empty.style.display = '';
+    } else if (empty) {
+        empty.style.display = 'none';
+    }
+}
+window.filterLibrary = filterLibrary;
+
+function _libSiteList() {
+    const sites = [];
+    document.querySelectorAll('#library .db-card').forEach(card => {
+        const name = card.querySelector('.db-name')?.textContent.trim();
+        const desc = card.querySelector('.db-desc')?.textContent.trim();
+        const href = card.getAttribute('href') || '';
+        if (name && href && !href.startsWith('javascript')) sites.push({ name, desc, href });
+    });
+    return sites;
+}
+
+window._libAIHistory = [];
+function libAISend() {
+    const input = document.getElementById('libAIInput');
+    const chat = document.getElementById('libAIChat');
+    const q = (input?.value || '').trim();
+    if (!q) return;
+    const btn = document.querySelector('.lib-ai-send');
+    if (btn) btn.disabled = true;
+    const hint = chat.querySelector('.lib-ai-hint');
+    if (hint) hint.remove();
+    chat.insertAdjacentHTML('beforeend', '<div class="lib-ai-msg lib-ai-q">' + escapeHtml(q) + '</div><div class="lib-ai-msg lib-ai-a" id="libAIThinking">正在想……</div>');
+    chat.scrollTop = chat.scrollHeight;
+    input.value = '';
+    const sites = _libSiteList();
+    const siteLines = sites.map(s => '- ' + s.name + '：' + (s.desc || '')).join('\n');
+    const system = '你是「六月息」史料库的文献资源导购员。用户想找某类历史资料但不知道去哪个网站/数据库。' +
+        '下面是本库已收录的全部站点（名称：简介）。回答要求：1) 从已收录站点里挑最合适的，说出站点名和它为什么合适；' +
+        '2) 如果库里没有合适的，如实说明，并可补充推荐库外知名的公开资源；3) 回答控制在 200 字内，直接给结论，不要寒暄；' +
+        '4) 涉及访问限制（需校园网/VPN/翻墙）要提醒。已收录站点：\n' + siteLines;
+    const history = window._libAIHistory.slice(-6);
+    history.push({ role: 'user', content: q });
+    fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'system', content: system }].concat(history) })
+    }).then(r => r.json()).then(d => {
+        const thinking = document.getElementById('libAIThinking');
+        let answer = (d.response || d.message || d.text || '').trim() || '（没有收到回答）';
+        answer = escapeHtml(answer);
+        answer = answer.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+        // 站名自动变链接(先转义后替换,站名是中文不受影响)
+        sites.forEach(s => {
+            if (answer.indexOf(s.name) >= 0) {
+                answer = answer.split(s.name).join('<a href="' + s.href + '" target="_blank" class="lib-ai-link">' + s.name + '</a>');
+            }
+        });
+        if (thinking) thinking.outerHTML = '<div class="lib-ai-msg lib-ai-a">' + answer.replace(/\n/g, '<br>') + '</div>';
+        window._libAIHistory.push({ role: 'user', content: q });
+        window._libAIHistory.push({ role: 'assistant', content: (d.response || d.message || d.text || '').trim() });
+        chat.scrollTop = chat.scrollHeight;
+        if (btn) btn.disabled = false;
+    }).catch(err => {
+        const thinking = document.getElementById('libAIThinking');
+        if (thinking) thinking.outerHTML = '<div class="lib-ai-msg lib-ai-a">请求失败：' + escapeHtml(String(err).slice(0, 80)) + '</div>';
+        if (btn) btn.disabled = false;
+    });
+}
+window.libAISend = libAISend;
+
+// 初始计数
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { try { filterLibrary(''); } catch (e) {} });
+} else {
+    try { filterLibrary(''); } catch (e) {}
+}
+
 async function loadRecentActivity() {
     const container = document.getElementById('activityTimeline');
     if (!container) return;

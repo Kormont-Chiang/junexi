@@ -12302,3 +12302,22 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .db-count { font-size: 10.5px; font-weight: 500; color: #8a8578; background: rgba(201, 169, 110, 0.12); padding: 0 8px; border-radius: 9px; line-height: 16px; }
 @media (max-width: 1300px) { .db-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 900px) { .db-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.lib-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.lib-search { flex: 1; padding: 11px 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); color: var(--text-primary); font-size: 13px; outline: none; transition: border-color .2s; }
+.lib-search:focus { border-color: rgba(201, 169, 110, 0.6); }
+.lib-count { font-size: 12px; color: var(--text-secondary, #8a8578); white-space: nowrap; }
+.lib-ai-panel { margin-top: 8px; }
+.lib-ai-chat { min-height: 70px; max-height: 380px; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; scrollbar-width: thin; }
+.lib-ai-hint { font-size: 12px; color: var(--text-secondary, #8a8578); padding: 6px 2px; }
+.lib-ai-msg { font-size: 13px; line-height: 1.8; margin-bottom: 10px; padding: 9px 13px; border-radius: 10px; max-width: 92%; }
+.lib-ai-q { margin-left: auto; background: rgba(201, 169, 110, 0.14); border: 1px solid rgba(201, 169, 110, 0.3); }
+.lib-ai-a { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); }
+.lib-ai-link { color: #c9a96e; text-decoration: underline; text-underline-offset: 3px; }
+.lib-ai-input-row { display: flex; gap: 10px; }
+.lib-ai-input { flex: 1; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); color: var(--text-primary); font-size: 13px; outline: none; }
+.lib-ai-input:focus { border-color: rgba(201, 169, 110, 0.6); }
+.lib-ai-send { padding: 10px 22px; background: rgba(201, 169, 110, 0.16); border: 1px solid rgba(201, 169, 110, 0.4); border-radius: var(--radius); color: var(--text-primary); cursor: pointer; font-size: 13px; transition: background .2s; }
+.lib-ai-send:hover { background: rgba(201, 169, 110, 0.28); }
+.lib-ai-send:disabled { opacity: .5; cursor: wait; }
+@media (max-width: 900px) { .lib-toolbar { flex-direction: column; align-items: stretch; } }

@@ -330,6 +330,12 @@
 
         <!-- ═══ 史料库 ═══ -->
         <div id="library" class="page">
+            <!-- 库内检索 -->
+            <div class="lib-toolbar">
+                <input type="text" id="libSearch" class="lib-search" placeholder="🔍 锁定目标：站名 / 描述 / 板块（如「敦煌」「期刊」「碑刻」）" oninput="filterLibrary(this.value)">
+                <span class="lib-count" id="libCount"></span>
+            </div>
+
             <!-- 🏫 社科大 · 校内资源 -->
             <div class="db-section">
                 <div class="db-section-title">🏫 社科大 · 校内资源<span class="db-count">6</span></div>
@@ -380,7 +386,7 @@
             </div>
             <!-- 📜 综合古籍库 -->
             <div class="db-section">
-                <div class="db-section-title">📜 综合古籍库<span class="db-count">10</span></div>
+                <div class="db-section-title">📜 综合古籍库<span class="db-count">14</span></div>
                 <div class="db-grid">
                 <a href="http://dh.ersjk.com/" target="_blank" class="db-card">
                     <div class="db-icon" style="background:rgba(199,84,80,0.14)">🌊</div>
@@ -452,11 +458,39 @@
                         <div class="db-desc">古籍高清影像 · 公开版权</div>
                     </div>
                 </a>
+                <a href="https://www.kanripo.org/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(120,60,60,0.14)">📜</div>
+                    <div class="db-info">
+                        <div class="db-name">汉籍 Repository</div>
+                        <div class="db-desc">京大 · 免费全文 · 标点本</div>
+                    </div>
+                </a>
+                <a href="https://archive.org/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(90,90,90,0.14)">🏛️</div>
+                    <div class="db-info">
+                        <div class="db-name">Internet Archive</div>
+                        <div class="db-desc">海量公开版权书影像</div>
+                    </div>
+                </a>
+                <a href="https://www.hathitrust.org/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(120,130,180,0.14)">📚</div>
+                    <div class="db-info">
+                        <div class="db-name">HathiTrust</div>
+                        <div class="db-desc">美加高校图书数字化</div>
+                    </div>
+                </a>
+                <a href="https://gallica.bnf.fr/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(80,100,160,0.14)">🗼</div>
+                    <div class="db-info">
+                        <div class="db-name">Gallica</div>
+                        <div class="db-desc">法国国家图书馆 · 敦煌西域文书</div>
+                    </div>
+                </a>
                 </div>
             </div>
             <!-- 📑 期刊论文 -->
             <div class="db-section">
-                <div class="db-section-title">📑 期刊论文<span class="db-count">10</span></div>
+                <div class="db-section-title">📑 期刊论文<span class="db-count">13</span></div>
                 <div class="db-grid">
                 <a href="https://www.cnki.net/" target="_blank" class="db-card">
                     <div class="db-icon" style="background:rgba(199,84,80,0.14)">📰</div>
@@ -526,6 +560,27 @@
                     <div class="db-info">
                         <div class="db-name">华艺 Airiti</div>
                         <div class="db-desc">台湾中文期刊全文</div>
+                    </div>
+                </a>
+                <a href="https://doaj.org/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(90,142,199,0.14)">🌍</div>
+                    <div class="db-info">
+                        <div class="db-name">DOAJ</div>
+                        <div class="db-desc">开放获取期刊目录</div>
+                    </div>
+                </a>
+                <a href="https://www.base-search.net/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(126,168,96,0.14)">🔎</div>
+                    <div class="db-info">
+                        <div class="db-name">BASE</div>
+                        <div class="db-desc">比勒费尔德学术搜索</div>
+                    </div>
+                </a>
+                <a href="https://cssrac.nju.edu.cn/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(120,60,60,0.14)">📊</div>
+                    <div class="db-info">
+                        <div class="db-name">CSSCI 来源目录</div>
+                        <div class="db-desc">南大核心 · 期刊查询</div>
                     </div>
                 </a>
                 </div>
@@ -615,7 +670,7 @@
             </div>
             <!-- ✍️ 古文字与出土文献 -->
             <div class="db-section">
-                <div class="db-section-title">✍️ 古文字与出土文献<span class="db-count">6</span></div>
+                <div class="db-section-title">✍️ 古文字与出土文献<span class="db-count">7</span></div>
                 <div class="db-grid">
                 <a href="https://ihparchive.ihp.sinica.edu.tw/ihpkmc/ihpkm" target="_blank" class="db-card">
                     <div class="db-icon" style="background:rgba(110,130,180,0.14)">🏛️</div>
@@ -659,11 +714,18 @@
                         <div class="db-desc">港中大 · 音义源流检索</div>
                     </div>
                 </a>
+                <a href="https://hanziyuan.net/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(190,140,80,0.14)">🀄</div>
+                    <div class="db-info">
+                        <div class="db-name">汉字字源</div>
+                        <div class="db-desc">汉字字形演变图解</div>
+                    </div>
+                </a>
                 </div>
             </div>
             <!-- 🌏 数字人文工具 -->
             <div class="db-section">
-                <div class="db-section-title">🌏 数字人文工具<span class="db-count">10</span></div>
+                <div class="db-section-title">🌏 数字人文工具<span class="db-count">13</span></div>
                 <div class="db-grid">
                 <a href="javascript:void(0)" onclick="switchTab('cbdb')" class="db-card">
                     <div class="db-icon" style="background:rgba(199,84,80,0.14)">👤</div>
@@ -735,11 +797,32 @@
                         <div class="db-desc">诗词检索 · 唐宋文学编年地图</div>
                     </div>
                 </a>
+                <a href="https://www1.ihp.sinica.edu.tw/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(110,130,180,0.14)">🏛️</div>
+                    <div class="db-info">
+                        <div class="db-name">史语所</div>
+                        <div class="db-desc">中研院 · 历史语言研究所</div>
+                    </div>
+                </a>
+                <a href="https://whgazetteer.org/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(90,160,160,0.14)">🗺️</div>
+                    <div class="db-info">
+                        <div class="db-name">WHGazetteer</div>
+                        <div class="db-desc">世界历史地名库 · 可对接</div>
+                    </div>
+                </a>
+                <a href="https://pleiades.stoa.org/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(150,130,100,0.14)">🏛️</div>
+                    <div class="db-info">
+                        <div class="db-name">Pleiades</div>
+                        <div class="db-desc">古代世界地名与坐标</div>
+                    </div>
+                </a>
                 </div>
             </div>
             <!-- 📮 学术资讯 · 预印本 -->
             <div class="db-section">
-                <div class="db-section-title">📮 学术资讯 · 预印本<span class="db-count">4</span></div>
+                <div class="db-section-title">📮 学术资讯 · 预印本<span class="db-count">5</span></div>
                 <div class="db-grid">
                 <a href="https://networks.h-net.org/" target="_blank" class="db-card">
                     <div class="db-icon" style="background:rgba(110,130,180,0.14)">📮</div>
@@ -769,6 +852,13 @@
                         <div class="db-desc">哲学文献索引</div>
                     </div>
                 </a>
+                <a href="https://papers.ssrn.com/" target="_blank" class="db-card">
+                    <div class="db-icon" style="background:rgba(60,90,140,0.14)">📄</div>
+                    <div class="db-info">
+                        <div class="db-name">SSRN</div>
+                        <div class="db-desc">社科预印本 · 工作论文</div>
+                    </div>
+                </a>
                 </div>
             </div>
 
@@ -780,7 +870,18 @@
                         <input type="text" id="obsidianSearchInput" class="search-input" style="margin-bottom:0;flex:1" placeholder="搜索自己的 Vault 笔记...">
                         <button class="btn-primary" onclick="searchVault()">搜索</button>
                     </div>
-                    <div id="obsidianSearchResults"></div>
+
+            <div id="obsidianSearchResults"></div>
+                </div>
+            </div>
+
+            <!-- 🤖 史料库 AI 导购 -->
+            <div class="lib-ai-panel">
+                <div class="db-section-title">🤖 不知道去哪查？问 AI</div>
+                <div class="lib-ai-chat" id="libAIChat"><div class="lib-ai-hint">例：想查宋代墓志材料去哪找 / 哪个库能查职官沿革 / 敦煌文书影像在哪看</div></div>
+                <div class="lib-ai-input-row">
+                    <input type="text" id="libAIInput" class="lib-ai-input" placeholder="想找某类资料，但不知道去哪个站……" onkeydown="if(event.key==='Enter')libAISend()">
+                    <button class="lib-ai-send" onclick="libAISend()">发送</button>
                 </div>
             </div>
         </div>

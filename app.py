@@ -14,7 +14,7 @@ import requests
 import subprocess
 from datetime import datetime
 from urllib.parse import quote, unquote
-from flask import Flask, jsonify, request, render_template, send_from_directory
+from flask import Flask, jsonify, request, render_template, send_from_directory, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -4032,6 +4032,74 @@ def obsidian_zotero_note():
         _up.quote(os.path.basename(vault)),
         _up.quote("文献笔记/" + fname))
     return jsonify({"ok": True, "path": path, "file": fname, "obsidian": obs_uri})
+
+# ── Zotero 附件 PDF 直读(内嵌阅读器用)────────────────────
+_ZOTERO_PREF_CACHE = {}
+def _zotero_pref(name):
+    if name in _ZOTERO_PREF_CACHE:
+        return _ZOTERO_PREF_CACHE[name]
+    import glob as _glob
+    import re as _re
+    val = None
+    for f in _glob.glob(os.path.expanduser(r"~\AppData\Roaming\Zotero\Zotero\Profiles\*\prefs.js")):
+        try:
+            t = open(f, encoding="utf-8", errors="ignore").read()
+            m = _re.search(_re.escape(name) + r'",\s*"([^"]+)"', t)
+            if m:
+                val = m.group(1).replace("\\\\", "\\")
+                break
+        except Exception:
+            pass
+    _ZOTERO_PREF_CACHE[name] = val
+    return val
+
+def _zotero_datadir():
+    d = _zotero_pref("extensions.zotero.dataDir")
+    if d and os.path.isdir(os.path.join(d, "storage")):
+        return d
+    for c in (os.path.expanduser(r"~\Zotero"), os.path.expanduser(r"~\Documents\Zotero")):
+        if os.path.isdir(os.path.join(c, "storage")):
+            return c
+    return None
+
+def _attachment_path(att_key, data):
+    """Zotero path 字段三种形态: storage:xx(imported) / attachments:xx(linked, 基准目录下) / 绝对路径"""
+    p = (data.get("path") or "").strip()
+    if not p:
+        return None
+    import re as _re
+    if p.lower().startswith("storage:"):
+        datadir = _zotero_datadir()
+        rel = p.split(":", 1)[1]
+        return os.path.join(datadir, "storage", att_key, rel) if datadir else None
+    if _re.match(r"^[A-Za-z]:[\\/]|^\\\\", p):
+        return p
+    if p.lower().startswith("attachments:"):
+        rel = p.split(":", 1)[1]
+        cands = []
+        base = _zotero_pref("extensions.zotero.baseAttachmentPath")
+        if base:
+            cands.append(os.path.join(base, rel))
+        datadir = _zotero_datadir()
+        if datadir:
+            cands.append(os.path.join(datadir, rel))
+            cands.append(os.path.join(datadir, "attachments", rel))
+        return next((c for c in cands if os.path.isfile(c)), None)
+    return None
+
+@app.route("/api/zotero/pdf/<att_key>", methods=["GET"])
+def zotero_pdf(att_key):
+    try:
+        s, data = _zotero_get("/api/users/0/items/%s" % att_key)
+        d = data.get("data", {})
+        if d.get("itemType") != "attachment":
+            return jsonify({"ok": False, "error": "not attachment"}), 404
+        fp = _attachment_path(att_key, d)
+        if not fp or not os.path.isfile(fp):
+            return jsonify({"ok": False, "error": "file not found"}), 404
+        return send_file(fp, mimetype="application/pdf", conditional=True)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:150]}), 500
 
 # ── 外部协议调起(WebView2 点 zotero:// obsidian:// 不响应, 走后端调起系统)──
 def _launch_uri(u):

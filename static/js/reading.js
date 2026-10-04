@@ -16,6 +16,29 @@
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    // 内嵌 PDF 阅读面板(WebView2 内置 PDF viewer, 走后端文件流)
+    function embedPdf(att) {
+        var pane = document.getElementById('rdPdfPane');
+        if (!pane) return;
+        pane.style.display = 'block';
+        pane.innerHTML = '';
+        var head = el('div');
+        head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:6px';
+        head.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">📄 内嵌阅读（在下方记笔记，数据仍存 Obsidian）</span>';
+        var x = extBtn('', '✕ 收起');
+        x.style.cssText = 'padding:3px 10px;font-size:12px;border-radius:6px;border:1px solid var(--border-color,#3a3f4a);background:transparent;color:var(--text-muted);cursor:pointer';
+        x.addEventListener('click', function () {
+            pane.style.display = 'none';
+            pane.innerHTML = '';
+        });
+        head.appendChild(x);
+        pane.appendChild(head);
+        var frame = el('iframe');
+        frame.src = '/api/zotero/pdf/' + att.key;
+        frame.style.cssText = 'width:100%;height:56vh;border:1px solid var(--border-color,#3a3f4a);border-radius:10px;background:#525659';
+        pane.appendChild(frame);
+    }
+
     // WebView2 不响应 zotero:// obsidian:// 链接, 统一走后端调起系统
     function openExternal(u) {
         fetch('/api/open-url?u=' + encodeURIComponent(u)).catch(function () {});
@@ -70,6 +93,7 @@
             '      <div class="map-panel-title">📖 文献</div>',
             '      <div class="rd-meta">← 从左侧选一篇文献开始</div>',
             '    </div>',
+            '    <div id="rdPdfPane" style="display:none"></div>',
             '    <div class="map-panel">',
             '      <div class="map-panel-title">✍️ 笔记（保存在 Obsidian）</div>',
             '      <textarea id="rdNote" class="rd-note" placeholder="在这里记笔记…\n\n保存后会变成 Obsidian 里 文献笔记/ 下的一个 .md 文件，带题录 frontmatter，可双链。"></textarea>',
@@ -153,6 +177,8 @@
 
     function select(it) {
         current = it;
+        var oldPane = document.getElementById('rdPdfPane');
+        if (oldPane) { oldPane.style.display = 'none'; oldPane.innerHTML = ''; }
         document.querySelectorAll('.rd-item').forEach(function (x) { x.classList.remove('sel'); });
         var node = document.querySelector('.rd-item[data-key="' + it.key + '"]');
         if (node) node.classList.add('sel');
@@ -173,7 +199,9 @@
             var pdf = atts.filter(function (a) { return a.isPdf; });
             if (!pdf.length) { row.innerHTML = '<span class="rd-status">这条没有 PDF 附件（可在 Zotero 里右键找全文）</span>'; return; }
             row.innerHTML = '';
+            var firstPdf = null;
             pdf.forEach(function (a) {
+                if (!firstPdf) firstPdf = a;
                 var b = extBtn('rd-btn', '打开 PDF');
                 (function (url) { b.addEventListener('click', function () { openExternal(url); }); })(a.open);
                 b.style.marginRight = '8px';
@@ -182,6 +210,8 @@
             var zs = extBtn('rd-btn ghost', '在 Zotero 查看');
             (function (url) { zs.addEventListener('click', function () { openExternal(url); }); })(it.select);
             row.appendChild(zs);
+            // 内嵌阅读: 有 PDF 就在六月息窗口里直接看
+            if (firstPdf) embedPdf(firstPdf);
         }).catch(function () {
             var row = document.getElementById('rdPdfRow');
             if (row) row.innerHTML = '<span class="rd-status">附件查询超时，<a href="#" id="rdRetryAtt" style="color:#c9a96e">重试</a></span>';

@@ -419,7 +419,7 @@ let _kbFilterTimer = null;
 function kbFilter(v) {
     _kbFilterQ = (v || '').trim();
     clearTimeout(_kbFilterTimer);
-    _kbFilterTimer = setTimeout(() => { _kbSelEntry = null; _kbHideDetail(); _kbHideDetail(true); _kbDrawStars(); if (document.getElementById('kbSvgSea')) _kbDrawStars('kbSvgSea'); }, 220);
+    _kbFilterTimer = setTimeout(() => { _kbSelEntry = null; _kbHideDetail(); _kbHideDetail(true); _kbDrawStars(); const seaSvg = document.getElementById('kbSvgSea'); if (seaSvg && seaSvg.innerHTML) _kbDrawStars('kbSvgSea'); if (document.getElementById('kbSeaOverlay') && document.getElementById('kbLand') && document.getElementById('kbLand').style.display !== 'none') kbLand(); }, 220);
 }
 
 function kbSetTheme(key) {
@@ -440,6 +440,13 @@ function kbShowEntry(id, inSea) {
     const th = themes.find(t => t.key === e.theme) || {};
     const detail = document.getElementById(inSea ? 'kbDetailSea' : 'kbDetail');
     if (!detail) return;
+    if (inSea) {
+        const land = document.getElementById('kbLand');
+        if (land) land.style.display = 'none';
+        const pane = document.getElementById('kbStarsPane');
+        if (pane) pane.style.display = 'block';
+        if (!document.getElementById('kbSvgSea').innerHTML) _kbDrawStars('kbSvgSea');
+    }
     // 同星座导航
     const sibs = entries.filter(x => x.theme === e.theme);
     const idx = sibs.findIndex(x => x.id === id);
@@ -455,7 +462,7 @@ function kbShowEntry(id, inSea) {
       <div class="kb-detail-text">${escapeHtml(e.text)}</div>
       <div class="kb-detail-nav">
         <button onclick="kbShowEntry(${prev.id}, ${inSea ? 'true' : 'false'})" class="kb-nav-btn">← ${escapeHtml((prev.text || '').slice(0, 14))}…</button>
-        <button onclick="kbHideDetail()" class="kb-nav-btn">收起</button>
+        <button onclick="${inSea ? 'kbHideDetail(true);kbShowMap()' : 'kbHideDetail()'}" class="kb-nav-btn">收起</button>
         <button onclick="kbShowEntry(${next.id}, ${inSea ? 'true' : 'false'})" class="kb-nav-btn">${escapeHtml((next.text || '').slice(0, 14))}… →</button>
       </div>`;
     detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -478,17 +485,69 @@ function kbOpenSea() {
           const n = (_kbData.entries || []).filter(e => e.theme === t.key).length;
           return `<span class="kb-chip${(_kbFilterTheme === t.key) ? ' on' : ''}" onclick="kbSetTheme('${_kbFilterTheme === t.key ? '' : t.key}')" style="border-color:${t.color};color:${t.color}">${t.icon} ${t.name}·${n}</span>`;
       }).join('')}</div>
-      <div class="kb-stars-wrap kb-stars-sea"><svg id="kbSvgSea" viewBox="0 0 1000 470" preserveAspectRatio="xMidYMid meet"></svg><div class="kb-tip" id="kbTipSea" style="display:none"></div></div>
+      <div class="kb-sea-body">
+        <div class="kb-land" id="kbLand"></div>
+        <div class="kb-stars-wrap kb-stars-sea" id="kbStarsPane" style="display:none"><svg id="kbSvgSea" viewBox="0 0 1000 470" preserveAspectRatio="xMidYMid meet"></svg><div class="kb-tip" id="kbTipSea" style="display:none"></div></div>
+      </div>
       <div class="kb-detail kb-detail-sea" id="kbDetailSea" style="display:none"></div>
-      <div class="kb-sea-foot">${escapeHtml((_kbData && _kbData.source) || '')} · 悬停识星 · 点击入星海 · ESC 退出</div>`;
+      <div class="kb-sea-foot">${escapeHtml((_kbData && _kbData.source) || '')} · ESC 退出</div>`;
     document.body.appendChild(ov);
     document.body.style.overflow = 'hidden';
-    _kbDrawStars('kbSvgSea');
-    const cnt = document.getElementById('kbCountSea');
-    if (cnt) cnt.textContent = (_kbData.entries || []).length + ' 颗星辰';
+    kbLand();
     ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') kbCloseSea(); });
 }
 window.kbOpenSea = kbOpenSea;
+
+function _kbPick() {
+    const entries = (_kbData && _kbData.entries) || [];
+    const pool = entries.filter(_kbEntryMatch);
+    const src = pool.length ? pool : entries;
+    return src[Math.floor(Math.random() * src.length)];
+}
+
+function kbLand() {
+    const land = document.getElementById('kbLand');
+    if (!land) return;
+    const e = _kbPick();
+    if (!e) return;
+    const themes = (_kbData && _kbData.themes) || [];
+    const th = themes.find(t => t.key === e.theme) || {};
+    document.getElementById('kbStarsPane').style.display = 'none';
+    land.style.display = 'flex';
+    land.innerHTML = `
+      <div class="kb-land-star" style="color:${th.color || '#c9a96e'}">\u2726</div>
+      <div class="kb-land-text" onclick="kbShowEntry(${e.id}, true)">${escapeHtml(e.text)}</div>
+      <div class="kb-land-meta">
+        <span class="kb-detail-theme" style="color:${th.color || '#c9a96e'};border-color:${th.color || '#c9a96e'}">${_kbGlyph(e.theme, themes)}</span>
+        <span class="kb-detail-src">${escapeHtml(e.src || '')}</span>
+      </div>
+      <div class="kb-land-actions">
+        <button class="kb-nav-btn" onclick="kbShowEntry(${e.id}, true)">展开这一条 →</button>
+        <button class="kb-nav-btn" onclick="kbReroll()">再来一颗 ⚀</button>
+        <button class="kb-nav-btn" onclick="kbShowMap()">看全图 ✦</button>
+      </div>`;
+    try { window._logActivity('kb-read', '学术知识库·拾星：' + (e.text || '').slice(0, 24)); } catch (err) {}
+}
+window.kbLand = kbLand;
+
+function kbReroll() {
+    const land = document.getElementById('kbLand');
+    if (!land) return;
+    land.style.opacity = '0';
+    setTimeout(() => { kbLand(); land.style.opacity = '1'; }, 160);
+}
+window.kbReroll = kbReroll;
+
+function kbShowMap() {
+    const land = document.getElementById('kbLand');
+    if (land) land.style.display = 'none';
+    document.getElementById('kbStarsPane').style.display = 'block';
+    _kbHideDetail(true);
+    if (!document.getElementById('kbSvgSea').innerHTML) _kbDrawStars('kbSvgSea');
+    const cnt = document.getElementById('kbCountSea');
+    if (cnt) cnt.textContent = (_kbData.entries || []).length + ' 颗星辰';
+}
+window.kbShowMap = kbShowMap;
 
 function kbCloseSea() {
     const ov = document.getElementById('kbSeaOverlay');

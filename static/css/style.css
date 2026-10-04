@@ -12355,3 +12355,22 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .kb-sea-foot { text-align: center; font-size: 11px; color: #6a6558; padding-top: 8px; }
 
 .kb-star-core { pointer-events: none; }
+
+/* ── 星辰大海 · 拾星 landing ───────────────────────── */
+.kb-sea-body { flex: 1; min-height: 0; position: relative; }
+.kb-land {
+    height: 100%; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; padding: 0 8vw;
+    transition: opacity .16s ease; animation: kbIn .35s ease;
+}
+.kb-land-star { font-size: 30px; margin-bottom: 22px; opacity: .9; text-shadow: 0 0 18px currentColor; }
+.kb-land-text {
+    max-width: 640px; font-size: 16.5px; line-height: 2.05; letter-spacing: .4px;
+    color: #ece7db; cursor: pointer; transition: color .2s;
+}
+.kb-land-text:hover { color: #c9a96e; }
+.kb-land-meta { display: flex; align-items: center; gap: 10px; margin-top: 24px; }
+.kb-land-actions { display: flex; gap: 10px; margin-top: 34px; }
+.kb-land-actions .kb-nav-btn { max-width: none; padding: 6px 16px; font-size: 12.5px; }
+.kb-stars-sea { height: 100%; }
+.kb-stars-sea #kbSvgSea { height: 100%; max-height: none; }

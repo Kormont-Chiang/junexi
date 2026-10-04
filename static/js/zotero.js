@@ -175,7 +175,7 @@
         panel.appendChild(box);
         cols[cols.length - 1].appendChild(panel);
 
-        fetch(API + 'recent?limit=8').then(function (r) { return r.json(); }).then(function (d) {
+        fetch(API + 'recent?limit=5').then(function (r) { return r.json(); }).then(function (d) {
             var b = document.getElementById('zotRecentList');
             if (!b) return;
             if (!d.ok) { b.innerHTML = '<div class="zot-empty">Zotero 未运行，启动后自动显示</div>'; return; }

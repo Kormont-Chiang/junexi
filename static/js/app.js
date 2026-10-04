@@ -39,6 +39,9 @@ function switchTab(tabId) {
     }
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
     document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === tabId));
+    // 仪表盘单屏: 激活时锁滚动(要锁 html, Windows 上滚动框在 documentElement), 离开解锁
+    document.documentElement.classList.toggle('dash-fit', tabId === 'dashboard');
+    document.body.classList.toggle('dash-fit', tabId === 'dashboard');
     // 页面特定初始化
     if (tabId === 'dashboard') loadDashboard();
     if (tabId === 'map') {
@@ -3777,6 +3780,12 @@ function searchVersion() {
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     checkStatus();
+    // 仪表盘为默认页时直接锁滚动(不经过 switchTab)
+    const dash = document.getElementById('dashboard');
+    if (dash && dash.classList.contains('active')) {
+        document.documentElement.classList.add('dash-fit');
+        document.body.classList.add('dash-fit');
+    }
 
     // 定期检查状态
     setInterval(checkStatus, 60000);

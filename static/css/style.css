@@ -1500,3 +1500,25 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     border-radius: 14px; color: #e8dcc0; font-size: 12px; padding: 5px 12px; cursor: pointer;
     user-select: none; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
 .cbdb-traj-fitall:hover { background: rgba(46,38,28,0.95); border-color: #c9962e; }
+
+/* ═══ 仪表盘单屏化: 一屏放下, 面板内滚兜底 (2026-10-04) ═══ */
+#dashboard.active { display: flex; flex-direction: column; height: calc(100vh - 108px); overflow: hidden; }
+#dashboard .stats-row { flex: 0 0 auto; gap: 12px; margin-bottom: 12px; }
+#dashboard .stat-card { padding: 10px 14px; }
+#dashboard .stat-card-icon { width: 40px; height: 40px; border-radius: 10px; font-size: 20px; }
+#dashboard .stat-value { font-size: 22px; }
+#dashboard .stat-label { font-size: 11px; margin-top: 2px; }
+#dashboard .dashboard-grid { flex: 1 1 0; min-height: 0; gap: 12px; }
+#dashboard .dash-col { gap: 12px; min-height: 0; }
+#dashboard .panel { padding: 12px 14px; overflow-y: auto; min-height: 0; flex: 1 1 0; }
+#dashboard .panel-header { margin-bottom: 10px; font-size: 13.5px; }
+#dashboard .quick-link { padding: 8px 10px; gap: 10px; }
+#dashboard .quick-link-icon { font-size: 20px; }
+#dashboard .quick-link-desc { font-size: 11px; }
+#dashboard .quick-action-btn { padding: 6px 4px; font-size: 11.5px; }
+#dashboard .tool-card { padding: 10px 4px; gap: 4px; }
+#dashboard .tool-card-icon { font-size: 20px; }
+#dashboard .tool-card-name { font-size: 11.5px; }
+
+/* 仪表盘单屏: 激活时锁页面滚动 */
+html.dash-fit, body.dash-fit { overflow: hidden; }

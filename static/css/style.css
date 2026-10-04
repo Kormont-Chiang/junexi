@@ -12374,3 +12374,28 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .kb-land-actions .kb-nav-btn { max-width: none; padding: 6px 16px; font-size: 12.5px; }
 .kb-stars-sea { height: 100%; }
 .kb-stars-sea #kbSvgSea { height: 100%; max-height: none; }
+
+/* ── 学术动态 · arXiv/PubMed 资讯流 ────────────────── */
+.news-feed-item { display: block; padding: 8px 2px; border-bottom: 1px dashed rgba(201, 169, 110, 0.14); cursor: default; }
+.news-feed-item:last-of-type { border-bottom: none; }
+.news-feed-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.news-src { font-size: 10px; font-weight: 700; padding: 0 7px; border-radius: 8px; letter-spacing: .5px; }
+.news-src-pm { background: rgba(90, 140, 200, 0.16); color: #7ea3d0; border: 1px solid rgba(90, 140, 200, 0.45); }
+.news-src-ax { background: rgba(200, 110, 90, 0.14); color: #d08a72; border: 1px solid rgba(200, 110, 90, 0.45); }
+.news-date { font-size: 10.5px; color: #8a8578; }
+.news-feed-title { display: block; font-size: 12.5px; line-height: 1.55; color: #e8e3d8; text-decoration: none; }
+.news-feed-title:hover { color: #c9a96e; text-decoration: underline; }
+.news-feed-meta { font-size: 10.5px; color: #8a8578; margin-top: 2px; }
+.news-feed-abs {
+    font-size: 11.5px; line-height: 1.7; color: #b8b2a4; margin-top: 5px;
+    max-height: 3.4em; overflow: hidden; cursor: pointer; position: relative;
+    transition: max-height .25s ease;
+}
+.news-feed-abs::after {
+    content: '展开 ▾'; position: absolute; right: 0; bottom: 0; padding-left: 30px;
+    font-size: 10.5px; color: #c9a96e;
+    background: linear-gradient(90deg, transparent, var(--bg-card, #17150f) 35%);
+}
+.news-feed-abs.open { max-height: 600px; }
+.news-feed-abs.open::after { content: '收起 ▴'; }
+.news-feed-foot { display: flex; align-items: center; gap: 10px; justify-content: center; padding-top: 10px; }

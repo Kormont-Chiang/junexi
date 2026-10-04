@@ -177,41 +177,37 @@ async function loadStats() {
     } catch {}
 }
 
-async function loadNews() {
+async function loadNews(force) {
     const container = document.getElementById('newsList');
     if (!container) return;
+    container.innerHTML = '<div class="empty-hint">正在抓取学术资讯…</div>';
     try {
-        const res = await fetch('/api/news');
+        const res = await fetch('/api/academic-feed' + (force ? '?refresh=1' : ''));
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-            container.innerHTML = data.slice(0, 5).map(item => `
-                <div class="news-item" ${item.link ? `onclick="openExternal('${item.link}')"` : ''}>
-                    <div class="news-text">
-                        ${item.badge ? `<span class="news-badge ${item.badge === 'HOT' ? 'hot' : ''}">${item.badge}</span>` : ''}
-                        <span>${item.title}</span>
-                    </div>
-                    <span class="news-date">${item.date || ''}</span>
-                </div>
-            `).join('');
-        } else {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">📰</div>
-                    <div class="empty-state-text">暂无学术动态</div>
-                    <div class="empty-state-hint">在 Vault 根目录创建「学术动态.md」即可编辑</div>
-                </div>
-            `;
+        const items = data.items || [];
+        if (!items.length) {
+            container.innerHTML = `<div class="empty-hint">${escapeHtml(data.error || '暂时没有抓到资讯，点右上角刷新重试')}</div>`;
+            return;
         }
-    } catch {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">📰</div>
-                <div class="empty-state-text">加载失败</div>
-                <div class="empty-state-hint">请确认 Obsidian 已连接</div>
-            </div>
-        `;
+        container.innerHTML = items.map((it, idx) => {
+            const srcCls = it.source === 'PubMed' ? 'news-src-pm' : 'news-src-ax';
+            const abs = (it.abstract || '').trim();
+            return `
+            <div class="news-item news-feed-item">
+                <div class="news-feed-head">
+                    <span class="news-src ${srcCls}">${escapeHtml(it.source || '')}</span>
+                    <span class="news-date">${escapeHtml(it.date || '')}</span>
+                </div>
+                <a class="news-feed-title" href="javascript:void(0)" onclick="openExternal('${(it.url || '').replace(/'/g, "%27")}')" title="打开原文">${escapeHtml(it.title || '')}</a>
+                <div class="news-feed-meta">${escapeHtml(it.authors || '')}</div>
+                ${abs ? `<div class="news-feed-abs" id="newsAbs${idx}" onclick="this.classList.toggle('open')">${escapeHtml(abs)}</div>` : ''}
+            </div>`;
+        }).join('') + `<div class="news-feed-foot"><button class="kb-nav-btn" onclick="loadNews(true)">↻ 刷新抓取</button>${data.stale ? '<span class="news-date">(离线缓存)</span>' : ''}</div>`;
+    } catch (e) {
+        container.innerHTML = '<div class="empty-hint">抓取失败：' + escapeHtml(String(e).slice(0, 80)) + '</div>';
     }
 }
+window.loadNews = loadNews;
 
 async function loadRecentActivity() {
     const container = document.getElementById('activityTimeline');

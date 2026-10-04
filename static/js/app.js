@@ -237,8 +237,8 @@ function renderTips(container, data) {
     container.innerHTML = data.items.map(t => `
         <div class="tip-row">
             <span class="tip-tag">${escapeHtml(t.tag)}</span>
-            <span class="tip-text">${escapeHtml(t.text)}</span>
-        </div>`).join('') + '<div class="tip-refresh" onclick="refreshTips()">换一批 ↻</div>';
+            <span class="tip-text">${escapeHtml(t.text)}<span class="tip-src">${escapeHtml(t.lecture || '')}</span></span>
+        </div>`).join('') + '<div class="tip-refresh" onclick="refreshTips()">换一批 ↻' + (data.source ? ' <span class="tip-source">' + escapeHtml(data.source) + '</span>' : '') + '</div>';
 }
 
 async function loadPapersList() {

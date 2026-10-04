@@ -4508,6 +4508,7 @@ function searchEra() {
             ${e.notes ? `<div class="result-card-row"><span class="result-card-label">备注</span><span class="result-card-value">${e.notes}</span></div>` : ''}
         </div>
     `).join('');
+    container.innerHTML += toolSourcesHtml('era');
 }
 
 function searchYear() {
@@ -4579,6 +4580,7 @@ function searchOfficial() {
             ${o.notes ? `<div class="result-card-row"><span class="result-card-label">备注</span><span class="result-card-value">${o.notes}</span></div>` : ''}
         </div>
     `).join('');
+    container.innerHTML += toolSourcesHtml('official');
 }
 
 function searchPlace() {
@@ -4610,7 +4612,104 @@ function searchPlace() {
             ${p.lat ? `<div class="result-card-row"><span class="result-card-label">坐标</span><span class="result-card-value">${p.lat}, ${p.lng}</span></div>` : ''}
         </div>
     `).join('');
+    container.innerHTML += toolSourcesHtml('place');
 }
+
+// ── 史学工具溯源层: 数据来源声明 + 在线核查路径 ──
+const TOOL_SOURCES = {
+    taboo: {
+        title: '避讳',
+        book: '王建《史讳辞典》（中华书局）',
+        online: [
+            { label: '🏛️ CBDB 查该帝王', act: "cbdb" },
+            { label: '📖 汉典查字源', url: 'https://www.zdic.net/' },
+        ],
+        note: '本库为常用帝讳简表；具体讳例以原书及出土文献为准'
+    },
+    phonology: {
+        title: '音韵',
+        book: '陈彭年等《广韵》（泽存堂本）',
+        online: [
+            { label: '🎵 韵典网·广韵查询', url: 'https://ytenx.org/' },
+            { label: '📖 汉典查该字', url: 'https://www.zdic.net/' },
+        ],
+        note: '反切、声类、韵部据《广韵》；中古音拟音各家不同，本库不录'
+    },
+    era: {
+        title: '年号',
+        book: '李崇智《中国历代年号考》（中华书局修订本）',
+        online: [
+            { label: '🏛️ CBDB 年号/帝王核查', act: "cbdb" },
+            { label: '🌐 维基年号列表', url: 'https://zh.wikipedia.org/wiki/中国年号列表' },
+        ],
+        note: '年号起讫换算用公历年末惯例，跨公元年份以实年核之'
+    },
+    official: {
+        title: '职官',
+        book: '吕宗力《中国历代官制大辞典》（商务印书馆）',
+        online: [
+            { label: '🏛️ CBDB 职官检索（站内联动）', act: "cbdb_office" },
+        ],
+        note: '职名释义为通制概述；具体朝代沿革请以该朝会要/职官志为准'
+    },
+    place: {
+        title: '地名',
+        book: '谭其骧主编《中国历史地图集》（地图出版社）',
+        online: [
+            { label: '🗺️ CHGIS 地图核查（站内联动）', act: "map" },
+            { label: '🏛️ CBDB 地名检索（站内联动）', act: "cbdb_place" },
+        ],
+        note: '今地对照为大体方位；沿革细节请以 CHGIS 及原书图幅为准'
+    },
+    version: {
+        title: '版本',
+        book: '《中国古籍善本书目》（上海古籍出版社）',
+        online: [
+            { label: '📚 国家图书馆 OPAC 查善本', url: 'http://opac.nlc.cn/' },
+            { label: '📖 中国哲学书电子化计划', url: 'https://ctext.org/zh' },
+        ],
+        note: '版本信息为通行要目；善本馆藏以国图 OPAC 及各馆藏目为准'
+    },
+};
+
+function toolSourcesHtml(key) {
+    const cfg = TOOL_SOURCES[key];
+    if (!cfg) return '';
+    const btns = (cfg.online || []).map((o, i) => {
+        if (o.act === 'cbdb') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'cbdb\')">' + o.label + '</button>';
+        if (o.act === 'cbdb_office') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'cbdb_office\')">' + o.label + '</button>';
+        if (o.act === 'cbdb_place') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'cbdb_place\')">' + o.label + '</button>';
+        if (o.act === 'map') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'map\')">' + o.label + '</button>';
+        return '<a class="tool-src-btn" href="' + o.url + '" target="_blank" rel="noopener">' + o.label + '</a>';
+    }).join('');
+    return '<div class="tool-sources"><div class="tool-sources-head">📎 来源与核查</div>' +
+        '<div class="tool-sources-book">本库依据：' + cfg.book + '</div>' +
+        '<div class="tool-sources-note">' + cfg.note + '</div>' +
+        '<div class="tool-sources-btns">' + btns + '</div></div>';
+}
+window.toolSourcesHtml = toolSourcesHtml;
+
+function toolSrcGoto(toolKey, target) {
+    // 站内联动: 把当前搜索词带过去
+    const inputMap = { taboo: 'tabooInput', phonology: 'phonologyInput', era: 'eraNameInput', official: 'officialInput', place: 'placeInput', version: 'versionInput' };
+    const q = (document.getElementById(inputMap[toolKey]) || {}).value || '';
+    if (target === 'cbdb' || target === 'cbdb_office' || target === 'cbdb_place') {
+        switchTab('cbdb');
+        if (target === 'cbdb_office' && typeof switchCBDBType === 'function') switchCBDBType('office');
+        if (target === 'cbdb_place' && typeof switchCBDBType === 'function') switchCBDBType('place');
+        if (target === 'cbdb' && typeof switchCBDBType === 'function') switchCBDBType('person');
+        const inp = document.getElementById('cbdbSearchInput');
+        if (inp && q) inp.value = q;
+        return;
+    }
+    if (target === 'map') {
+        switchTab('map');
+        const mi = document.querySelector('#placeInput, .map-search-input');
+        if (mi && q) { mi.value = q; }
+        return;
+    }
+}
+window.toolSrcGoto = toolSrcGoto;
 
 function searchTaboo() {
     const input = document.getElementById('tabooInput');
@@ -4647,6 +4746,7 @@ function searchTaboo() {
             </div>
         `;
     }).join('');
+    container.innerHTML += toolSourcesHtml('taboo');
 }
 
 function searchPhonology() {
@@ -4689,6 +4789,7 @@ function searchPhonology() {
             </div>
         `;
     }).join('');
+    container.innerHTML += toolSourcesHtml('phonology');
 }
 
 function searchVersion() {
@@ -4725,6 +4826,7 @@ function searchVersion() {
             `).join('') : ''}
         </div>
     `).join('');
+    container.innerHTML += toolSourcesHtml('version');
 }
 
 // ── 初始化 ─────────────────────────────────────────────

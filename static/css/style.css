@@ -12361,3 +12361,11 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .pl-cat-title { font-size: 11px; letter-spacing: 2px; opacity: .5; margin: 6px 0 4px; }
 .pl-item { display: inline-block; font-size: 12px; padding: 4px 10px; margin: 2px 4px 2px 0; border: 1px solid var(--border-color); border-radius: 12px; cursor: pointer; transition: all .15s; }
 .pl-item:hover { border-color: #c9a96e; color: #c9a96e; }
+
+.tool-sources { margin-top: 14px; padding: 10px 14px; border: 1px dashed var(--border-color); border-radius: var(--radius); font-size: 12px; }
+.tool-sources-head { font-weight: 600; letter-spacing: 1px; margin-bottom: 4px; opacity: .8; }
+.tool-sources-book { opacity: .75; line-height: 1.7; }
+.tool-sources-note { opacity: .5; font-size: 11px; line-height: 1.6; margin-top: 2px; }
+.tool-sources-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.tool-src-btn { font-size: 12px; padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-decoration: none; transition: all .15s; }
+.tool-src-btn:hover { border-color: #c9a96e; color: #c9a96e; }

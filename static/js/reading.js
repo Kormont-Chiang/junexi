@@ -51,8 +51,18 @@
             '.rd-card.sel{border-color:#c9a96e;background:rgba(201,169,110,.12)}',
             '.rd-card-t{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}',
             '.rd-card-m{font-size:10.5px;color:var(--text-muted,#8a8f9a);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
-            '/* 主体: 左PDF右笔记 */',
-            '.rd-body{display:flex;gap:14px;padding:14px 16px;height:calc(100vh - 168px)}',
+            '/* 主体: 左PDF右笔记(布局可切换+拖拽调宽) */',
+            '.rd-body{display:flex;padding:14px 16px;height:calc(100vh - 168px);gap:0}',
+            '.rd-body[data-layout="row"]{flex-direction:row}',
+            '.rd-body[data-layout="row-reverse"]{flex-direction:row-reverse}',
+            '.rd-body[data-layout="column"]{flex-direction:column}',
+            '.rd-body[data-layout="column-reverse"]{flex-direction:column-reverse}',
+            '.rd-resizer{flex:0 0 10px;cursor:col-resize;position:relative;z-index:5;border-radius:5px}',
+            '.rd-resizer:hover,.rd-resizer.dragging{background:rgba(201,169,110,.22)}',
+            '.rd-resizer::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:4px;height:38px;border-radius:2px;background:var(--border-color,#3a3f4a)}',
+            '.rd-body[data-layout^="column"] .rd-resizer{cursor:row-resize}',
+            '.rd-body[data-layout^="column"] .rd-resizer::after{width:38px;height:4px}',
+            '#rdLayoutSel{padding:6px 8px;border-radius:7px;border:1px solid var(--border-color,#3a3f4a);background:var(--bg,#1e2127);color:var(--text,#e4e0d8);font-size:12.5px;outline:none;flex-shrink:0;cursor:pointer}',
             '.rd-pdf{flex:1.25;display:flex;flex-direction:column;min-width:0;border:1px solid var(--border-color,#2a2e37);border-radius:12px;overflow:hidden;background:var(--panel,#262a32)}',
             '.rd-note-wrap{flex:1;display:flex;flex-direction:column;min-width:0;border:1px solid var(--border-color,#2a2e37);border-radius:12px;overflow:hidden;background:var(--panel,#262a32)}',
             '.rd-pane-head{padding:8px 12px;font-size:12.5px;font-weight:600;border-bottom:1px solid var(--border-color,#2a2e37);display:flex;justify-content:space-between;align-items:center;gap:8px}',
@@ -71,14 +81,21 @@
             '    <button class="rd-btn sm" id="rdSearchBtn">搜索</button>',
             '  </div>',
             '  <div class="rd-strip" id="rdStrip"><div class="zot-empty">载入中…</div></div>',
+            '  <select id="rdLayoutSel" title="PDF 面板位置">',
+            '    <option value="row">📐 PDF在左</option>',
+            '    <option value="row-reverse">📐 PDF在右</option>',
+            '    <option value="column">📐 PDF在上</option>',
+            '    <option value="column-reverse">📐 PDF在下</option>',
+            '  </select>',
             '</div>',
-            '<div class="rd-body">',
-            '  <div class="rd-pdf">',
+            '<div class="rd-body" id="rdBody" data-layout="row">',
+            '  <div class="rd-pdf" id="rdPdfPane">',
             '    <div class="rd-pane-head"><span>📄 论文</span><span class="rd-pane-sub" id="rdPdfTitle">← 从上方条带选文献</span></div>',
             '    <div class="rd-pdf-ph" id="rdPh"><div style="font-size:34px">📖</div><div>选中后在这里读</div></div>',
             '    <iframe id="rdFrame" style="display:none"></iframe>',
             '  </div>',
-            '  <div class="rd-note-wrap">',
+            '  <div class="rd-resizer" id="rdResizer" title="拖拽调整两栏比例"></div>',
+            '  <div class="rd-note-wrap" id="rdNotePane">',
             '    <div class="rd-pane-head"><span>✍️ 笔记</span><span class="rd-pane-sub">保存 → Obsidian 文献笔记/</span></div>',
             '    <textarea id="rdNote" placeholder="边读边记…&#10;&#10;保存后变成 Obsidian 里 文献笔记/ 下的 .md，带题录和跳回链接，可双链。"></textarea>',
             '    <div class="rd-actions">',
@@ -96,7 +113,69 @@
             if (e.key === 'Enter') doSearch();
         });
         document.getElementById('rdSave').addEventListener('click', saveNote);
+        setupResizer();
+        setupLayout();
         loadRecent();
+    }
+
+    function setupResizer() {
+        var rz = document.getElementById('rdResizer');
+        var body = document.getElementById('rdBody');
+        var pdf = document.getElementById('rdPdfPane');
+        var note = document.getElementById('rdNotePane');
+        rz.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            var horiz = (body.dataset.layout || 'row').indexOf('row') === 0;
+            var startPos = horiz ? e.clientX : e.clientY;
+            var startSize = horiz ? pdf.offsetWidth : pdf.offsetHeight;
+            var total = horiz ? body.clientWidth : body.clientHeight;
+            if (total < 100) return;
+            rz.classList.add('dragging');
+            document.body.style.cursor = horiz ? 'col-resize' : 'row-resize';
+            document.body.style.userSelect = 'none';
+            function onMove(ev) {
+                var pos = horiz ? ev.clientX : ev.clientY;
+                var pct = (startSize + pos - startPos) / total;
+                pct = Math.max(0.15, Math.min(0.85, pct));
+                applyRatio(pct);
+                try { localStorage.setItem('jx.rd.ratio', String(pct)); } catch (err) {}
+            }
+            function onUp() {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                rz.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+    }
+
+    function applyRatio(pct) {
+        var pdf = document.getElementById('rdPdfPane');
+        var note = document.getElementById('rdNotePane');
+        pdf.style.flex = '0 0 ' + (pct * 100).toFixed(1) + '%';
+        note.style.flex = '1 1 0';
+    }
+
+    function setupLayout() {
+        var body = document.getElementById('rdBody');
+        var sel = document.getElementById('rdLayoutSel');
+        // 恢复上次设置
+        try {
+            var lay = localStorage.getItem('jx.rd.layout');
+            if (lay && sel.querySelector('option[value="' + lay + '"]')) {
+                body.dataset.layout = lay;
+                sel.value = lay;
+            }
+            var ratio = parseFloat(localStorage.getItem('jx.rd.ratio'));
+            if (ratio > 0.15 && ratio < 0.85) applyRatio(ratio);
+        } catch (e) {}
+        sel.addEventListener('change', function () {
+            body.dataset.layout = sel.value;
+            try { localStorage.setItem('jx.rd.layout', sel.value); } catch (e) {}
+        });
     }
 
     function cardHtml(it) {

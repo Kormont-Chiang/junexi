@@ -2788,47 +2788,122 @@ def send_static(path):
 
 # ── API: Obsidian ───────────────────────────────────────
 
+def _vault_resolve(filepath):
+    """vault 内安全解析路径, 防目录穿越; 返回绝对路径或 None"""
+    vault = _vault_path()
+    if not vault:
+        return None
+    fp = os.path.realpath(os.path.join(vault, filepath))
+    if not fp.startswith(os.path.realpath(vault) + os.sep) and fp != os.path.realpath(vault):
+        return None
+    return fp
+
 @app.route("/api/obsidian/notes", methods=["GET"])
 def obsidian_list_notes():
-    """列出 Obsidian 笔记（搜索功能），始终返回数组"""
+    """列出 Obsidian 笔记（REST 优先, 文件系统兜底）"""
     query = request.args.get("q", "")
     folder = request.args.get("folder", "")
 
     if query:
         result = obsidian_api("GET", f"/search/simple/?query={quote(query)}")
-    else:
-        result = obsidian_api("GET", f"/vault/{quote(folder)}/" if folder else "/vault/")
-
-    # 统一返回数组格式
-    if isinstance(result, dict):
-        if "files" in result:
-            files = result["files"]
-            # 过滤掉 README.md 和隐藏文件
-            files = [f for f in files if not f.startswith('.') and f != 'README.md']
-            return jsonify(files)
-        if "matches" in result:
+        if isinstance(result, dict) and "matches" in result:
             return jsonify(result["matches"])
-    return jsonify([])
+        # 兜底: 文件名+正文扫描
+        vault = _vault_path()
+        hits = []
+        if vault:
+            q = query.lower()
+            for root, _dirs, files in os.walk(vault):
+                if len(hits) >= 50:
+                    break
+                for fn in files:
+                    if not fn.endswith('.md') or fn.startswith('.'):
+                        continue
+                    full = os.path.join(root, fn)
+                    rel = os.path.relpath(full, vault).replace('\\', '/')
+                    hit = q in fn.lower()
+                    if not hit:
+                        try:
+                            if q in open(full, encoding='utf-8', errors='ignore').read(80000).lower():
+                                hit = True
+                        except Exception:
+                            pass
+                    if hit:
+                        hits.append({"path": rel, "basename": fn})
+        return jsonify(hits)
+
+    result = obsidian_api("GET", f"/vault/{quote(folder)}/" if folder else "/vault/")
+    if isinstance(result, dict) and "files" in result:
+        files = [f for f in result["files"] if not f.startswith('.') and f != 'README.md']
+        return jsonify(files)
+    # 兜底: 直扫 vault 目录
+    vault = _vault_path()
+    if not vault:
+        return jsonify([])
+    base = os.path.join(vault, folder) if folder else vault
+    items = []
+    try:
+        for root, _dirs, files in os.walk(base):
+            for fn in sorted(files):
+                if fn.endswith('.md') and not fn.startswith('.') and fn != 'README.md':
+                    full = os.path.join(root, fn)
+                    rel = os.path.relpath(full, vault).replace('\\', '/')
+                    items.append({"basename": fn, "path": rel})
+    except Exception:
+        pass
+    return jsonify(items)
 
 @app.route("/api/obsidian/note/<path:filepath>", methods=["GET"])
 def obsidian_get_note(filepath):
-    """读取 Obsidian 笔记内容"""
+    """读取 Obsidian 笔记内容（REST 优先, 文件系统兜底）"""
     result = obsidian_api("GET", f"/vault/{filepath}")
-    return jsonify(result)
+    if "error" not in result:
+        return jsonify(result)
+    fp = _vault_resolve(filepath)
+    if fp and os.path.isfile(fp):
+        try:
+            return jsonify({"content": open(fp, encoding='utf-8', errors='ignore').read()})
+        except Exception as e:
+            return jsonify({"error": str(e)})
+    return jsonify({"error": "文件不存在或 Obsidian 未连接"})
 
 @app.route("/api/obsidian/note/<path:filepath>", methods=["PUT"])
 def obsidian_update_note(filepath):
-    """更新/创建 Obsidian 笔记"""
+    """更新/创建 Obsidian 笔记（REST 优先, 文件系统兜底）"""
     data = request.json or {}
     content = data.get("content", "")
     result = obsidian_api("PUT", f"/vault/{filepath}", {"content": content})
-    return jsonify(result)
+    if "error" not in result:
+        return jsonify(result)
+    fp = _vault_resolve(filepath)
+    if not fp:
+        return jsonify({"error": "vault 不可用或路径非法"})
+    try:
+        os.makedirs(os.path.dirname(fp), exist_ok=True)
+        with open(fp, "w", encoding="utf-8", newline="\n") as f:
+            f.write(content)
+        return jsonify({"ok": True, "path": fp})
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @app.route("/api/obsidian/note/<path:filepath>", methods=["DELETE"])
 def obsidian_delete_note(filepath):
-    """删除 Obsidian 笔记"""
+    """删除 Obsidian 笔记（REST 优先; 兜底=移入 vault/.trash）"""
     result = obsidian_api("DELETE", f"/vault/{filepath}")
-    return jsonify(result)
+    if "error" not in result:
+        return jsonify(result)
+    fp = _vault_resolve(filepath)
+    if not fp or not os.path.isfile(fp):
+        return jsonify({"error": "文件不存在"})
+    try:
+        import shutil as _sh
+        vault = _vault_path()
+        trash = os.path.join(vault, '.trash')
+        os.makedirs(trash, exist_ok=True)
+        _sh.move(fp, os.path.join(trash, os.path.basename(fp)))
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @app.route("/api/obsidian/daily", methods=["POST"])
 def obsidian_create_daily():
@@ -2897,6 +2972,36 @@ def obsidian_stats():
             else:
                 stats["root_files"].append(f)
                 stats["total_files"] += 1
+    elif not (isinstance(result, dict) and "files" in result):
+        # 兜底: 直扫 vault 文件系统
+        vault = _vault_path()
+        if vault:
+            top = {}
+            for root, dirs, files in os.walk(vault):
+                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                rel = os.path.relpath(root, vault)
+                depth = 0 if rel == '.' else rel.count(os.sep) + 1
+                if depth > 2:
+                    dirs[:] = []
+                    continue
+                md = [f for f in files if f.endswith('.md') and not f.startswith('.')]
+                if rel == '.':
+                    stats["root_files"] = md
+                    stats["total_files"] += len(md)
+                else:
+                    key = rel.replace('\\', '/')
+                    first = key.split('/')[0]
+                    if first not in top:
+                        top[first] = {"files": 0, "subfolders": -1}
+                    top[first]["files"] += len(md)
+                    if key == first:
+                        top[first]["subfolders"] += len(dirs) + 1
+            stats["folders"] = top
+            stats["total_files"] = 0
+            stats["total_folders"] = 0
+            for k, v in top.items():
+                stats["total_files"] += v["files"]
+                stats["total_folders"] += max(0, v["subfolders"]) + 1
 
     # 兼容旧格式：仪表盘使用 论文/札记/人物/史料/日记 作为 key
     legacy = {}
@@ -4461,4 +4566,4 @@ if __name__ == "__main__":
     print("=" * 50)
     print(f"访问地址: http://127.0.0.1:{port}")
     print("=" * 50)
-    app.run(host="127.0.0.1", port=port, debug=debug)
+    app.run(host="127.0.0.1", port=port, debug=debug, threaded=True)

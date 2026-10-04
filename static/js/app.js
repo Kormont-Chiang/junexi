@@ -53,7 +53,12 @@ function switchTab(tabId) {
     if (tabId === 'workspace') loadWorkspace();
     if (tabId === 'library') loadLibrary();
     if (tabId === 'tools') initToolTabs();
-    if (tabId === 'cbdb') loadCBDBDynasties();
+    if (tabId === 'cbdb') {
+        // 首次进入时渲染默认检索表单(模板里"人名"tab是active但表单要靠这里生成)
+        const _area = document.getElementById('cbdbSearchArea');
+        if (_area && !_area.innerHTML.trim()) switchCBDBType(window._cbdbType || 'person');
+        loadCBDBDynasties();
+    }
 }
 
 // ── Obsidian 集成 ──────────────────────────────────────
@@ -372,7 +377,7 @@ async function loadWorkspace() {
 
         if (Array.isArray(data) && data.length > 0) {
             container.innerHTML = data.map(f => `
-                <div class="doc-item" onclick="viewPaper('论文/${f.basename || f}')" style="cursor:pointer">
+                <div class="doc-item" onclick="viewPaper('${f.path || ('论文/' + (f.basename || f))}')" style="cursor:pointer">
                     <div class="doc-icon">📄</div>
                     <div class="doc-info">
                         <div class="doc-title">${(f.basename || f).replace('.md', '')}</div>
@@ -381,7 +386,7 @@ async function loadWorkspace() {
             `).join('');
 
             // 自动加载第一篇论文
-            viewPaper(`论文/${data[0].basename || data[0]}`);
+            viewPaper(data[0].path || `论文/${data[0].basename || data[0]}`);
         } else {
             container.innerHTML = `
                 <div class="empty-state">

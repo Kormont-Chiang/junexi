@@ -64,7 +64,7 @@ Kanripo 汉籍 Repository · 荣新江《学术训练与学术规范》（知识
 
 ## License
 
-待定（MIT / Apache-2.0 / CC BY-NC-SA，见 docs/开源体检报告.md）
+[MIT](LICENSE) — 自由使用、修改与再分发，保留署名即可。
 
 ---
 

@@ -232,25 +232,34 @@ async function loadRecentActivity() {
     }
 }
 
+function renderTips(container, data) {
+    if (!data.ok || !data.items) return;
+    container.innerHTML = data.items.map(t => `
+        <div class="tip-row">
+            <span class="tip-tag">${escapeHtml(t.tag)}</span>
+            <span class="tip-text">${escapeHtml(t.text)}</span>
+        </div>`).join('') + '<div class="tip-refresh" onclick="refreshTips()">换一批 ↻</div>';
+}
+
 async function loadPapersList() {
     const container = document.getElementById('papersList');
     if (!container) return;
     try {
-        const res = await fetch('/api/zotero/recently-read?limit=5');
-        const data = await res.json();
-        if (data.ok && data.items && data.items.length) {
-            container.innerHTML = data.items.map(it => `
-                <div class="paper-row" onclick="openReadingItem('${it.key}', '${it.att_key}')" title="在读文献页打开">
-                    <span class="paper-row-t">${escapeHtml(it.title)}</span>
-                    <span class="paper-row-m">${it.year || ''} ${it.read_at}</span>
-                </div>`).join('');
-        } else {
-            container.innerHTML = '<div class="empty-hint">在 JX 或 Zotero 里读论文后, 这里自动出现</div>';
-        }
+        const res = await fetch('/api/writing-tips?n=3');
+        renderTips(container, await res.json());
     } catch (e) {
-        container.innerHTML = '<div class="empty-hint">读取失败</div>';
+        container.innerHTML = '<div class="empty-hint">加载失败</div>';
     }
 }
+
+window.refreshTips = async function () {
+    const container = document.getElementById('papersList');
+    if (!container) return;
+    try {
+        const res = await fetch('/api/writing-tips?n=3&refresh=1');
+        renderTips(container, await res.json());
+    } catch (e) { /* 忽略 */ }
+};
 
 window.openReadingItem = function (key, attKey) {
     if (key) sessionStorage.setItem('jx.rd.pending', key);

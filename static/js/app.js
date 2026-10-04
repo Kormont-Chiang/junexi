@@ -563,13 +563,13 @@ function kbLand() {
       <div class="kb-land-meta">
         <span class="kb-detail-theme" style="color:${th.color || '#c9a96e'};border-color:${th.color || '#c9a96e'}">${_kbGlyph(e.theme, themes)}</span>
         <span class="kb-detail-src">${escapeHtml(e.src || '')}</span>
+        <span class="kb-detail-src">第 ${e.id} / ${(_kbData.entries || []).length} 颗</span>
       </div>
       <div class="kb-land-actions">
         <button class="kb-nav-btn" onclick="kbShowEntry(${e.id}, true)">展开这一条 →</button>
         <button class="kb-nav-btn" onclick="kbReroll()">再来一颗 ⚀</button>
         <button class="kb-nav-btn" onclick="kbShowMap()">看全图 ✦</button>
       </div>`;
-    try { window._logActivity('kb-read', '学术知识库·拾星：' + (e.text || '').slice(0, 24)); } catch (err) {}
 }
 window.kbLand = kbLand;
 

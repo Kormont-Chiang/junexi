@@ -197,6 +197,11 @@ async function loadNews(force) {
             <span class="kb-chip${srcFilter === 'PubMed' ? ' on' : ''}" onclick="feedSetSrc('PubMed')" style="border-color:#7ea3d0;color:#7ea3d0">PubMed·${items.filter(i => i.source === 'PubMed').length}</span>
             <span class="kb-chip${srcFilter === 'arXiv' ? ' on' : ''}" onclick="feedSetSrc('arXiv')" style="border-color:#d08a72;color:#d08a72">arXiv·${items.filter(i => i.source === 'arXiv').length}</span>
         </div>`;
+        shown.forEach(it => {
+            it.title = _cleanFeedText(it.title);
+            it.abstract = _cleanFeedText(it.abstract);
+            it.authors = _cleanFeedText(it.authors);
+        });
         container.innerHTML = srcChips + shown.map((it, idx) => {
             const srcCls = it.source === 'PubMed' ? 'news-src-pm' : 'news-src-ax';
             const abs = (it.abstract || '').trim();
@@ -222,6 +227,17 @@ function feedSetSrc(s) {
     loadNews();
 }
 window.feedSetSrc = feedSetSrc;
+
+// feed/arXiv 文本清洗: LaTeX 内联数学+HTML 实体+空白归一
+function _cleanFeedText(s) {
+    if (!s) return '';
+    return String(s)
+        .replace(/\$[^$\n]{1,80}\$/g, ' ')
+        .replace(/\$\$[^$]{1,200}\$\$/g, ' ')
+        .replace(/&[a-z]+;/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
 
 // ── 史料库: 检索 + AI 导购 ──
 function filterLibrary(kw) {
@@ -3653,6 +3669,75 @@ function _kbKbForPrompt(text) {
     } catch (e) { return ''; }
 }
 
+let _aiKbExtra = ''; // 手动引用的知识库条目(拼接进 system prompt)
+
+
+function aiKbRefToggle() {
+    const panel = document.getElementById('aiKbRefPanel');
+    if (!panel) return;
+    if (panel.style.display === 'none') {
+        panel.style.display = '';
+        aiKbRefRender();
+    } else {
+        panel.style.display = 'none';
+    }
+}
+window.aiKbRefToggle = aiKbRefToggle;
+
+async function aiKbRefRender() {
+    const panel = document.getElementById('aiKbRefPanel');
+    if (!panel) return;
+    try {
+        if (!_kbData) {
+            const res = await fetch('/api/writing-kb');
+            _kbData = await res.json();
+        }
+        const themes = _kbData.themes || [];
+        const entries = _kbData.entries || [];
+        panel.innerHTML = '<div class="kb-chips" style="margin-bottom:8px">' +
+            themes.map(t => {
+                const n = entries.filter(e => e.theme === t.key).length;
+                return '<span class="kb-chip" onclick="aiKbRefPick(\'' + t.key + '\')" style="color:' + (t.color || '#c9a96e') + ';border-color:' + (t.color || '#c9a96e') + '55">' + (t.label || t.key) + '·' + n + '</span>';
+            }).join('') + '</div>' +
+            '<div class="ai-kbref-list" id="aiKbRefList"><div class="empty-hint">点上面主题挑条目，选中后 AI 会带着它回答</div></div>';
+    } catch (e) {
+        panel.innerHTML = '<div class="empty-hint">知识库加载失败</div>';
+    }
+}
+
+function aiKbRefPick(themeKey) {
+    const entries = (_kbData && _kbData.entries) || [];
+    const list = document.getElementById('aiKbRefList');
+    if (!list) return;
+    const sub = entries.filter(e => e.theme === themeKey);
+    list.innerHTML = sub.map(e => {
+        const short = (e.text || '').slice(0, 42) + ((e.text || '').length > 42 ? '…' : '');
+        return '<div class="ai-kbref-item" onclick="aiKbRefUse(' + e.id + ')">' + escapeHtml(short) + '</div>';
+    }).join('') || '<div class="empty-hint">该主题暂无条目</div>';
+}
+window.aiKbRefPick = aiKbRefPick;
+
+function aiKbRefUse(id) {
+    const entries = (_kbData && _kbData.entries) || [];
+    const e = entries.find(x => x.id === id);
+    if (!e) return;
+    _aiKbExtra = '\n\n用户手动引用的学术规范条目（回答时请结合这条展开）：「' + e.text + '」（出处：' + (e.src || '') + '）';
+    const badge = document.getElementById('aiKbRefBadge');
+    if (badge) {
+        badge.style.display = '';
+        badge.textContent = '已引用：' + (e.text || '').slice(0, 18) + '…';
+    }
+    showToast('已引用这条规范，下一轮对话生效', 'success');
+}
+window.aiKbRefUse = aiKbRefUse;
+
+function aiKbRefClear() {
+    _aiKbExtra = '';
+    const badge = document.getElementById('aiKbRefBadge');
+    if (badge) badge.style.display = 'none';
+}
+window.aiKbRefClear = aiKbRefClear;
+
 async function sendAIChat() {
     const input = document.getElementById('aiChatInput');
     const messages = document.getElementById('aiChatMessages');
@@ -3673,7 +3758,7 @@ async function sendAIChat() {
     try {
         const _aiKb = _kbKbForPrompt(text);
         const msgs = [
-            { role: 'system', content: '你是「六月息」内置的历史学研究助手，擅长史料解读、历史概念阐释与史学论证。请用准确、清晰的中文回答，必要时引用具体史实，并适当使用小标题与分段以提升可读性。' + _aiKb },
+            { role: 'system', content: '你是「六月息」内置的历史学研究助手，擅长史料解读、历史概念阐释与史学论证。请用准确、清晰的中文回答，必要时引用具体史实，并适当使用小标题与分段以提升可读性。' + _aiKb + (_aiKbExtra || '') },
             ...(Array.isArray(window._aiHistory) ? window._aiHistory : []),
             { role: 'user', content: text }
         ];

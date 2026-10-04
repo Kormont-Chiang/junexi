@@ -1254,6 +1254,13 @@
                         <button class="ai-quick-btn" onclick="aiQuickAction('concept')">📖 概念解释</button>
                         <button class="ai-quick-btn" onclick="aiQuickAction('compare')">⚖️ 史料对比</button>
                     </div>
+                    <div class="ai-kbref">
+                        <div class="ai-kbref-bar">
+                            <button class="ai-quick-btn" onclick="aiKbRefToggle()">📚 引用知识库</button>
+                            <span class="ai-kbref-badge" id="aiKbRefBadge" style="display:none" onclick="aiKbRefClear()" title="点击清除引用"></span>
+                        </div>
+                        <div class="ai-kbref-panel" id="aiKbRefPanel" style="display:none"></div>
+                    </div>
                 </div>
             </div>
         </div>

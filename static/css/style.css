@@ -12343,3 +12343,12 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .rd-note-area:focus { border-color: rgba(201, 169, 110, 0.6); }
 .rd-note-save { width: 100%; }
 @media (max-width: 1100px) { .rd-split { grid-template-columns: 1fr; } }
+
+.ai-kbref { margin-top: 10px; }
+.ai-kbref-bar { display: flex; align-items: center; gap: 10px; }
+.ai-kbref-badge { font-size: 11px; color: #c9a96e; background: rgba(201, 169, 110, 0.12); padding: 2px 10px; border-radius: 9px; cursor: pointer; }
+.ai-kbref-badge:hover::after { content: " ×"; }
+.ai-kbref-panel { margin-top: 8px; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); }
+.ai-kbref-list { max-height: 180px; overflow-y: auto; scrollbar-width: thin; }
+.ai-kbref-item { font-size: 12px; line-height: 1.7; padding: 5px 8px; border-radius: 6px; cursor: pointer; transition: background .15s; }
+.ai-kbref-item:hover { background: rgba(201, 169, 110, 0.10); }

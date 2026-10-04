@@ -3029,6 +3029,11 @@ _ACAD_FEED_CACHE = {"ts": 0.0, "items": [], "err": ""}
 _ACAD_FEED_TTL = 1800  # 30 分钟
 
 
+def _ts():
+    import datetime
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _arxiv_fetch(query, max_n):
     import urllib.request as _ur
     import xml.etree.ElementTree as _ET
@@ -3110,7 +3115,7 @@ def academic_feed():
     now = _time.time()
     if not force and now - _ACAD_FEED_CACHE["ts"] < _ACAD_FEED_TTL and _ACAD_FEED_CACHE["items"]:
         return jsonify({"ok": True, "items": _ACAD_FEED_CACHE["items"], "cached": True,
-                        "fetched_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(_ACAD_FEED_CACHE["ts"]))})
+                        "fetched_at": _ts()})
     items, errs = [], []
     try:
         items += _arxiv_fetch("all:%22cognitive+science%22", 4)
@@ -3136,7 +3141,7 @@ def academic_feed():
     if merged:
         _ACAD_FEED_CACHE.update({"ts": now, "items": merged, "err": "; ".join(errs)})
         return jsonify({"ok": True, "items": merged, "cached": False, "partial": bool(errs),
-                        "fetched_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now))})
+                        "fetched_at": _ts()})
     # 全失败: 过期缓存兜底
     if _ACAD_FEED_CACHE["items"]:
         return jsonify({"ok": True, "items": _ACAD_FEED_CACHE["items"], "stale": True,

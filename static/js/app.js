@@ -189,7 +189,14 @@ async function loadNews(force) {
             container.innerHTML = `<div class="empty-hint">${escapeHtml(data.error || '暂时没有抓到资讯，点右上角刷新重试')}</div>`;
             return;
         }
-        container.innerHTML = items.map((it, idx) => {
+        const srcFilter = window._feedSrcFilter || '';
+        const shown = srcFilter ? items.filter(it => it.source === srcFilter) : items;
+        const srcChips = `<div class="kb-chips news-src-chips">
+            <span class="kb-chip${!srcFilter ? ' on' : ''}" onclick="feedSetSrc('')">全部·${items.length}</span>
+            <span class="kb-chip${srcFilter === 'PubMed' ? ' on' : ''}" onclick="feedSetSrc('PubMed')" style="border-color:#7ea3d0;color:#7ea3d0">PubMed·${items.filter(i => i.source === 'PubMed').length}</span>
+            <span class="kb-chip${srcFilter === 'arXiv' ? ' on' : ''}" onclick="feedSetSrc('arXiv')" style="border-color:#d08a72;color:#d08a72">arXiv·${items.filter(i => i.source === 'arXiv').length}</span>
+        </div>`;
+        container.innerHTML = srcChips + shown.map((it, idx) => {
             const srcCls = it.source === 'PubMed' ? 'news-src-pm' : 'news-src-ax';
             const abs = (it.abstract || '').trim();
             return `
@@ -202,12 +209,18 @@ async function loadNews(force) {
                 <div class="news-feed-meta">${escapeHtml(it.authors || '')}</div>
                 ${abs ? `<div class="news-feed-abs" id="newsAbs${idx}" onclick="this.classList.toggle('open')">${escapeHtml(abs)}</div>` : ''}
             </div>`;
-        }).join('') + `<div class="news-feed-foot"><button class="kb-nav-btn" onclick="loadNews(true)">↻ 刷新抓取</button><span class="news-date">${data.fetched_at ? '更新于 ' + data.fetched_at.slice(11, 16) : ''}${data.stale ? ' · 离线缓存' : ''}</span></div>`;
+        }).join('') + (shown.length ? '' : '<div class="empty-hint">这个源暂时没有条目</div>') + `<div class="news-feed-foot"><button class="kb-nav-btn" onclick="loadNews(true)">↻ 刷新抓取</button><span class="news-date">${data.fetched_at ? '更新于 ' + data.fetched_at.slice(11, 16) : ''}${data.stale ? ' · 离线缓存' : ''}</span></div>`;
     } catch (e) {
         container.innerHTML = '<div class="empty-hint">抓取失败：' + escapeHtml(String(e).slice(0, 80)) + '</div>';
     }
 }
 window.loadNews = loadNews;
+
+function feedSetSrc(s) {
+    window._feedSrcFilter = s || '';
+    loadNews();
+}
+window.feedSetSrc = feedSetSrc;
 
 async function loadRecentActivity() {
     const container = document.getElementById('activityTimeline');

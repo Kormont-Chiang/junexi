@@ -12396,7 +12396,7 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
     font-size: 10.5px; color: #c9a96e;
     background: linear-gradient(90deg, transparent, var(--bg-card, #17150f) 35%);
 }
-.news-feed-abs.open { max-height: 600px; }
+.news-feed-abs.open { max-height: 50vh; overflow-y: auto; scrollbar-width: thin; }
 .news-feed-abs.open::after { content: '收起 ▴'; }
 .news-feed-foot { display: flex; align-items: center; gap: 10px; justify-content: center; padding-top: 10px; }
 
@@ -12425,3 +12425,6 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
     .kb-sea-head { flex-wrap: wrap; gap: 8px; }
     .kb-sea-title { font-size: 13px; letter-spacing: 1px; }
 }
+
+.news-src-chips { margin-bottom: 4px; }
+.news-src-chips .kb-chip { font-size: 10.5px; padding: 1px 8px; }

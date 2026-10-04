@@ -530,7 +530,14 @@ function kbOpenSea() {
     document.body.appendChild(ov);
     document.body.style.overflow = 'hidden';
     kbLand();
-    ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') kbCloseSea(); });
+    ov.setAttribute('tabindex', '-1');
+    ov.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { kbCloseSea(); return; }
+        const landVisible = document.getElementById('kbLand') && document.getElementById('kbLand').style.display !== 'none';
+        if (landVisible && (e.key === ' ' || e.key === 'ArrowRight')) { e.preventDefault(); kbReroll(); }
+        if (landVisible && (e.key === 'm' || e.key === 'M' || e.key === 'ArrowUp')) kbShowMap();
+    });
+    ov.focus();
 }
 window.kbOpenSea = kbOpenSea;
 

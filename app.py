@@ -3117,18 +3117,19 @@ def academic_feed():
         return jsonify({"ok": True, "items": _ACAD_FEED_CACHE["items"], "cached": True,
                         "fetched_at": _ts()})
     items, errs = [], []
-    try:
-        items += _arxiv_fetch("all:%22cognitive+science%22", 4)
-    except Exception as ex:
-        errs.append("arXiv(cogsci): %s" % ex)
-    try:
-        items += _arxiv_fetch("cat:q-bio.NC", 3)
-    except Exception as ex:
-        errs.append("arXiv(q-bio.NC): %s" % ex)
-    try:
-        items += _pubmed_fetch('("cognitive science"[Title/Abstract] OR "cognitive neuroscience"[Title/Abstract])', 5)
-    except Exception as ex:
-        errs.append("PubMed: %s" % ex)
+    from concurrent.futures import ThreadPoolExecutor
+    _jobs = [
+        ("arXiv(cogsci)", lambda: _arxiv_fetch("all:%22cognitive+science%22", 4)),
+        ("arXiv(q-bio.NC)", lambda: _arxiv_fetch("cat:q-bio.NC", 3)),
+        ("PubMed", lambda: _pubmed_fetch('("cognitive science"[Title/Abstract] OR "cognitive neuroscience"[Title/Abstract])', 5)),
+    ]
+    with ThreadPoolExecutor(max_workers=3) as _ex:
+        _futs = { _ex.submit(fn): name for name, fn in _jobs }
+        for fut, name in [(f, _futs[f]) for f in _futs]:
+            try:
+                items += fut.result(timeout=40)
+            except Exception as ex:
+                errs.append("%s: %s" % (name, ex))
     # 去重(同标题) + 按日期倒序
     seen, merged = set(), []
     for it in sorted(items, key=lambda x: x.get("date", ""), reverse=True):

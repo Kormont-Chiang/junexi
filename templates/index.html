@@ -625,6 +625,39 @@
                         <a href="https://chgis.fas.harvard.edu/" target="_blank" class="chgis-link">🏛️ CHGIS 官网下载</a>
                         <a href="https://yugong.fudan.edu.cn/" target="_blank" class="chgis-link">🏛️ 复旦历史地理平台</a>
                     </div>
+                    <div class="map-panel">
+                        <div class="map-panel-title">🏛️ 历史疆域图 · 谭图底本</div>
+                        <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.6">叠加中央研究院 CCTS 历史疆域瓦片（底本：谭其骧《中国历史地图集》），与现代底图对照。</p>
+                        <select id="cctsLayerSelect" onchange="cctsSetLayer(this.value)" style="width:100%;padding:7px 10px;border-radius:7px;border:1px solid var(--border,#3a3f4a);background:var(--bg,#1e2127);color:var(--text,#e4e0d8);font-size:13px;margin-bottom:8px">
+                            <option value="">关闭疆域叠加</option>
+                            <option value="shang">商</option>
+                            <option value="Xijhou">西周</option>
+                            <option value="spring_autumn">春秋</option>
+                            <option value="warring_states">战国</option>
+                            <option value="ad0741">唐 · 开元廿九年（741）</option>
+                            <option value="ad1111">北宋 · 政和元年（1111）</option>
+                            <option value="ad1208">南宋 · 嘉定元年（1208）</option>
+                            <option value="ad1330">元 · 至顺元年（1330）</option>
+                            <option value="ad1582">明 · 万历十年（1582）</option>
+                            <option value="ad1820">清 · 嘉庆廿五年（1820）</option>
+                        </select>
+                        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted)">
+                            <span>透明度</span>
+                            <input type="range" id="cctsOpacity" min="0.2" max="1" step="0.05" value="0.75" style="flex:1" oninput="cctsSetOpacity(this.value)">
+                            <span id="cctsOpacityVal">75%</span>
+                        </div>
+                        <p id="cctsHint" style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">瓦片自台北中研院加载，首次较慢，属正常</p>
+                    </div>
+                    <div class="map-panel">
+                        <div class="map-panel-title">📚 历史地图线上资源</div>
+                        <a href="https://history-map.osgeo.cn/" target="_blank" class="chgis-link">🗺️ 左图右史 · 谭图全 304 幅在线浏览</a>
+                        <a href="https://ccts.sinica.edu.tw/" target="_blank" class="chgis-link">🏛️ 中华文明之时空架构（中研院）</a>
+                        <a href="https://yugong.fudan.edu.cn/" target="_blank" class="chgis-link">🏛️ 复旦历史地理信息平台</a>
+                        <a href="https://qinggis.fudan.edu.cn/" target="_blank" class="chgis-link">🏛️ 复旦清朝历史 GIS</a>
+                        <a href="https://www.srhgis.com/" target="_blank" class="chgis-link">🐫 丝绸之路历史地理信息平台</a>
+                        <a href="https://worldmap.harvard.edu/maps/china-history" target="_blank" class="chgis-link">🌍 哈佛 WorldMap · 中国历史</a>
+                        <a href="https://www.davidrumsey.com/" target="_blank" class="chgis-link">🗺️ David Rumsey 古旧地图收藏（斯坦福）</a>
+                    </div>
                 </div>
                 <div class="map-main">
                     <div id="leafletMap"></div>
@@ -867,6 +900,7 @@
     <script src="/static/js/lib/echarts.min.js?v=16"></script>
     <script src="/static/js/app.js?v=35"></script>
     <script src="/static/js/zotero.js?v=1"></script>
+    <script src="/static/js/ccts.js?v=1"></script>
 </body>
 </html>
 tml>

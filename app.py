@@ -4129,6 +4129,10 @@ def chgis_regime():
         return jsonify({"error": str(e)}), 500
 
 
+# ── 插件加载(骨架: 只注册不改现有路由) ──
+from plugin_loader import load_plugins
+_plugin_nav, _plugin_loaded, _plugin_skipped = load_plugins(app)
+
 # ── 启动预热 ────────────────────────────────────────────
 def _cbdb_warmup():
     """后台预热：冷启动后首个 CBDB 查询要 ~79s（Access 打开 613MB mdb 冷文件 +

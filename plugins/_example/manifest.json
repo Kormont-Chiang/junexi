@@ -1,0 +1,8 @@
+{
+  "id": "_example",
+  "name": "插件示例",
+  "version": "0.1",
+  "enabled": true,
+  "routes": "routes.py:bp",
+  "nav": { "label": "插件示例", "icon": "🧩", "tab": "_example" }
+}

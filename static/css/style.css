@@ -12416,3 +12416,12 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
     border: 1px solid rgba(201, 169, 110, 0.35); background: transparent; color: #c9a96e;
 }
 .kb-ml-actions button:hover { background: rgba(201, 169, 110, 0.14); }
+
+.kb-theme-click { cursor: pointer; transition: background .18s; }
+.kb-theme-click:hover { background: rgba(201, 169, 110, 0.14); }
+@media (max-width: 900px) {
+    .kb-land { padding: 0 22px; }
+    .kb-land-text { font-size: 14px; line-height: 1.95; }
+    .kb-sea-head { flex-wrap: wrap; gap: 8px; }
+    .kb-sea-title { font-size: 13px; letter-spacing: 1px; }
+}

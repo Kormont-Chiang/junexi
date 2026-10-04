@@ -498,6 +498,7 @@ function kbShowEntry(id, inSea) {
       <div class="kb-detail-text">${escapeHtml(e.text)}</div>
       <div class="kb-detail-nav">
         <button onclick="kbShowEntry(${prev.id}, ${inSea ? 'true' : 'false'})" class="kb-nav-btn">← ${escapeHtml((prev.text || '').slice(0, 14))}…</button>
+        <button onclick="kbAskAI(${e.id})" class="kb-nav-btn" title="带着这一条去问 AI 助手">✦ 问 AI</button>
         <button onclick="${inSea ? 'kbHideDetail(true);kbShowMap()' : 'kbHideDetail();kbMiniLand()'}" class="kb-nav-btn">收起</button>
         <button onclick="kbShowEntry(${next.id}, ${inSea ? 'true' : 'false'})" class="kb-nav-btn">${escapeHtml((next.text || '').slice(0, 14))}… →</button>
       </div>`;
@@ -561,7 +562,7 @@ function kbLand() {
       <div class="kb-land-star" style="color:${th.color || '#c9a96e'}">\u2726</div>
       <div class="kb-land-text" onclick="kbShowEntry(${e.id}, true)">${escapeHtml(e.text)}</div>
       <div class="kb-land-meta">
-        <span class="kb-detail-theme" style="color:${th.color || '#c9a96e'};border-color:${th.color || '#c9a96e'}">${_kbGlyph(e.theme, themes)}</span>
+        <span class="kb-detail-theme kb-theme-click" style="color:${th.color || '#c9a96e'};border-color:${th.color || '#c9a96e'}" onclick="kbSetTheme('${e.theme}')" title="只看这个星座">${_kbGlyph(e.theme, themes)}</span>
         <span class="kb-detail-src">${escapeHtml(e.src || '')}</span>
         <span class="kb-detail-src">第 ${e.id} / ${(_kbData.entries || []).length} 颗</span>
       </div>
@@ -591,6 +592,20 @@ function kbShowMap() {
     if (cnt) cnt.textContent = (_kbData.entries || []).length + ' 颗星辰';
 }
 window.kbShowMap = kbShowMap;
+
+function kbAskAI(id) {
+    const entries = (_kbData && _kbData.entries) || [];
+    const e = entries.find(x => x.id === id);
+    if (!e) return;
+    try { kbCloseSea(); } catch (err) {}
+    switchTab('ai');
+    const input = document.getElementById('aiChatInput');
+    if (input) {
+        input.value = '请结合具体例子展开讲讲这条学术规范/方法：「' + e.text + '」（出处：荣新江《学术训练与学术规范》' + (e.src || '') + '）';
+        setTimeout(() => { input.focus(); }, 150);
+    }
+}
+window.kbAskAI = kbAskAI;
 
 function kbCloseSea() {
     const ov = document.getElementById('kbSeaOverlay');

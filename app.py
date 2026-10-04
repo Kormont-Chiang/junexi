@@ -4212,6 +4212,42 @@ def zotero_recent():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:150]})
 
+REAL_TYPES = {"book", "journalArticle", "bookSection", "thesis", "report",
+              "conferencePaper", "encyclopediaArticle", "document", "manuscript", "newspaperArticle"}
+
+@app.route("/api/zotero/library", methods=["GET"])
+def zotero_library():
+    """全库真文献(过滤 attachment/annotation/note), 分页拉全"""
+    q = request.args.get("q", "").strip()
+    try:
+        all_items = []
+        start = 0
+        for _ in range(10):  # 最多 1000 条防护
+            params = {"itemType": "-attachment", "limit": 100, "start": start,
+                      "sort": "dateAdded", "direction": "desc"}
+            if q:
+                params["q"] = q
+            s, data = _zotero_get("/api/users/0/items", params)
+            if not isinstance(data, list) or not data:
+                break
+            for it in data:
+                d = it.get("data", {})
+                if d.get("itemType") in REAL_TYPES:
+                    all_items.append(it)
+            if len(data) < 100:
+                break
+            start += 100
+        items = _zotero_map_items(all_items)
+        # 客户端再过滤一遍(标题/作者/年份含关键词), 弥补 local API q 覆盖面
+        if q:
+            ql = q.lower()
+            items = [x for x in items if ql in (x["title"] or "").lower()
+                     or ql in (x["creators"] or "").lower()
+                     or ql in (x["year"] or "")]
+        return jsonify({"ok": True, "total": len(items), "items": items})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:150]})
+
 @app.route("/api/zotero/search", methods=["GET"])
 def zotero_search():
     q = request.args.get("q", "").strip()
@@ -4500,6 +4536,13 @@ def _attachment_path(att_key, data):
     """Zotero path 字段三种形态: storage:xx(imported) / attachments:xx(linked, 基准目录下) / 绝对路径"""
     p = (data.get("path") or "").strip()
     if not p:
+        # local API 不回传 path: imported_file 走 storage/<key>/<filename>
+        if data.get("linkMode") == "imported_file" and data.get("filename"):
+            datadir = _zotero_datadir()
+            if datadir:
+                fp = os.path.join(datadir, "storage", att_key, data["filename"])
+                if os.path.isfile(fp):
+                    return fp
         return None
     import re as _re
     if p.lower().startswith("storage:"):

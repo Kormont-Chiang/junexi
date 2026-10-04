@@ -886,6 +886,54 @@
             </div>
         </div>
 
+        <!-- ═══ 读文献 ═══ -->
+        <div id="reading" class="page">
+            <div class="reading-layout">
+                <!-- 左: 文献库/阅读器 -->
+                <div class="panel reading-lib">
+                    <div class="panel-header" id="rdLibHeader"><span class="panel-icon">📚</span> 我的文献库（Zotero）</div>
+                    <div id="rdViewer" style="display:none">
+                        <div class="rd-viewer-bar">
+                            <button class="kb-nav-btn" onclick="rdBackToList()">← 返回列表</button>
+                            <span class="rd-viewer-title" id="rdViewerTitle"></span>
+                            <button class="kb-nav-btn" onclick="rdOpenExt()">↗ 新窗口</button>
+                        </div>
+                        <div class="rd-split">
+                            <iframe id="rdPdfFrame" class="rd-pdf-frame" title="PDF 阅读器"></iframe>
+                            <div class="rd-note">
+                                <div class="rd-note-head">🔥 边读边记 <span class="rd-note-saved" id="rdNoteSaved"></span></div>
+                                <textarea id="rdNoteArea" class="rd-note-area" placeholder="读的时候随手记，点下方保存 → Obsidian「文献笔记/」"></textarea>
+                                <button class="btn-primary rd-note-save" onclick="rdSaveNote()">保存到 Obsidian 文献笔记</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="search-row" style="margin-bottom:10px">
+                        <input type="text" id="rdSearch" class="search-input" style="margin-bottom:0;flex:1" placeholder="搜标题 / 作者 / 年份……" onkeydown="if(event.key==='Enter')rdSearch()">
+                        <button class="btn-primary" onclick="rdSearch()">搜索</button>
+                    </div>
+                    <div id="rdListWrap">
+                        <div class="rd-meta" id="rdMeta"></div>
+                        <div class="doc-list" id="rdList" style="max-height:none"></div>
+                    </div>
+                </div>
+                <!-- 右: 最近阅读 + 导读 -->
+                <div class="reading-side">
+                    <div class="panel" id="rdResumePanel" style="display:none">
+                        <div class="panel-header"><span class="panel-icon">⏯️</span> 继续阅读</div>
+                        <div id="rdResume"></div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-header"><span class="panel-icon">🕐</span> 最近在读</div>
+                        <div id="rdRecentRead"></div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-header"><span class="panel-icon">🆕</span> 最近导入</div>
+                        <div id="rdRecentAdd"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ═══ 史料地图 ═══ -->
         <div id="map" class="page">
             <div class="map-layout">
@@ -1220,7 +1268,7 @@
     <script src="/static/js/data/chgis/chgis-data.js?v=16"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="/static/js/lib/echarts.min.js?v=16"></script>
-    <script src="/static/js/app.js?v=50"></script>
+    <script src="/static/js/app.js?v=51"></script>
     <script src="/static/js/zotero.js?v=5"></script>
     <script src="/static/js/ccts.js?v=2"></script>
     <script src="/static/js/reading.js?v=9"></script>

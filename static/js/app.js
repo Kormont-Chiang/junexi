@@ -37,6 +37,7 @@ function switchTab(tabId) {
     if (tabId !== 'map' && chgisMap && chgisMap._animating) {
         try { chgisMap.stop(); } catch (e) { /* 防御 */ }
     }
+    if (tabId === 'reading' && !_rdLoadedOnce) { try { loadReading(); } catch (e) {} }
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabId));
     document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === tabId));
     // 仪表盘单屏: 激活时锁滚动(要锁 html, Windows 上滚动框在 documentElement), 离开解锁
@@ -318,6 +319,191 @@ function libAISend() {
     });
 }
 window.libAISend = libAISend;
+
+// ── 读文献页 ─────────────────────────────────────────
+let _rdLoadedOnce = false;
+async function loadReading() {
+    _rdLoadedOnce = true;
+    await Promise.all([rdLoadLibrary(''), rdLoadRecentAdd(), rdLoadRecentRead()]);
+}
+
+async function rdLoadLibrary(q) {
+    const list = document.getElementById('rdList');
+    const meta = document.getElementById('rdMeta');
+    if (!list) return;
+    list.innerHTML = '<div class="empty-hint">连接 Zotero……</div>';
+    try {
+        const res = await fetch('/api/zotero/library' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'fail');
+        if (meta) meta.textContent = data.total + ' 篇文献' + (q ? (' · 关键词「' + q + '」') : '');
+        if (!data.items.length) {
+            list.innerHTML = '<div class="empty-hint">没有找到文献。在 Zotero 里导入后会自动出现在这里；也可以换个关键词搜。</div>';
+            return;
+        }
+        list.innerHTML = data.items.map(it => `
+            <div class="doc-item rd-item" onclick="rdOpen('${it.key}')">
+                <div class="doc-title">${escapeHtml(it.title)}</div>
+                <div class="doc-meta">${escapeHtml(it.creators || '佚名')}${it.year ? ' · ' + it.year : ''} · ${{journalArticle:'期刊',book:'专著',bookSection:'章节',thesis:'学位论文',report:'报告',conferencePaper:'会议',encyclopediaArticle:'百科',document:'文献',manuscript:'手稿',newspaperArticle:'报纸'}[it.itemType] || it.itemType}</div>
+            </div>`).join('');
+    } catch (e) {
+        list.innerHTML = '<div class="empty-hint">文献库加载失败：' + escapeHtml(String(e).slice(0, 80)) + '</div>';
+    }
+}
+window.rdLoadLibrary = rdLoadLibrary;
+
+function rdSearch() {
+    const q = (document.getElementById('rdSearch')?.value || '').trim();
+    rdLoadLibrary(q);
+}
+window.rdSearch = rdSearch;
+
+let _rdCurrent = null; // { key, title, attKey, creators, year, itemType }
+
+async function rdOpen(key) {
+    try {
+        const res = await fetch('/api/zotero/item/' + key + '/attachments');
+        const data = await res.json();
+        if (!data.ok || !data.attachments || !data.attachments.length) {
+            showToast('这条文献没有 PDF 附件', 'error');
+            return;
+        }
+        const pdf = data.attachments.find(x => x.isPdf) || data.attachments[0];
+        // 取该条题录信息(作者/年份/标题)
+        let meta = { creators: '', year: '', title: '', itemType: '' };
+        try {
+            const libRes = await fetch('/api/zotero/library');
+            const lib = await libRes.json();
+            const it = (lib.items || []).find(x => x.key === key);
+            if (it) meta = it;
+        } catch (e) {}
+        _rdCurrent = { key, attKey: pdf.key, title: meta.title || pdf.title || '(PDF)',
+                       creators: meta.creators || '', year: meta.year || '', itemType: meta.itemType || '' };
+        const viewer = document.getElementById('rdViewer');
+        const listWrap = document.getElementById('rdListWrap');
+        const header = document.getElementById('rdLibHeader');
+        if (viewer && listWrap) {
+            listWrap.style.display = 'none';
+            if (header) header.style.display = 'none';
+            viewer.style.display = '';
+            document.getElementById('rdViewerTitle').textContent = _rdCurrent.title;
+            document.getElementById('rdPdfFrame').src = '/api/zotero/pdf/' + pdf.key;
+            const area = document.getElementById('rdNoteArea');
+            if (area) area.value = '';
+            const saved = document.getElementById('rdNoteSaved');
+            if (saved) saved.textContent = '';
+        } else {
+            window.open('/api/zotero/pdf/' + pdf.key, '_blank');
+        }
+        rdLoadRecentRead();
+    } catch (e) {
+        showToast('打开失败：' + String(e).slice(0, 60), 'error');
+    }
+}
+window.rdOpen = rdOpen;
+
+function rdBackToList() {
+    const viewer = document.getElementById('rdViewer');
+    const listWrap = document.getElementById('rdListWrap');
+    const header = document.getElementById('rdLibHeader');
+    if (viewer) viewer.style.display = 'none';
+    if (listWrap) listWrap.style.display = '';
+    if (header) header.style.display = '';
+    _rdCurrent = null;
+}
+window.rdBackToList = rdBackToList;
+
+function rdOpenExt() {
+    if (_rdCurrent && _rdCurrent.attKey) {
+        window.open('/api/zotero/pdf/' + _rdCurrent.attKey, '_blank');
+    }
+}
+window.rdOpenExt = rdOpenExt;
+
+async function rdSaveNote() {
+    const area = document.getElementById('rdNoteArea');
+    const saved = document.getElementById('rdNoteSaved');
+    if (!area || !area.value.trim()) { showToast('先写点内容再保存', 'error'); return; }
+    if (!_rdCurrent) return;
+    try {
+        const res = await fetch('/api/obsidian/zotero-note', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: _rdCurrent.title,
+                content: area.value,
+                meta: { creators: _rdCurrent.creators, year: _rdCurrent.year,
+                        itemType: _rdCurrent.itemType, zoteroKey: _rdCurrent.key }
+            })
+        });
+        const d = await res.json();
+        if (d.ok) {
+            if (saved) saved.textContent = '✓ 已保存 ' + new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            showToast('已存到 Obsidian 文献笔记', 'success');
+        } else {
+            showToast('保存失败：' + (d.error || ''), 'error');
+        }
+    } catch (e) {
+        showToast('保存失败：' + String(e).slice(0, 60), 'error');
+    }
+}
+window.rdSaveNote = rdSaveNote;
+
+async function rdLoadRecentAdd() {
+    const box = document.getElementById('rdRecentAdd');
+    if (!box) return;
+    try {
+        const res = await fetch('/api/zotero/recent?limit=6');
+        const data = await res.json();
+        if (!data.ok || !data.items.length) { box.innerHTML = '<div class="empty-hint">暂无</div>'; return; }
+        box.innerHTML = data.items.map(it => `
+            <div class="doc-item rd-item rd-mini" onclick="rdOpen('${it.key}')">
+                <div class="doc-title">${escapeHtml(it.title)}</div>
+                <div class="doc-meta">${it.year || ''}</div>
+            </div>`).join('');
+    } catch (e) { box.innerHTML = '<div class="empty-hint">连接失败</div>'; }
+}
+
+async function rdLoadRecentRead() {
+    const box = document.getElementById('rdRecentRead');
+    const resumePanel = document.getElementById('rdResumePanel');
+    if (!box) return;
+    try {
+        const res = await fetch('/api/zotero/recently-read?limit=6');
+        const data = await res.json();
+        const items = data.items || [];
+        if (!items.length) {
+            box.innerHTML = '<div class="empty-hint">还没有阅读记录</div>';
+            if (resumePanel) resumePanel.style.display = 'none';
+            return;
+        }
+        box.innerHTML = items.slice(0, 5).map(it => `
+            <div class="doc-item rd-item rd-mini" onclick="rdOpenByAtt('${it.att_key || ''}', '${it.key || ''}')">
+                <div class="doc-title">${escapeHtml(it.title || '(PDF)')}</div>
+                <div class="doc-meta">${it.read_at || ''}</div>
+            </div>`).join('');
+        // 继续阅读横幅: 最近一篇
+        const last = items[0];
+        if (last && resumePanel) {
+            resumePanel.style.display = '';
+            document.getElementById('rdResume').innerHTML = `
+                <div class="doc-item rd-item" onclick="rdOpenByAtt('${last.att_key || ''}', '${last.key || ''}')">
+                    <div class="doc-title">⏯️ ${escapeHtml(last.title || '(PDF)')}</div>
+                    <div class="doc-meta">上次读到 ${last.read_at || '最近'} · 点击继续</div>
+                </div>`;
+        }
+    } catch (e) { box.innerHTML = '<div class="empty-hint">连接失败</div>'; }
+}
+
+async function rdOpenByAtt(attKey, parentKey) {
+    if (attKey) {
+        window.open('/api/zotero/pdf/' + attKey, '_blank');
+        rdLoadRecentRead();
+    } else if (parentKey) {
+        rdOpen(parentKey);
+    }
+}
+window.rdOpenByAtt = rdOpenByAtt;
 
 // 初始计数
 if (document.readyState === 'loading') {

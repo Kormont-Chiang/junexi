@@ -244,6 +244,12 @@ let _kbFilterQ = '';
 let _kbFilterTheme = '';
 let _kbSelEntry = null;
 
+const KB_GLYPH = { zhixue: '\u2726', shiliao: '\u2739', jiansuo: '\u2756', lunwen: '\u2727', shuping: '\u273b', guifan: '\u00a7', daode: '\u2696' };
+function _kbGlyph(key, themes) {
+    const t = (themes || []).find(x => x.key === key);
+    return (KB_GLYPH[key] || '\u2726') + ' ' + (t ? t.name : key);
+}
+
 function _kbRand(seed) {
     let s = seed % 2147483647;
     if (s <= 0) s += 2147483646;
@@ -306,12 +312,17 @@ function _kbDrawStars(svgId) {
     const rows = [128, 348];
     const positions = [
         [cols[0], rows[0]], [cols[1], rows[0]], [cols[2], rows[0]], [cols[3], rows[0]],
-        [cols[0] + 122, rows[1]], [cols[1] + 122, rows[1]], [cols[2] + 122, rows[1]]
+        [210, rows[1]], [500, rows[1]], [790, rows[1]]
     ];
 
     let html = '';
     let matchCount = 0;
     const starPos = {};
+    { const brnd = _kbRand(20261004);
+      for (let bi = 0; bi < 110; bi++) {
+          const bx = brnd() * 1000, by = brnd() * 470, brr = 0.4 + brnd() * 0.9;
+          html += `<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="${brr.toFixed(2)}" fill="#cfd6e4" opacity="${(0.10 + brnd() * 0.30).toFixed(2)}"/>`;
+      } }
 
     themes.forEach((t, ti) => {
         const list = byTheme[t.key] || [];
@@ -319,26 +330,46 @@ function _kbDrawStars(svgId) {
         const rnd = _kbRand(t.key.length * 7919 + ti * 104729);
 
         // 星座名
-        html += `<text x="${cx}" y="${cy}" text-anchor="middle" class="kb-constellation" fill="${t.color}">${t.icon} ${t.name}</text>`;
+        html += `<text x="${cx}" y="${cy}" text-anchor="middle" class="kb-constellation" fill="${t.color}" style="filter:drop-shadow(0 0 7px ${t.color})">${_kbGlyph(t.key, themes)}</text>`;
 
-        // 星位: 环带分布
+        // 星位: 高斯散布 + 两轮排斥, 出圈拉回
+        const spread = list.length <= 6 ? 0.72 : (list.length >= 12 ? 1.0 : 0.85);
         const coords = list.map((e, ei) => {
-            const ring = ei % 2 === 0 ? 1 : 1.62;
-            const baseAng = (ei / Math.max(list.length, 1)) * Math.PI * 2 + ti * 0.7;
-            const ang = baseAng + (rnd() - 0.5) * 0.5;
-            const R = 38 * ring + (rnd() - 0.5) * 12;
-            return { e, x: cx + Math.cos(ang) * R * 1.28, y: cy + Math.sin(ang) * R };
+            const g = () => (rnd() + rnd() + rnd() - 1.5) * 46 * spread;
+            return { e, x: cx + g() * 1.5, y: cy + g() };
+        });
+        for (let round = 0; round < 2; round++) {
+            for (let p = 0; p < coords.length; p++) for (let q = p + 1; q < coords.length; q++) {
+                const A2 = coords[p], B2 = coords[q];
+                const dx = A2.x - B2.x, dy = A2.y - B2.y;
+                const d2 = dx * dx + dy * dy;
+                if (d2 < 26 * 26 && d2 > 0.01) {
+                    const d = Math.sqrt(d2), push = (26 - d) / 2;
+                    const ux = dx / d, uy = dy / d;
+                    A2.x += ux * push; A2.y += uy * push;
+                    B2.x -= ux * push; B2.y -= uy * push;
+                }
+            }
+        }
+        coords.forEach(c => {
+            c.x = Math.max(30, Math.min(970, c.x));
+            c.y = Math.max(30, Math.min(440, c.y));
         });
 
-        // 连线: 近邻成链(星座感)
+        // 连线: 每星仅连最近邻居(意象星座线)
         for (let k = 0; k < coords.length; k++) {
-            const a = coords[k], b = coords[(k + 1) % coords.length];
-            const dx = a.x - b.x, dy = a.y - b.y;
-            const d = Math.sqrt(dx * dx + dy * dy);
-            if (d < 150 || k === coords.length - 1) {
-                const dimA = _kbEntryMatch(a.e), dimB = _kbEntryMatch(b.e);
-                const op = (dimA && dimB) ? 0.32 : 0.05;
-                html += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="${t.color}" stroke-width="0.6" opacity="${op}"/>`;
+            let best = -1, bd = 115;
+            for (let m = 0; m < coords.length; m++) {
+                if (m === k) continue;
+                const dx = coords[k].x - coords[m].x, dy = coords[k].y - coords[m].y;
+                const d = Math.sqrt(dx * dx + dy * dy);
+                if (d < bd) { bd = d; best = m; }
+            }
+            if (best >= 0 && best > k) {
+                const A2 = coords[k], B2 = coords[best];
+                const dimA = _kbEntryMatch(A2.e), dimB = _kbEntryMatch(B2.e);
+                const op = (dimA && dimB) ? 0.26 : 0.04;
+                html += `<line x1="${A2.x}" y1="${A2.y}" x2="${B2.x}" y2="${B2.y}" stroke="${t.color}" stroke-width="0.5" opacity="${op}"/>`;
             }
         }
 
@@ -346,12 +377,13 @@ function _kbDrawStars(svgId) {
         coords.forEach(({ e, x, y }) => {
             const on = _kbEntryMatch(e);
             if (on) matchCount++;
-            const r = e.text.length > 90 ? 5.4 : (e.text.length > 55 ? 4.4 : 3.5);
-            const op = on ? 0.92 : 0.07;
-            const glowOp = on ? 0.30 : 0.03;
+            const r = e.text.length > 90 ? 6.2 : (e.text.length > 55 ? 4.8 : 3.4);
+            const op = on ? 0.95 : 0.07;
+            const phase = (e.id % 7) * 0.5;
             starPos[e.id] = { x, y };
-            html += `<circle cx="${x}" cy="${y}" r="${r * 2.2}" fill="${t.color}" opacity="${glowOp}" class="kb-star-glow"/>`;
+            html += `<circle cx="${x}" cy="${y}" r="${r * 2.4}" fill="${t.color}" opacity="${on ? 0.26 : 0.03}" class="kb-star-glow" style="animation-delay:-${phase}s"/>`;
             html += `<circle cx="${x}" cy="${y}" r="${r}" fill="${t.color}" opacity="${op}" class="kb-star" data-id="${e.id}" style="cursor:pointer"/>`;
+            if (on && r >= 4.8) html += `<circle cx="${x}" cy="${y}" r="${r * 0.36}" fill="#fff8ec" opacity="0.75" class="kb-star-core"/>`;
         });
     });
 

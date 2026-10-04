@@ -12288,7 +12288,7 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .kb-chip.on { background: rgba(201, 169, 110, 0.16); font-weight: 600; }
 .kb-stars-wrap { position: relative; width: 100%; }
 #kbSvg { display: block; width: 100%; height: auto; max-height: 400px; min-height: 260px; }
-.kb-constellation { font-size: 13px; font-weight: 600; letter-spacing: 2px; opacity: .85; }
+.kb-constellation { font-size: 14.5px; font-weight: 700; letter-spacing: 3px; opacity: .95; paint-order: stroke; stroke: #06070c; stroke-width: 5px; stroke-linejoin: round; }
 .kb-star { transition: opacity .25s; }
 .kb-star:hover { stroke: #fff; stroke-width: 1.2; }
 .kb-star-glow { animation: kbTwinkle 3.6s ease-in-out infinite; }
@@ -12330,7 +12330,11 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .kb-sea-btn:hover { background: rgba(201, 169, 110, 0.18); }
 .kb-sea-overlay {
     position: fixed; inset: 0; z-index: 9000; display: flex; flex-direction: column;
-    background: radial-gradient(ellipse at 30% 20%, #171a24 0%, #0b0d14 55%, #07080d 100%);
+    background:
+        radial-gradient(ellipse 900px 600px at 18% 12%, rgba(46, 52, 88, 0.55) 0%, transparent 60%),
+        radial-gradient(ellipse 700px 500px at 82% 78%, rgba(88, 64, 46, 0.35) 0%, transparent 60%),
+        radial-gradient(ellipse 500px 400px at 65% 25%, rgba(40, 68, 78, 0.3) 0%, transparent 65%),
+        #06070c;
     padding: 18px 26px; animation: kbSeaIn .3s ease;
 }
 @keyframes kbSeaIn { from { opacity: 0; } to { opacity: 1; } }
@@ -12349,3 +12353,5 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
     background: rgba(20, 22, 30, 0.92); border-color: rgba(201, 169, 110, 0.5);
 }
 .kb-sea-foot { text-align: center; font-size: 11px; color: #6a6558; padding-top: 8px; }
+
+.kb-star-core { pointer-events: none; }

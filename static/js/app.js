@@ -57,12 +57,16 @@ function switchTab(tabId) {
 }
 
 // ── Obsidian 集成 ──────────────────────────────────────
+// 所有外部跳转统一走后端 /api/open-url (WebView2 不响应 obsidian:// 自定义协议, window.open/_blank 也不可靠)
+window.openExternal = function (url) {
+    fetch('/api/open-url?u=' + encodeURIComponent(url)).catch(() => {});
+};
+
 function openObsidianURI(path) {
-    if (path) {
-        window.location.href = `obsidian://open?vault=${encodeURIComponent(VAULT_NAME)}&file=${encodeURIComponent(path)}`;
-    } else {
-        window.location.href = `obsidian://open?vault=${encodeURIComponent(VAULT_NAME)}`;
-    }
+    const u = path
+        ? `obsidian://open?vault=${encodeURIComponent(VAULT_NAME)}&file=${encodeURIComponent(path)}`
+        : `obsidian://open?vault=${encodeURIComponent(VAULT_NAME)}`;
+    window.openExternal(u);
 }
 
 async function openObsidianNote(path) {
@@ -176,7 +180,7 @@ async function loadNews() {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
             container.innerHTML = data.slice(0, 5).map(item => `
-                <div class="news-item" ${item.link ? `onclick="window.open('${item.link}','_blank')"` : ''}>
+                <div class="news-item" ${item.link ? `onclick="openExternal('${item.link}')"` : ''}>
                     <div class="news-text">
                         ${item.badge ? `<span class="news-badge ${item.badge === 'HOT' ? 'hot' : ''}">${item.badge}</span>` : ''}
                         <span>${item.title}</span>

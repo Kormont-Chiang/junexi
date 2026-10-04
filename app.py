@@ -2832,23 +2832,33 @@ def obsidian_delete_note(filepath):
 
 @app.route("/api/obsidian/daily", methods=["POST"])
 def obsidian_create_daily():
-    """创建今日札记"""
-    today = datetime.now().strftime("%Y-%m-%d")
-    content = request.json.get("content", "") if request.json else ""
-    filepath = f"日记/{today}.md"
-
-    # 检查是否已存在
-    existing = obsidian_api("GET", f"/vault/{filepath}")
-    if "error" not in existing:
-        # 追加内容
-        existing_content = existing.get("content", "")
-        new_content = existing_content + "\n\n" + content if content else existing_content
-        result = obsidian_api("PUT", f"/vault/{filepath}", {"content": new_content})
-    else:
-        # 创建新文件
-        header = f"# {today} 札记\n\n"
-        result = obsidian_api("PUT", f"/vault/{filepath}", {"content": header + content})
-    return jsonify(result)
+    """创建/追加今日札记(文件直写, 不依赖 Local REST API 插件)"""
+    import datetime as _dt
+    import urllib.parse as _up
+    today = _dt.datetime.now().strftime("%Y-%m-%d")
+    content = ((request.get_json(force=True, silent=True) or {}).get("content") or "").strip()
+    vault = _vault_path()
+    if not vault:
+        return jsonify({"ok": False, "error": "vault not found"})
+    folder = os.path.join(vault, "日记")
+    try:
+        os.makedirs(folder, exist_ok=True)
+    except Exception as e:
+        return jsonify({"ok": False, "error": "mkdir: %s" % e})
+    fp = os.path.join(folder, today + ".md")
+    try:
+        if os.path.isfile(fp):
+            old = open(fp, encoding="utf-8", errors="ignore").read()
+            body = old.rstrip() + ("\n\n" + content if content else "") + "\n"
+        else:
+            body = "# %s 札记\n\n%s\n" % (today, content)
+        with open(fp, "w", encoding="utf-8", newline="\n") as f:
+            f.write(body)
+    except Exception as e:
+        return jsonify({"ok": False, "error": "write: %s" % e})
+    uri = "obsidian://open?vault=%s&file=%s" % (
+        _up.quote(os.path.basename(vault)), _up.quote("日记/" + today + ".md"))
+    return jsonify({"ok": True, "path": fp, "file": today + ".md", "obsidian": uri})
 
 @app.route("/api/obsidian/stats", methods=["GET"])
 def obsidian_stats():

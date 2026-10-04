@@ -12,6 +12,22 @@
         return typeof chgisMap !== 'undefined' ? chgisMap : null;
     }
 
+    window._cctsOn = false;
+
+    // 统一决定「图区放大」状态: CCTS 或朝代轮廓任一开启即收窄侧栏
+    window._applyMapFocus = function () {
+        var layout = document.querySelector('.map-layout');
+        if (!layout) return;
+        var focused = !!window._cctsOn || !!window._dynastyOn;
+        if (layout.classList.contains('map-focused') === focused) return;
+        layout.classList.toggle('map-focused', focused);
+        var m = map();
+        if (m) {
+            setTimeout(function () { m.invalidateSize(); }, 60);
+            setTimeout(function () { m.invalidateSize(); }, 400);
+        }
+    };
+
     window.cctsSetLayer = function (layerId) {
         var m = map();
         if (!m) { console.error('CCTS: map not ready'); return; }
@@ -19,6 +35,8 @@
             m.removeLayer(currentLayer);
             currentLayer = null;
         }
+        window._cctsOn = !!layerId;
+        window._applyMapFocus();
         if (!layerId) return;
         var url = 'https://gis.sinica.edu.tw/ccts/file-exists.php?img=' + layerId + '-png-{z}-{x}-{y}';
         currentLayer = L.tileLayer(url, {

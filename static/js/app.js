@@ -3193,6 +3193,10 @@ async function switchDynasty(dynastyKey) {
     markerLayers.forEach(l => chgisMap.removeLayer(l));
     markerLayers = [];
 
+    // 朝代轮廓与 CCTS 疆域层任一开启 → 侧栏收窄放大图区
+    window._dynastyOn = dynastyKey !== 'none';
+    if (window._applyMapFocus) window._applyMapFocus();
+
     // “无”：仅底图
     if (dynastyKey === 'none') {
         if (infoLabel) infoLabel.textContent = '未选择朝代';

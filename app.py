@@ -3109,7 +3109,8 @@ def academic_feed():
     force = request.args.get("refresh") == "1"
     now = _time.time()
     if not force and now - _ACAD_FEED_CACHE["ts"] < _ACAD_FEED_TTL and _ACAD_FEED_CACHE["items"]:
-        return jsonify({"ok": True, "items": _ACAD_FEED_CACHE["items"], "cached": True})
+        return jsonify({"ok": True, "items": _ACAD_FEED_CACHE["items"], "cached": True,
+                        "fetched_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(_ACAD_FEED_CACHE["ts"]))})
     items, errs = [], []
     try:
         items += _arxiv_fetch("all:%22cognitive+science%22", 4)
@@ -3134,7 +3135,8 @@ def academic_feed():
     merged = merged[:10]
     if merged:
         _ACAD_FEED_CACHE.update({"ts": now, "items": merged, "err": "; ".join(errs)})
-        return jsonify({"ok": True, "items": merged, "cached": False, "partial": bool(errs)})
+        return jsonify({"ok": True, "items": merged, "cached": False, "partial": bool(errs),
+                        "fetched_at": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now))})
     # 全失败: 过期缓存兜底
     if _ACAD_FEED_CACHE["items"]:
         return jsonify({"ok": True, "items": _ACAD_FEED_CACHE["items"], "stale": True,

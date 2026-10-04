@@ -202,7 +202,7 @@ async function loadNews(force) {
                 <div class="news-feed-meta">${escapeHtml(it.authors || '')}</div>
                 ${abs ? `<div class="news-feed-abs" id="newsAbs${idx}" onclick="this.classList.toggle('open')">${escapeHtml(abs)}</div>` : ''}
             </div>`;
-        }).join('') + `<div class="news-feed-foot"><button class="kb-nav-btn" onclick="loadNews(true)">↻ 刷新抓取</button>${data.stale ? '<span class="news-date">(离线缓存)</span>' : ''}</div>`;
+        }).join('') + `<div class="news-feed-foot"><button class="kb-nav-btn" onclick="loadNews(true)">↻ 刷新抓取</button><span class="news-date">${data.fetched_at ? '更新于 ' + data.fetched_at.slice(11, 16) : ''}${data.stale ? ' · 离线缓存' : ''}</span></div>`;
     } catch (e) {
         container.innerHTML = '<div class="empty-hint">抓取失败：' + escapeHtml(String(e).slice(0, 80)) + '</div>';
     }
@@ -267,7 +267,7 @@ function renderKbList(container) {
     const chips = themes.map(t => {
         const n = (byTheme[t.key] || []).length;
         const on = !_kbFilterTheme || _kbFilterTheme === t.key;
-        return `<span class="kb-chip${(_kbFilterTheme === t.key) ? ' on' : ''}" data-theme="${t.key}" onclick="kbSetTheme('${_kbFilterTheme === t.key ? '' : t.key}')" style="border-color:${t.color};color:${t.color}">${t.icon} ${t.name}·${n}</span>`;
+        return `<span class="kb-chip${(_kbFilterTheme === t.key) ? ' on' : ''}" data-theme="${t.key}" onclick="kbSetTheme('${_kbFilterTheme === t.key ? '' : t.key}')" style="border-color:${t.color};color:${t.color}">${KB_GLYPH[t.key] || '\u2726'} ${t.name}·${n}</span>`;
     }).join('');
 
     container.innerHTML = `
@@ -277,12 +277,47 @@ function renderKbList(container) {
         <span class="kb-count" id="kbCount">${entries.length} 颗星辰 · ${themes.length} 个星座</span>
       </div>
       <div class="kb-chips">${chips}</div>
-      <div class="kb-stars-wrap"><svg id="kbSvg" viewBox="0 0 1000 470" preserveAspectRatio="xMidYMid meet"></svg><div class="kb-tip" id="kbTip" style="display:none"></div></div>
+      <div class="kb-mini-land" id="kbMiniLand"></div>
+      <div class="kb-stars-wrap" id="kbMiniStars" style="display:none"><svg id="kbSvg" viewBox="0 0 1000 470" preserveAspectRatio="xMidYMid meet"></svg><div class="kb-tip" id="kbTip" style="display:none"></div></div>
       <div class="kb-detail" id="kbDetail" style="display:none"></div>
-      <div class="tip-refresh">${escapeHtml(data.source || '')} · 悬停识星,点击入星海</div>`;
+      <div class="tip-refresh">${escapeHtml(data.source || '')} · ⤢ 星海 全屏漫游</div>`;
 
-    _kbDrawStars();
+    kbMiniLand();
 }
+
+function kbMiniLand() {
+    const box = document.getElementById('kbMiniLand');
+    if (!box || !_kbData) return;
+    const e = _kbPick();
+    if (!e) return;
+    const themes = _kbData.themes || [];
+    const th = themes.find(t => t.key === e.theme) || {};
+    box.style.display = 'block';
+    document.getElementById('kbMiniStars').style.display = 'none';
+    box.innerHTML = `
+      <div class="kb-ml-star" style="color:${th.color || '#c9a96e'}">\u2726</div>
+      <div class="kb-ml-text" onclick="kbShowEntry(${e.id})" title="展开这一条">${escapeHtml(e.text)}</div>
+      <div class="kb-ml-meta">
+        <span style="color:${th.color || '#c9a96e'}">${_kbGlyph(e.theme, themes)}</span>
+        <span class="kb-detail-src">${escapeHtml(e.src || '')}</span>
+        <span class="kb-ml-actions">
+          <button onclick="kbMiniLand()" title="换一颗">⚀</button>
+          <button onclick="kbMiniMap()" title="看小星图">✦</button>
+          <button onclick="kbOpenSea()" title="全屏星海">⤢</button>
+        </span>
+      </div>`;
+}
+window.kbMiniLand = kbMiniLand;
+
+function kbMiniMap() {
+    const box = document.getElementById('kbMiniLand');
+    if (box) box.style.display = 'none';
+    document.getElementById('kbMiniStars').style.display = 'block';
+    _kbHideDetail();
+    if (!document.getElementById('kbSvg').innerHTML) _kbDrawStars();
+}
+window.kbMiniMap = kbMiniMap;
+
 
 function _kbEntryMatch(e) {
     if (_kbFilterTheme && e.theme !== _kbFilterTheme) return false;
@@ -442,6 +477,11 @@ function kbShowEntry(id, inSea) {
         const pane = document.getElementById('kbStarsPane');
         if (pane) pane.style.display = 'block';
         if (!document.getElementById('kbSvgSea').innerHTML) _kbDrawStars('kbSvgSea');
+    } else {
+        const box = document.getElementById('kbMiniLand');
+        if (box) box.style.display = 'none';
+        document.getElementById('kbMiniStars').style.display = 'block';
+        if (!document.getElementById('kbSvg').innerHTML) _kbDrawStars();
     }
     // 同星座导航
     const sibs = entries.filter(x => x.theme === e.theme);
@@ -458,7 +498,7 @@ function kbShowEntry(id, inSea) {
       <div class="kb-detail-text">${escapeHtml(e.text)}</div>
       <div class="kb-detail-nav">
         <button onclick="kbShowEntry(${prev.id}, ${inSea ? 'true' : 'false'})" class="kb-nav-btn">← ${escapeHtml((prev.text || '').slice(0, 14))}…</button>
-        <button onclick="${inSea ? 'kbHideDetail(true);kbShowMap()' : 'kbHideDetail()'}" class="kb-nav-btn">收起</button>
+        <button onclick="${inSea ? 'kbHideDetail(true);kbShowMap()' : 'kbHideDetail();kbMiniLand()'}" class="kb-nav-btn">收起</button>
         <button onclick="kbShowEntry(${next.id}, ${inSea ? 'true' : 'false'})" class="kb-nav-btn">${escapeHtml((next.text || '').slice(0, 14))}… →</button>
       </div>`;
     detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -479,7 +519,7 @@ function kbOpenSea() {
       </div>
       <div class="kb-chips kb-chips-sea">${(_kbData.themes || []).map(t => {
           const n = (_kbData.entries || []).filter(e => e.theme === t.key).length;
-          return `<span class="kb-chip${(_kbFilterTheme === t.key) ? ' on' : ''}" onclick="kbSetTheme('${_kbFilterTheme === t.key ? '' : t.key}')" style="border-color:${t.color};color:${t.color}">${t.icon} ${t.name}·${n}</span>`;
+          return `<span class="kb-chip${(_kbFilterTheme === t.key) ? ' on' : ''}" onclick="kbSetTheme('${_kbFilterTheme === t.key ? '' : t.key}')" style="border-color:${t.color};color:${t.color}">${KB_GLYPH[t.key] || '\u2726'} ${t.name}·${n}</span>`;
       }).join('')}</div>
       <div class="kb-sea-body">
         <div class="kb-land" id="kbLand"></div>

@@ -12399,3 +12399,20 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .news-feed-abs.open { max-height: 600px; }
 .news-feed-abs.open::after { content: '收起 ▴'; }
 .news-feed-foot { display: flex; align-items: center; gap: 10px; justify-content: center; padding-top: 10px; }
+
+/* ── 迷你拾星(仪表盘面板) ─────────────────────────── */
+.kb-mini-land { text-align: center; padding: 10px 4px 6px; animation: kbIn .3s ease; }
+.kb-ml-star { font-size: 20px; margin-bottom: 8px; text-shadow: 0 0 12px currentColor; }
+.kb-ml-text {
+    font-size: 12.5px; line-height: 1.9; color: #ddd7ca; cursor: pointer;
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+    transition: color .2s;
+}
+.kb-ml-text:hover { color: #c9a96e; }
+.kb-ml-meta { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; font-size: 11px; }
+.kb-ml-actions { margin-left: 6px; display: inline-flex; gap: 4px; }
+.kb-ml-actions button {
+    padding: 1px 8px; font-size: 11px; cursor: pointer; border-radius: 8px;
+    border: 1px solid rgba(201, 169, 110, 0.35); background: transparent; color: #c9a96e;
+}
+.kb-ml-actions button:hover { background: rgba(201, 169, 110, 0.14); }

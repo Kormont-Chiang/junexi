@@ -4162,8 +4162,11 @@ _plugin_nav, _plugin_loaded, _plugin_skipped = load_plugins(app)
 def _scan_plugin_manifests():
     """扫描 plugins/ 返回全部插件清单(含未加载/被禁用的), 供管理面板。"""
     import glob as _glob
+    from plugin_loader import load_overrides, effective_enabled
     items = []
-    for mf in sorted(_glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugins", "*", "manifest.json"))):
+    _ov = load_overrides()
+    _pbase = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
+    for mf in sorted(_glob.glob(os.path.join(_pbase, "plugins", "*", "manifest.json"))):
         try:
             m = json.load(open(mf, encoding="utf-8"))
             pid = m.get("id") or os.path.basename(os.path.dirname(mf))
@@ -4172,9 +4175,9 @@ def _scan_plugin_manifests():
                 "name": m.get("name", pid),
                 "version": m.get("version", "?"),
                 "desc": m.get("desc", ""),
-                "enabled": m.get("enabled", True) is not False,
+                "enabled": effective_enabled(m, pid, _ov),
                 "loaded": pid in _plugin_loaded,
-                "skip_reason": dict(_plugin_skipped).get(pid, "") if not m.get("enabled", True) else "",
+                "skip_reason": dict(_plugin_skipped).get(pid, "") if not effective_enabled(m, pid, _ov) else "",
             })
         except Exception as e:
             items.append({"id": os.path.basename(os.path.dirname(mf)), "name": "?", "version": "?", "desc": "", "enabled": False, "loaded": False, "skip_reason": "manifest 解析失败: %s" % str(e)[:80]})
@@ -4188,14 +4191,19 @@ def api_plugins_list():
 
 @app.route("/api/plugins/<pid>/toggle", methods=["POST"])
 def api_plugins_toggle(pid):
+    """开关写入用户数据目录的 plugin-overrides.json(frozen 下 manifest 只读)。"""
     import glob as _glob
-    for mf in _glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugins", "*", "manifest.json")):
+    from plugin_loader import load_overrides, save_overrides, effective_enabled
+    _pbase = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
+    for mf in _glob.glob(os.path.join(_pbase, "plugins", "*", "manifest.json")):
         try:
             m = json.load(open(mf, encoding="utf-8"))
             if m.get("id") == pid or os.path.basename(os.path.dirname(mf)) == pid:
-                m["enabled"] = not (m.get("enabled", True) is not False)
-                json.dump(m, open(mf, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-                return jsonify({"ok": True, "id": pid, "enabled": m["enabled"], "note": "重启后生效"})
+                ov = load_overrides()
+                cur = effective_enabled(m, pid, ov)
+                ov.setdefault(pid, {})["enabled"] = not cur
+                save_overrides(ov)
+                return jsonify({"ok": True, "id": pid, "enabled": (not cur), "note": "重启后生效"})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)[:120]}), 500
     return jsonify({"ok": False, "error": "插件不存在"}), 404

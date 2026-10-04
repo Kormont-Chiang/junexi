@@ -9,6 +9,8 @@ hiddenimports += collect_submodules('webview')
 datas = [
     ('templates', 'templates'),
     ('static', 'static'),
+    ('plugins', 'plugins'),
+    ('docs', 'docs'),
 ]
 datas += collect_data_files('webview')
 datas += collect_data_files('clr_loader')

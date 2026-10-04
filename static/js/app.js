@@ -232,23 +232,39 @@ async function loadRecentActivity() {
     }
 }
 
-function renderTips(container, data) {
-    if (!data.ok || !data.items) return;
-    container.innerHTML = data.items.map(t => `
-        <div class="tip-row">
-            <span class="tip-tag">${escapeHtml(t.tag)}</span>
-            <span class="tip-text">${escapeHtml(t.text)}<span class="tip-src">${escapeHtml(t.lecture || '')}</span></span>
-        </div>`).join('') + '<div class="tip-refresh" onclick="refreshTips()">换一批 ↻' + (data.source ? ' <span class="tip-source">' + escapeHtml(data.source) + '</span>' : '') + '</div>';
+
+let _kbData = null;
+function renderKbList(container) {
+    container.innerHTML = _kbData.lectures.map((L, i) => `
+        <div class="kb-row" onclick="showKbLecture(${i})">
+            <span class="kb-no">${escapeHtml(L.no)}</span>
+            <span class="kb-title">${escapeHtml(L.title)}</span>
+            <span class="kb-n">${L.points.length}</span>
+        </div>`).join('') + '<div class="tip-refresh">' + escapeHtml(_kbData.source) + '</div>';
 }
+function showKbLecture(i) {
+    const container = document.getElementById('papersList');
+    if (!container || !_kbData) return;
+    const L = _kbData.lectures[i];
+    container.innerHTML = '<div class="kb-back" onclick="renderKbList(document.getElementById(\'papersList\'))">← 目录</div>' +
+        '<div class="kb-head">' + escapeHtml(L.no) + ' · ' + escapeHtml(L.title) + '</div>' +
+        L.points.map(pt => '<div class="kb-pt">' + escapeHtml(pt) + '</div>').join('');
+}
+window.showKbLecture = showKbLecture;
 
 async function loadPapersList() {
     const container = document.getElementById('papersList');
     if (!container) return;
     try {
-        const res = await fetch('/api/writing-tips?n=3');
-        renderTips(container, await res.json());
+        if (!_kbData) {
+            const res = await fetch('/api/writing-kb');
+            const data = await res.json();
+            if (!data.ok) throw new Error('kb fail');
+            _kbData = data;
+        }
+        renderKbList(container);
     } catch (e) {
-        container.innerHTML = '<div class="empty-hint">加载失败</div>';
+        container.innerHTML = '<div class="empty-hint">知识库加载失败</div>';
     }
 }
 

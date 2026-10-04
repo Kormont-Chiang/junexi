@@ -2853,6 +2853,11 @@ def obsidian_list_notes():
         pass
     return jsonify(items)
 
+@app.route("/api/obsidian/search", methods=["GET"])
+def obsidian_search_alias():
+    """兼容旧前端调用的搜索别名(等同 notes?q=)"""
+    return obsidian_list_notes()
+
 @app.route("/api/obsidian/note/<path:filepath>", methods=["GET"])
 def obsidian_get_note(filepath):
     """读取 Obsidian 笔记内容（REST 优先, 文件系统兜底）"""
@@ -2939,7 +2944,7 @@ def obsidian_create_daily():
 def obsidian_stats():
     """获取 Obsidian 统计信息（递归统计 Vault 所有文件）"""
     result = obsidian_api("GET", "/vault/")
-    stats = {"total_files": 0, "total_folders": 0, "folders": {}, "root_files": []}
+    stats = {"total_files": 0, "total_folders": 0, "folders": {}, "root_files": [], "total_chars": 0}
 
     def count_recursive(path, depth=0):
         """递归统计文件夹内容"""
@@ -2985,6 +2990,11 @@ def obsidian_stats():
                     dirs[:] = []
                     continue
                 md = [f for f in files if f.endswith('.md') and not f.startswith('.')]
+                for _fn in md:
+                    try:
+                        stats["total_chars"] += len(open(os.path.join(root, _fn), encoding='utf-8', errors='ignore').read())
+                    except Exception:
+                        pass
                 if rel == '.':
                     stats["root_files"] = md
                     stats["total_files"] += len(md)
@@ -3018,9 +3028,25 @@ def get_news():
     """从 Obsidian 读取学术动态"""
     result = obsidian_api("GET", "/vault/学术动态.md")
     if "error" in result:
-        return jsonify({"items": [], "error": "未找到 学术动态.md，请在 Vault 根目录创建此文件"})
+        # 兜底: 直读 vault 文件
+        fp = _vault_resolve("学术动态.md")
+        if not fp or not os.path.isfile(fp):
+            return jsonify({"items": [], "error": "未找到 学术动态.md，请在 Vault 根目录创建此文件"})
+        try:
+            content = open(fp, encoding="utf-8", errors="ignore").read()
+        except Exception:
+            return jsonify({"items": [], "error": "学术动态.md 读取失败"})
+    else:
+        content = result.get("content", "") or ""
 
-    content = result.get("content", "")
+    # 兼容历史 double-encoding: 内容可能是 {"content": "..."} JSON
+    try:
+        _j = json.loads(content)
+        if isinstance(_j, dict) and "content" in _j:
+            content = _j["content"] or ""
+    except Exception:
+        pass
+
     items = []
 
     # 解析 markdown 格式：每行格式为 `- [标题](链接) | 时间 | 标签`
@@ -4218,11 +4244,11 @@ def zotero_recently_read():
     def _one(hit):
         mt, att_key = hit
         try:
-            s, data = _zotero_get("/api/users/0/items/%s" % att_key, timeout=25)
+            s, data = _zotero_get("/api/users/0/items/%s" % att_key, timeout=10)
             ad = data.get("data", {})
             parent = ad.get("parentItem")
             if parent:
-                s2, pdata = _zotero_get("/api/users/0/items/%s" % parent, timeout=25)
+                s2, pdata = _zotero_get("/api/users/0/items/%s" % parent, timeout=10)
                 pd = pdata.get("data", {})
                 if pd.get("itemType") == "attachment" or not pd.get("title"):
                     return None

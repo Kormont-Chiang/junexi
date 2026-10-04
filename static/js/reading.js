@@ -222,6 +222,7 @@
     }
 
     function openPdfDirect(attKey) {
+        try { localStorage.setItem('jx.rd.last', JSON.stringify({ att: attKey, key: null, title: '外部 PDF', ts: Date.now() })); } catch (e) {}
         var frame = document.getElementById('rdFrame');
         var ph = document.getElementById('rdPh');
         document.getElementById('rdPdfTitle').textContent = '外部 PDF';
@@ -265,6 +266,7 @@
 
     function select(it) {
         current = it;
+        try { localStorage.setItem('jx.rd.last', JSON.stringify({ att: it.att_key || null, key: it.key, title: it.title, ts: Date.now() })); } catch (e) {}
         document.querySelectorAll('.rd-card').forEach(function (x) { x.classList.remove('sel'); });
         var node = document.querySelector('.rd-card[data-key="' + it.key + '"]');
         if (node) node.classList.add('sel');
@@ -356,4 +358,45 @@
     function init() { buildPage(); }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
+})();
+
+// ── 继续阅读横幅 ──────────────────────────────────────
+(function () {
+    function renderContinueBar() {
+        try {
+            if (document.getElementById('rdContinueBar')) return;
+            var raw = localStorage.getItem('jx.rd.last');
+            if (!raw) return;
+            var last = JSON.parse(raw);
+            if (!last || !last.title) return;
+            // 已选中该项则不显示
+            if (current && (current.key === last.key || (last.att && current.att_key === last.att))) return;
+            var strip = document.getElementById('rdStrip');
+            if (!strip || !strip.parentNode) return;
+            var bar = document.createElement('div');
+            bar.id = 'rdContinueBar';
+            bar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 12px;margin:0 0 6px;font-size:12px;background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.35);border-radius:8px;color:var(--text,#e4e0d8)';
+            var when = last.ts ? new Date(last.ts) : null;
+            var whenTxt = when ? (when.getMonth() + 1) + '-' + when.getDate() + ' ' + String(when.getHours()).padStart(2, '0') + ':' + String(when.getMinutes()).padStart(2, '0') : '';
+            bar.innerHTML = '<span style="color:#c9a96e">↻</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" id="rdContinueGo" title="打开">' +
+                '继续阅读：《' + String(last.title).replace(/</g, '&lt;') + '》' + (whenTxt ? ' <span style="color:#8a8578;font-size:11px">' + whenTxt + '</span>' : '') +
+                '</span><span style="cursor:pointer;color:#8a8578;font-size:14px;padding:0 4px" id="rdContinueX" title="关闭">×</span>';
+            strip.parentNode.insertBefore(bar, strip);
+            document.getElementById('rdContinueGo').onclick = function () {
+                var items = window._rdItems || {};
+                if (last.key && items[last.key]) { select(items[last.key]); }
+                else if (last.att) { openPdfDirect(last.att); }
+                bar.remove();
+            };
+            document.getElementById('rdContinueX').onclick = function () {
+                localStorage.removeItem('jx.rd.last');
+                bar.remove();
+            };
+        } catch (e) {}
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { setTimeout(renderContinueBar, 600); });
+    } else {
+        setTimeout(renderContinueBar, 600);
+    }
 })();

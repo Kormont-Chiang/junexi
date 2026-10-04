@@ -479,7 +479,8 @@ async function loadWorkspaceStats() {
         const notes = legacy['札记'] || 0;
         const diary = legacy['日记'] || 0;
         document.getElementById('wsTodayNotes').textContent = notes + diary;
-        document.getElementById('wsTotalWords').textContent = stats.total_files || 0;
+        const chars = stats.total_chars || 0;
+        document.getElementById('wsTotalWords').textContent = chars > 10000 ? (chars / 10000).toFixed(1) + '万' : chars;
         document.getElementById('wsLastEdit').textContent = '今天';
     } catch {}
 }
@@ -4105,3 +4106,27 @@ async function cbdbAIShowEntryRange(params) {
     // use_index：入仕年多未标（c_year=0），用索引年兜底——否则无年份记录会漏进其他朝代
     loadEntryPersons(info.code, title, { from: params.from_year, to: params.to_year, useIndex: true });
 }
+
+// 顶部全局搜索: Enter 跳到 CBDB 人名检索
+(function () {
+    const bindTopSearch = () => {
+        const gs = document.getElementById('globalSearch');
+        if (!gs || gs.dataset.bound) return;
+        gs.dataset.bound = '1';
+        gs.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            const q = gs.value.trim();
+            if (!q) return;
+            switchTab('cbdb');
+            if (window._cbdbType !== 'person') switchCBDBType('person');
+            const inp = document.getElementById('cbdbSearchInput');
+            if (inp) { inp.value = q; }
+            if (typeof searchCBDB === 'function') searchCBDB();
+        });
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bindTopSearch);
+    } else {
+        bindTopSearch();
+    }
+})();

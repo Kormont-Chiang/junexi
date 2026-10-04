@@ -3323,6 +3323,18 @@ function applyNetTypeFilter() {
 }
 
 // ── AI 助手 ────────────────────────────────────────────
+const AI_KB_TRIGGERS = ['论文', '写作', '注释', '引用', '参考文献', '书评', '札记', '规范', '标题', '摘要', '选题', '文献综述', '学术史', '投稿', '期刊', '摘要', '翻译', '史料', '长编', '繁体', '体例', '考证', '目录', '检索', '工具书', '类书', '版本', '校勘', '墓志', '简牍', '敦煌'];
+
+function _kbKbForPrompt(text) {
+    try {
+        if (!_kbData || !Array.isArray(_kbData.entries)) return '';
+        const hit = AI_KB_TRIGGERS.some(k => (text || '').includes(k));
+        if (!hit) return '';
+        const lines = _kbData.entries.map(e => '\u00b7 ' + e.text + '(' + (e.src || '') + ')');
+        return '\n\n用户的问题是学术写作/规范/史料方法方向。以下为本地知识库(荣新江《学术训练与学术规范》第二版要点),回答时优先参照其中方法论,可引用但不必逐条列举:\n' + lines.join('\n');
+    } catch (e) { return ''; }
+}
+
 async function sendAIChat() {
     const input = document.getElementById('aiChatInput');
     const messages = document.getElementById('aiChatMessages');
@@ -3341,8 +3353,9 @@ async function sendAIChat() {
     messages.scrollTop = messages.scrollHeight;
 
     try {
+        const _aiKb = _kbKbForPrompt(text);
         const msgs = [
-            { role: 'system', content: '你是「六月息」内置的历史学研究助手，擅长史料解读、历史概念阐释与史学论证。请用准确、清晰的中文回答，必要时引用具体史实，并适当使用小标题与分段以提升可读性。' },
+            { role: 'system', content: '你是「六月息」内置的历史学研究助手，擅长史料解读、历史概念阐释与史学论证。请用准确、清晰的中文回答，必要时引用具体史实，并适当使用小标题与分段以提升可读性。' + _aiKb },
             ...(Array.isArray(window._aiHistory) ? window._aiHistory : []),
             { role: 'user', content: text }
         ];

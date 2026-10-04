@@ -3027,6 +3027,29 @@ def obsidian_stats():
 # ── 学术动态 · arXiv + PubMed 认知科学源 ──────────────
 _ACAD_FEED_CACHE = {"ts": 0.0, "items": [], "err": ""}
 _ACAD_FEED_TTL = 1800  # 30 分钟
+_ACAD_FEED_DISK = os.path.join(_data_dir(), "acad_feed.json") if "_data_dir" in dir() else os.path.join(os.path.expandvars("%LOCALAPPDATA%"), "JuneXi", "acad_feed.json")
+
+
+def _feed_disk_load():
+    try:
+        if os.path.isfile(_ACAD_FEED_DISK):
+            d = json.loads(open(_ACAD_FEED_DISK, encoding="utf-8").read())
+            if d.get("items"):
+                _ACAD_FEED_CACHE.update({"ts": float(d.get("ts", 0)), "items": d["items"]})
+    except Exception:
+        pass
+
+
+def _feed_disk_save():
+    try:
+        os.makedirs(os.path.dirname(_ACAD_FEED_DISK), exist_ok=True)
+        open(_ACAD_FEED_DISK, "w", encoding="utf-8").write(json.dumps(
+            {"ts": _ACAD_FEED_CACHE["ts"], "items": _ACAD_FEED_CACHE["items"]}, ensure_ascii=False))
+    except Exception:
+        pass
+
+
+_feed_disk_load()
 
 
 def _ts():
@@ -3141,6 +3164,7 @@ def academic_feed():
     merged = merged[:10]
     if merged:
         _ACAD_FEED_CACHE.update({"ts": now, "items": merged, "err": "; ".join(errs)})
+        _feed_disk_save()
         return jsonify({"ok": True, "items": merged, "cached": False, "partial": bool(errs),
                         "fetched_at": _ts()})
     # 全失败: 过期缓存兜底

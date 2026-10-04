@@ -16,6 +16,16 @@
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    // WebView2 不响应 zotero:// obsidian:// 链接, 统一走后端调起系统
+    function openExternal(u) {
+        fetch('/api/open-url?u=' + encodeURIComponent(u)).catch(function () {});
+    }
+    function extBtn(cls, text) {
+        var b = el('button', cls || 'rd-btn', text);
+        b.type = 'button';
+        return b;
+    }
+
     function buildPage() {
         if (document.getElementById('readingPage')) return;
         var main = document.querySelector('main.main-content') || document.querySelector('main');
@@ -164,12 +174,13 @@
             if (!pdf.length) { row.innerHTML = '<span class="rd-status">这条没有 PDF 附件（可在 Zotero 里右键找全文）</span>'; return; }
             row.innerHTML = '';
             pdf.forEach(function (a) {
-                var b = el('a', 'rd-btn', '打开 PDF');
-                b.href = a.open; b.style.marginRight = '8px';
+                var b = extBtn('rd-btn', '打开 PDF');
+                (function (url) { b.addEventListener('click', function () { openExternal(url); }); })(a.open);
+                b.style.marginRight = '8px';
                 row.appendChild(b);
             });
-            var zs = el('a', 'rd-btn ghost', '在 Zotero 查看');
-            zs.href = it.select;
+            var zs = extBtn('rd-btn ghost', '在 Zotero 查看');
+            (function (url) { zs.addEventListener('click', function () { openExternal(url); }); })(it.select);
             row.appendChild(zs);
         }).catch(function () {
             var row = document.getElementById('rdPdfRow');
@@ -198,7 +209,11 @@
         }).then(function (r) { return r.json(); }).then(function (d) {
             btn.disabled = false;
             if (!d.ok) { st.textContent = '保存失败：' + (d.error || ''); return; }
-            st.innerHTML = '✅ 已存入 Obsidian：<a href="' + d.obsidian + '">' + esc(d.file) + '</a>';
+            st.innerHTML = '✅ 已存入 Obsidian：' + esc(d.file) + '　';
+            var ob = extBtn('', '在 Obsidian 打开');
+            ob.style.cssText = 'padding:4px 12px;font-size:12px;border-radius:6px;border:1px solid #c9a96e;background:transparent;color:#c9a96e;cursor:pointer';
+            (function (url) { ob.addEventListener('click', function () { openExternal(url); }); })(d.obsidian);
+            st.appendChild(ob);
         }).catch(function (e) {
             btn.disabled = false;
             st.textContent = '请求失败：' + e;

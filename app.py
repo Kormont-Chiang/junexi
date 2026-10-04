@@ -4033,6 +4033,25 @@ def obsidian_zotero_note():
         _up.quote("文献笔记/" + fname))
     return jsonify({"ok": True, "path": path, "file": fname, "obsidian": obs_uri})
 
+# ── 外部协议调起(WebView2 点 zotero:// obsidian:// 不响应, 走后端用系统打开)──
+@app.route("/api/open-url", methods=["GET"])
+def open_external_url():
+    u = request.args.get("u", "").strip()
+    if not u:
+        return jsonify({"ok": False, "error": "empty url"}), 400
+    if not (u.startswith("zotero://") or u.startswith("obsidian://")
+            or u.startswith("http://") or u.startswith("https://")):
+        return jsonify({"ok": False, "error": "scheme not allowed"}), 400
+    try:
+        if u.startswith(("zotero://", "obsidian://")):
+            os.startfile(u)
+        else:
+            import webbrowser
+            webbrowser.open(u)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:150]})
+
 # ── Main ────────────────────────────────────────────────
 
 if __name__ == "__main__":

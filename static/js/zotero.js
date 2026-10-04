@@ -139,8 +139,9 @@
             box.innerHTML = '';
             d.items.forEach(function (it) {
                 var a = el('a', 'zot-item');
-                a.href = it.select;
+                a.href = 'javascript:void 0';
                 a.title = '在 Zotero 中定位';
+                (function (u) { a.addEventListener('click', function (e) { e.preventDefault(); openZotero(u); }); })(it.select);
                 var meta = [];
                 if (it.creators) meta.push(esc(it.creators));
                 if (it.year) meta.push(esc(it.year));
@@ -182,9 +183,10 @@
             b.innerHTML = '';
             d.items.forEach(function (it) {
                 var a = el('a', 'zot-item');
-                a.href = it.select;
+                a.href = 'javascript:void 0';
                 a.title = '在 Zotero 中定位';
                 a.style.padding = '8px 10px';
+                (function (u) { a.addEventListener('click', function (e) { e.preventDefault(); openZotero(u); }); })(it.select);
                 var meta = [];
                 if (it.creators) meta.push(esc(it.creators));
                 if (it.year) meta.push(esc(it.year));
@@ -197,6 +199,11 @@
             var b = document.getElementById('zotRecentList');
             if (b) b.innerHTML = '<div class="zot-empty">Zotero 未运行，启动后自动显示</div>';
         });
+    }
+
+    // WebView2 点 zotero:// 不响应, 走后端调起系统
+    function openZotero(u) {
+        fetch('/api/open-url?u=' + encodeURIComponent(u)).catch(function () {});
     }
 
     function init() {

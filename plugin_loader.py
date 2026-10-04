@@ -19,6 +19,13 @@ def _plugins_dir():
 
 PLUGINS_DIR = _plugins_dir()
 
+# 插件静态资源 {pid: {css:[url], js:[url]}}
+_plugin_assets = {}
+
+
+def plugin_assets():
+    return dict(_plugin_assets)
+
 
 def _user_data_dir():
     d = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "JuneXi")
@@ -85,6 +92,20 @@ def load_plugins(app):
                     "icon": nav.get("icon", "🧩"),
                     "plugin": pid,
                 })
+            # 插件静态资源: manifest assets {css:[], js:[]} + /plugin/<id>/static/<path> 伺服
+            sdir = os.path.join(pdir, "static")
+            assets = manifest.get("assets") or {}
+            css = [c for c in (assets.get("css") or []) if isinstance(c, str)]
+            js = [j for j in (assets.get("js") or []) if isinstance(j, str)]
+            if os.path.isdir(sdir) and (css or js):
+                import flask as _fl
+                bp_s = _fl.Blueprint("jx_pstatic_%s" % pid, __name__,
+                                     static_folder=sdir, static_url_path="/plugin/%s/static" % pid)
+                app.register_blueprint(bp_s)
+                _plugin_assets[pid] = {
+                    "css": ["/plugin/%s/static/%s" % (pid, c) for c in css],
+                    "js": ["/plugin/%s/static/%s" % (pid, j) for j in js],
+                }
             loaded.append(pid)
         except Exception as e:
             skipped.append((pid, "%s: %s" % (type(e).__name__, str(e)[:120])))

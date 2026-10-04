@@ -43,6 +43,22 @@ function loadPluginNav() {
             _pluginTabs[n.tab] = n.plugin;
             return '<button class="nav-tab" data-tab="' + n.tab + '" onclick="switchTab(\'' + n.tab + '\')">' + (n.icon || '🧩') + ' ' + escapeHtml(n.label) + '</button>';
         }).join('');
+        // 插件静态资源注入: css 进 head, js 按序 append(每插件每文件一次)
+        const assets = d.assets || {};
+        Object.entries(assets).forEach(([pid, as]) => {
+            (as.css || []).forEach(url => {
+                if (document.querySelector('link[data-jx-plugin="' + url + '"]')) return;
+                const l = document.createElement('link');
+                l.rel = 'stylesheet'; l.href = url; l.setAttribute('data-jx-plugin', url);
+                document.head.appendChild(l);
+            });
+            (as.js || []).forEach(url => {
+                if (document.querySelector('script[data-jx-plugin="' + url + '"]')) return;
+                const s = document.createElement('script');
+                s.src = url; s.setAttribute('data-jx-plugin', url);
+                document.body.appendChild(s);
+            });
+        });
     }).catch(() => {});
 }
 

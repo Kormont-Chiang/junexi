@@ -10,5 +10,10 @@
     "icon": "🧩",
     "tab": "_example"
   },
-  "page": true
+  "page": true,
+  "assets": {
+    "js": [
+      "ping.js"
+    ]
+  }
 }

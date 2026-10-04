@@ -4024,7 +4024,7 @@ def chgis_regime():
 
 
 # ── 插件加载(骨架: 只注册不改现有路由) ──
-from plugin_loader import load_plugins
+from plugin_loader import load_plugins, plugin_assets
 _plugin_nav, _plugin_loaded, _plugin_skipped = load_plugins(app)
 
 
@@ -4055,7 +4055,8 @@ def _scan_plugin_manifests():
 
 @app.route("/api/plugins", methods=["GET"])
 def api_plugins_list():
-    return jsonify({"ok": True, "plugins": _scan_plugin_manifests(), "nav": _plugin_nav})
+    return jsonify({"ok": True, "plugins": _scan_plugin_manifests(), "nav": _plugin_nav,
+                    "assets": plugin_assets()})
 
 
 @app.route("/api/plugins/<pid>/toggle", methods=["POST"])

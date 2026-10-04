@@ -240,12 +240,9 @@ async function loadPapersList() {
         const data = await res.json();
         if (data.ok && data.items && data.items.length) {
             container.innerHTML = data.items.map(it => `
-                <div class="doc-item" onclick="openReadingItem('${it.key}', '${it.att_key}')" style="cursor:pointer" title="在读文献页打开">
-                    <div class="doc-icon">📄</div>
-                    <div class="doc-info">
-                        <div class="doc-title">${escapeHtml(it.title)}</div>
-                        <div class="doc-meta">${escapeHtml(it.creators || '')}${it.year ? ' · ' + it.year : ''} · 读于 ${it.read_at}</div>
-                    </div>
+                <div class="paper-row" onclick="openReadingItem('${it.key}', '${it.att_key}')" title="在读文献页打开">
+                    <span class="paper-row-t">${escapeHtml(it.title)}</span>
+                    <span class="paper-row-m">${it.year || ''} ${it.read_at}</span>
                 </div>`).join('');
         } else {
             container.innerHTML = '<div class="empty-hint">在 JX 或 Zotero 里读论文后, 这里自动出现</div>';

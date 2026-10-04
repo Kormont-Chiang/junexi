@@ -4113,11 +4113,11 @@ def zotero_recently_read():
     def _one(hit):
         mt, att_key = hit
         try:
-            s, data = _zotero_get("/api/users/0/items/%s" % att_key)
+            s, data = _zotero_get("/api/users/0/items/%s" % att_key, timeout=25)
             ad = data.get("data", {})
             parent = ad.get("parentItem")
             if parent:
-                s2, pdata = _zotero_get("/api/users/0/items/%s" % parent)
+                s2, pdata = _zotero_get("/api/users/0/items/%s" % parent, timeout=25)
                 pd = pdata.get("data", {})
                 if pd.get("itemType") == "attachment" or not pd.get("title"):
                     return None

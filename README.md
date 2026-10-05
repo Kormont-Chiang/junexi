@@ -31,8 +31,8 @@ Obsidian 与 Zotero 可以在其内部连接，CBDB 与地图、社会网络分�
 | 🔍 联合检索 | 一次输入多库并行：CBDB 本地计数、Kanripo 汉籍库、ctext、订阅库带词直达 |
 | 🛠️ 史学工具 | 避讳/音韵/年号/职官/地名/版本目录六件，结果附来源声明与在线核查路径 |
 | 🤖 AI 助手 | 多模型可选（DeepSeek 对话/深思、OpenClaw 网关），历史研究提示词库 17 条，荣新江《学术训练与学术规范》知识库注入 |
-| 🧩 插件系统 | 插件 = `plugins/` 下的文件夹，管理页可视化开关，前端页面自动注入 |
-| 📓 学术动态 | arXiv + PubMed 历史/人文/认知科学 RSS 聚合 |
+| 🧩 插件系统 | 插件 = 带 manifest.json 的文件夹，管理页可视化开关；**插件市场**：URL/本机一键安装 .jxplugin，registry 即本仓库 plugins-registry.json（PR 提条目上架）；开发见 [插件开发指南](docs/插件开发指南.md) |
+| 📓 学术动态 | arXiv 数字人文/数字史学 + Medievalists.net + JSTOR Daily，RSS 多源 30min 缓存 |
 
 ## ⚠️ 安全说明（杀毒软件警告）
 
@@ -50,6 +50,14 @@ python app.py                     # 默认 127.0.0.1:5000
 ```
 
 桌面版（Windows）：`python -m PyInstaller -y JuneXi.spec` 产出 `dist/JuneXi/`。
+
+## 内置插件
+
+| 插件 | 内容 |
+| --- | --- |
+| 🏛️ CBDB 检索 | 29 路由全功能：人名/官职/地名/入仕/社会区分/著作/亲属递归/社会关系/路径/GeoJSON/网络图，Access 本地库 + 预热 |
+| 📖 Zotero 联动 | 本地代理（状态/检索/书库/附件）+ 最近阅读 + PDF 内嵌直读 + 笔记落盘 Obsidian |
+| 📰 学术动态 | arXiv 数字人文 + Medievalists.net + JSTOR Daily RSS 聚合 |
 
 ## 数据依赖（不在仓库内）
 

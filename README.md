@@ -1,4 +1,4 @@
-# 六月息 JuneXi
+﻿# 六月息 JuneXi
 
 > 历史研究个人工作台：**史料的检索与联动枢纽**。
 > 集成 CBDB 本地化检索、历史地图、Zotero 联动、Obsidian 笔记桥、
@@ -101,5 +101,5 @@ Kanripo 汉籍 Repository · 荣新江《学术训练与学术规范》（知识
 
 | 文件 | SHA-256 |
 |---|---|
-| JuneXi-v0.2.1-windows.zip（最新 Release） | `cf34a4377be65dc9bc99f2f322944dd1067bac45f5ce125f28b25d9bbb1942c7` |
-| JuneXi.exe（含于 zip，v0.2.0 相同） | `d875f95d04e30a2a3b8a806f5130af88573119e776093da7920db503a6c748e4`（Windows Defender 2026-10-05 全量扫描无威胁） |
+| JuneXi-v0.2.2-windows.zip（最新 Release） | `601665d9bd16278253c49d3874f1845083f47c92942d802c92bc40bae97f3457` |
+| JuneXi.exe（含于 zip，自 v0.2.0 未变） | `d875f95d04e30a2a3b8a806f5130af88573119e776093da7920db503a6c748e4`（Windows Defender 2026-10-05 全量扫描无威胁） |

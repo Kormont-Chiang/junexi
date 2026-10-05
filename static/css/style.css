@@ -12387,28 +12387,29 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .fed-note { font-size: 11px; opacity: .5; margin-top: 4px; }
 .fed-sub { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
-/* ── 插件管理器 (Zotero 扩展管理器风) ── */
-.pm-summary { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 6px 12px; font-size: 13px; opacity: .85; }
-.pm-hint { font-size: 11px; opacity: .5; }
-.pm-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 8px; background: var(--bg-card); transition: opacity .15s; }
-.pm-row.off { opacity: .5; }
-.pm-row:hover { border-color: rgba(201, 169, 110, .4); }
-.pm-icon { width: 44px; height: 44px; flex: 0 0 44px; display: flex; align-items: center; justify-content: center; font-size: 22px; border-radius: 11px; background: rgba(201, 169, 110, .12); }
+/* ── 插件管理器 (系统设置感: 限宽居中/分隔线/金底图标) ── */
+#pluginList { max-width: 780px; margin: 0 auto; padding: 8px 4px; }
+.pm-summary { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 10px 14px; font-size: 13px; letter-spacing: .5px; opacity: .75; }
+.pm-row { display: flex; align-items: center; gap: 16px; padding: 14px 12px; border-bottom: 1px solid var(--border-color); transition: background .15s, opacity .15s; }
+.pm-row:first-of-type { border-top: 1px solid var(--border-color); }
+.pm-row:hover { background: rgba(201, 169, 110, .06); }
+.pm-row.off { opacity: .48; }
+.pm-icon { width: 46px; height: 46px; flex: 0 0 46px; display: flex; align-items: center; justify-content: center; font-size: 23px; border-radius: 12px; background: linear-gradient(135deg, rgba(201,169,110,.22), rgba(201,169,110,.08)); border: 1px solid rgba(201,169,110,.25); }
 .pm-main { flex: 1; min-width: 0; }
-.pm-title { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
-.pm-name { font-size: 14px; font-weight: 600; letter-spacing: .5px; }
-.pm-ver { font-size: 11px; opacity: .45; font-family: ui-monospace, Consolas, monospace; }
-.pm-status { font-size: 11px; opacity: .65; display: inline-flex; align-items: center; gap: 5px; margin-left: 4px; }
+.pm-title { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+.pm-name { font-size: 15px; font-weight: 600; letter-spacing: .8px; }
+.pm-ver { font-size: 11px; opacity: .4; font-family: ui-monospace, Consolas, monospace; }
+.pm-status { font-size: 11px; opacity: .6; display: inline-flex; align-items: center; gap: 5px; margin-left: 2px; letter-spacing: .5px; }
 .pm-dot { width: 7px; height: 7px; border-radius: 50%; background: #999; display: inline-block; }
-.pm-dot.on { background: #5cb87a; box-shadow: 0 0 5px rgba(92, 184, 122, .6); }
+.pm-dot.on { background: #5cb87a; box-shadow: 0 0 6px rgba(92,184,122,.7); }
 .pm-dot.warn { background: #d0a050; }
-.pm-desc { font-size: 12px; opacity: .6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pm-skip { font-size: 11px; color: #c07a6a; margin-top: 3px; }
-.pm-empty { padding: 24px; text-align: center; font-size: 12px; opacity: .5; }
+.pm-desc { font-size: 12px; opacity: .55; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-skip { font-size: 11px; color: #c07a6a; margin-top: 4px; }
+.pm-empty { padding: 28px; text-align: center; font-size: 12px; opacity: .5; }
 /* iOS 式开关 */
-.pm-switch { position: relative; width: 40px; height: 22px; flex: 0 0 40px; cursor: pointer; }
+.pm-switch { position: relative; width: 42px; height: 24px; flex: 0 0 42px; cursor: pointer; }
 .pm-switch input { opacity: 0; width: 0; height: 0; }
-.pm-switch span { position: absolute; inset: 0; border-radius: 22px; background: rgba(128,128,128,.35); transition: background .18s; }
-.pm-switch span::before { content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; border-radius: 50%; background: #fff; transition: transform .18s; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
-.pm-switch input:checked + span { background: #c9a96e; }
+.pm-switch span { position: absolute; inset: 0; border-radius: 24px; background: rgba(128,128,128,.3); transition: background .18s; }
+.pm-switch span::before { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; border-radius: 50%; background: #fff; transition: transform .18s; box-shadow: 0 1px 3px rgba(0,0,0,.28); }
+.pm-switch input:checked + span { background: linear-gradient(135deg, #d4b47e, #c9a96e); }
 .pm-switch input:checked + span::before { transform: translateX(18px); }

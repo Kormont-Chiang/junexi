@@ -1,0 +1,14 @@
+{
+  "id": "my-plugin",
+  "name": "我的插件",
+  "version": "1.0",
+  "desc": "一句话说明插件做什么（管理页/市场卡片显示）",
+  "author": "你的名字",
+  "enabled": true,
+  "routes": "routes.py:bp",
+  "icon": "🔌",
+  "permissions": ["network"],
+  "nav": { "tab": "myplugin", "label": "我的插件", "icon": "🔌" },
+  "assets": { "css": ["style.css"], "js": ["page.js"] },
+  "warmup": "warmup.py:run"
+}

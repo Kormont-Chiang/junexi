@@ -11,6 +11,7 @@ datas = [
     ('static', 'static'),
     ('plugins', 'plugins'),
     ('docs', 'docs'),
+    ('data/toolbooks', 'data/toolbooks'),
 ]
 datas += collect_data_files('webview')
 datas += collect_data_files('clr_loader')

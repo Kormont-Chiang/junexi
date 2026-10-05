@@ -1209,6 +1209,21 @@ def open_external_url():
 _NIANHAO_BOOK = []
 _NIANHAO_BOOK_LOADED = False
 
+def _vault_path():
+    """Obsidian vault 路径: 读 obsidian.json 选最近使用的 vault（插件化拆分时核心侧副本）。"""
+    cfg = os.path.expanduser(r"~\AppData\Roaming\obsidian\obsidian.json")
+    try:
+        d = json.load(open(cfg, encoding="utf-8"))
+        best = None
+        for v in d.get("vaults", {}).values():
+            if v.get("path", "").endswith(OBSIDIAN_VAULT):
+                return v["path"]
+            if best is None or v.get("ts", 0) > best.get("ts", 0):
+                best = v
+        return best["path"] if best else None
+    except Exception:
+        return None
+
 def _load_nianhao_book():
     global _NIANHAO_BOOK, _NIANHAO_BOOK_LOADED
     if _NIANHAO_BOOK_LOADED:

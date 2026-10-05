@@ -24,6 +24,14 @@ Obsidian 与 Zotero 可以在其内部连接，CBDB 与地图、社会网络分�
 | 🧩 插件系统 | 插件 = `plugins/` 下的文件夹，管理页可视化开关，前端页面自动注入 |
 | 📓 学术动态 | arXiv + PubMed 历史/人文/认知科学 RSS 聚合 |
 
+## ⚠️ 安全说明（杀毒软件警告）
+
+本软件**未购买代码签名证书**（年费数百美元），Windows SmartScreen / 360 等会对“网上下载 + 未知发布者”的程序弹警告，这是预期行为，**不是病毒**。
+
+- 代码全部开源可自查；发布包用 PyInstaller 从仓库源码直接构建
+- 若被杀软隔离，请对 JuneXi.exe 添加信任/白名单后重试
+- 存疑请把 JuneXi.exe 上传 [virustotal.com](https://www.virustotal.com) 自查，或比对以下 SHA-256 指纹
+
 ## 快速开始（开发）
 
 ```bash
@@ -69,3 +77,10 @@ Kanripo 汉籍 Repository · 荣新江《学术训练与学术规范》（知识
 ---
 
 *"去以六月息者也"——《庄子·逍遥游》*
+
+
+## 发布包完整性
+
+| 文件 | SHA-256 |
+|---|---|
+| JuneXi-v0.2.0-windows.zip 内 JuneXi.exe | `d875f95d04e30a2a3b8a806f5130af88573119e776093da7920db503a6c748e4` （Windows Defender 2026-10-05 全量扫描无威胁） |

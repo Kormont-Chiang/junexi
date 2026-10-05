@@ -894,13 +894,15 @@ _plugin_nav, _plugin_loaded, _plugin_skipped = load_plugins(app)
 
 
 def _scan_plugin_manifests():
-    """扫描 plugins/ 返回全部插件清单(含未加载/被禁用的), 供管理面板。"""
+    """扫描全部插件目录(用户目录优先,去重)生成清单(含未加载/已停用的), 带目录来源。"""
     import glob as _glob
-    from plugin_loader import load_overrides, effective_enabled, all_plugin_dirs
+    from plugin_loader import load_overrides, effective_enabled, all_plugin_dirs, user_plugins_dir
     items = []
     _ov = load_overrides()
     _seen = set()
+    _updir = os.path.abspath(user_plugins_dir())
     for _base in all_plugin_dirs():
+        _src = "user" if os.path.abspath(_base) == _updir else "builtin"
         for mf in sorted(_glob.glob(os.path.join(_base, "*", "manifest.json"))):
             try:
                 m = json.load(open(mf, encoding="utf-8"))
@@ -916,6 +918,7 @@ def _scan_plugin_manifests():
                     "icon": m.get("icon", ""),
                     "enabled": effective_enabled(m, pid, _ov),
                     "loaded": pid in _plugin_loaded,
+                    "source": _src,
                     "skip_reason": dict(_plugin_skipped).get(pid, "") if not effective_enabled(m, pid, _ov) else "",
                 })
             except Exception as e:
@@ -947,6 +950,25 @@ def api_plugins_toggle(pid):
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)[:120]}), 500
     return jsonify({"ok": False, "error": "插件不存在"}), 404
+
+
+@app.route("/api/plugins/<pid>/uninstall", methods=["POST"])
+def api_plugins_uninstall(pid):
+    """卸载用户目录插件(内置插件拒绝)。删目录+清开关覆盖。"""
+    import shutil as _sh
+    from plugin_loader import user_plugins_dir, load_overrides, save_overrides
+    pdir = os.path.join(user_plugins_dir(), pid)
+    if not os.path.isdir(pdir):
+        return jsonify({"ok": False, "error": "只能卸载用户目录的插件（内置插件随包分发，不可卸载）"}), 400
+    try:
+        _sh.rmtree(pdir, ignore_errors=True)
+        ov = load_overrides()
+        if pid in ov:
+            del ov[pid]
+            save_overrides(ov)
+        return jsonify({"ok": True, "id": pid, "note": "已卸载，重启后彻底移除"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:120]}), 500
 
 
 # ── 插件市场: 安装(本机文件/URL) ─────────────────────────

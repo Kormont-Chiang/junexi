@@ -114,6 +114,7 @@ async function loadPluginManager() {
                     (p.skip_reason ? '<div class="pm-skip">' + escapeHtml(p.skip_reason) + '</div>' : '') +
                 '</div>' +
                 '<label class="pm-switch"><input type="checkbox" ' + (enabled ? 'checked' : '') + ' onchange="togglePlugin(\'' + p.id + '\')"><span></span></label>' +
+                (p.source === 'user' ? ('<button class="btn btn-sm pm-uninstall" onclick="uninstallPlugin(\'' + p.id + '\')" title="卸载">🗑</button>') : '') +
             '</div>';
         }).join('');
         list.innerHTML = '<div class="pm-summary">已安装 ' + ps.length + ' 个插件 · ' + running + ' 个运行中</div>' + html;
@@ -164,6 +165,11 @@ async function loadPluginMarket() {
     if (!el) return;
     el.innerHTML = '<div class="empty-hint">拉取 registry 中……</div>';
     const REG = 'https://raw.githubusercontent.com/Kormont-Chiang/junexi/main/plugins-registry.json';
+    let installedMap = {};
+    try {
+        const pd = await (await fetch('/api/plugins')).json();
+        (pd.plugins || []).forEach(p => { installedMap[p.id] = p.version; });
+    } catch (e) {}
     try {
         const d = await (await fetch(REG, { cache: 'no-store' })).json();
         if (!Array.isArray(d) || !d.length) {
@@ -171,6 +177,8 @@ async function loadPluginMarket() {
             return;
         }
         el.innerHTML = d.map(p => {
+            const cur = installedMap[p.id];
+            const state = cur ? (cur === p.version ? '已安装' : ('升级 ' + cur + '→' + p.version)) : null;
             const can = !!(p.url && /^https:\/\//.test(p.url));
             return '<div class="pm-row">' +
                 '<div class="pm-icon">🛒</div>' +
@@ -179,9 +187,9 @@ async function loadPluginMarket() {
                     '<span class="pm-ver">' + escapeHtml(String(p.version || '')) + '</span>' +
                     '<span class="pm-status">' + escapeHtml(p.author || '') + '</span></div>' +
                     '<div class="pm-desc">' + escapeHtml(p.desc || '') + '</div>' +
-                    '<div class="pm-skip">权限: ' + escapeHtml((p.permissions || ['未声明']).join('/')) + '</div>' +
+                    '<div class="pm-skip">权限: ' + escapeHtml((p.permissions || ['未声明']).join('/')) + (state ? (' · <b>' + escapeHtml(state) + '</b>') : '') + '</div>' +
                 '</div>' +
-                (can ? ('<button class="btn btn-primary btn-sm" onclick="installMarketPlugin(this)" data-url="' + escapeHtml(p.url) + '" data-sha="' + escapeHtml(p.sha256 || '') + '">安装</button>') : '<span class="pm-ver">未发布</span>') +
+                (can ? ('<button class="btn btn-primary btn-sm" onclick="installMarketPlugin(this)" data-url="' + escapeHtml(p.url) + '" data-sha="' + escapeHtml(p.sha256 || '') + '">' + (cur ? (cur === p.version ? '重装' : '升级') : '安装') + '</button>') : '<span class="pm-ver">未发布</span>') +
             '</div>';
         }).join('');
     } catch (e) {
@@ -189,6 +197,18 @@ async function loadPluginMarket() {
     }
 }
 window.loadPluginMarket = loadPluginMarket;
+
+async function uninstallPlugin(pid) {
+    if (!confirm('卸载插件 ' + pid + '？其文件将被删除。')) return;
+    try {
+        const d = await (await fetch('/api/plugins/' + encodeURIComponent(pid) + '/uninstall', { method: 'POST' })).json();
+        showToast(d.ok ? '已卸载，重启后移除' : (d.error || '卸载失败'), d.ok ? 'success' : 'error');
+        loadPluginManager();
+    } catch (e) {
+        showToast(String(e).slice(0, 80), 'error');
+    }
+}
+window.uninstallPlugin = uninstallPlugin;
 
 async function installMarketPlugin(btn) {
     const url = btn.getAttribute('data-url');

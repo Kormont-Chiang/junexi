@@ -111,9 +111,55 @@ def _pubmed_fetch(term, max_n):
     return items
 
 
+def _rss_fetch(url, source, max_n):
+    """通用 RSS2.0/Atom 抓取: title/link/pubDate|published/description 截断"""
+    import re as _re
+    import urllib.request as _ur
+    import xml.etree.ElementTree as _ET
+    req = _ur.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JuneXi/1.0"})
+    with _ur.urlopen(req, timeout=15) as r:
+        root = _ET.fromstring(r.read())
+    def _strip(tag):
+        return _re.sub(r"<[^>]+>", "", tag or "").strip()
+    def _short(t, n=280):
+        t = " ".join((t or "").split())
+        return t[:n] + ("……" if len(t) > n else "")
+    items = []
+    # RSS 2.0
+    for it in root.iter("item"):
+        title = _strip(it.findtext("title"))
+        link = _strip(it.findtext("link"))
+        date = (_strip(it.findtext("pubDate")) or _strip(it.findtext("date")))[:16]
+        desc = _short(_strip(it.findtext("description")))
+        if title:
+            items.append({"title": title, "source": source, "date": date,
+                          "abstract": desc, "url": link, "authors": ""})
+        if len(items) >= max_n:
+            return items
+    if items:
+        return items
+    # Atom
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+    for e in root.findall("a:entry", ns):
+        title = _strip(e.findtext("a:title", "", ns))
+        link = ""
+        for lk in e.findall("a:link", ns):
+            if lk.get("rel", "alternate") == "alternate":
+                link = lk.get("href", "")
+                break
+        date = (_strip(e.findtext("a:published", "", ns)) or _strip(e.findtext("a:updated", "", ns)))[:16]
+        desc = _short(_strip(e.findtext("a:summary", "", ns) or e.findtext("a:content", "", ns)))
+        if title:
+            items.append({"title": title, "source": source, "date": date,
+                          "abstract": desc, "url": link, "authors": ""})
+        if len(items) >= max_n:
+            break
+    return items
+
+
 @bp.route("/api/academic-feed", methods=["GET"])
 def academic_feed():
-    """认知科学学术动态: arXiv + PubMed 双源, 30min 缓存, 过期缓存兜底"""
+    """学术动态: 数字人文(arXiv)+世界史/学术写作(RSS) 多源, 30min 缓存, 过期缓存兜底"""
     import time as _time
     force = request.args.get("refresh") == "1"
     now = _time.time()
@@ -123,9 +169,10 @@ def academic_feed():
     items, errs = [], []
     from concurrent.futures import ThreadPoolExecutor
     _jobs = [
-        ("arXiv(cogsci)", lambda: _arxiv_fetch("all:%22cognitive+science%22", 4)),
-        ("arXiv(q-bio.NC)", lambda: _arxiv_fetch("cat:q-bio.NC", 3)),
-        ("PubMed", lambda: _pubmed_fetch('("cognitive science"[Title/Abstract] OR "cognitive neuroscience"[Title/Abstract])', 5)),
+        ("arXiv(数字人文)", lambda: _arxiv_fetch("all:%22digital+humanities%22+AND+cat:cs.DL", 3)),
+        ("arXiv(历史时空)", lambda: _arxiv_fetch("all:%22digital+history%22", 3)),
+        ("Medievalists.net", lambda: _rss_fetch("https://www.medievalists.net/feed/", "Medievalists", 3)),
+        ("JSTOR Daily", lambda: _rss_fetch("https://daily.jstor.org/feed/", "JSTOR Daily", 3)),
     ]
     with ThreadPoolExecutor(max_workers=3) as _ex:
         _futs = {_ex.submit(fn): name for name, fn in _jobs}

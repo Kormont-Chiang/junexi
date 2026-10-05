@@ -12422,3 +12422,7 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .pm-market { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; }
 .pm-market-list .pm-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--border); }
 
+.era-book-block { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 10px; }
+.era-book-title { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+.era-book-item { margin-bottom: 8px; }
+.era-book-more { font-size: 12px; color: var(--text-muted); margin-top: 6px; }

@@ -4694,6 +4694,29 @@ function searchEra() {
         </div>
     `).join('');
     container.innerHTML += toolSourcesHtml('era');
+    searchEraBook(query, container);
+}
+
+async function searchEraBook(query, container) {
+    try {
+        const d = await (await fetch('/api/tools/era/book?q=' + encodeURIComponent(query))).json();
+        if (!d.ok || !d.items || !d.items.length) return;
+        const items = d.items.slice(0, 6);
+        const bookHtml = '<div class="era-book-block">' +
+            '<div class="era-book-title">📖 原书考证 · 李崇智《中国历代年号考》</div>' +
+            items.map(it => {
+                const span = it.year_span ? ('<span class="result-card-badge">' + escapeHtml(it.year_span) + '</span>') : '';
+                return '<div class="result-card era-book-item">' +
+                    '<div class="result-card-title">' + escapeHtml((it.eras && it.eras.length ? it.eras.join(' / ') : it.ruler) || '') +
+                    ' <span style="font-size:12px;color:var(--text-muted)">' + escapeHtml(it.ruler || '') + '</span></div>' +
+                    '<div class="result-card-body">' + span + '<span class="result-card-badge">书页 ' + it.page + '</span></div>' +
+                    (it.note ? '<div class="result-card-row"><span class="result-card-label">按语</span><span class="result-card-value">' + escapeHtml(it.note.slice(0, 220)) + '</span></div>' : '') +
+                '</div>';
+            }).join('') +
+            (d.total > 6 ? '<div class="era-book-more">共 ' + d.total + ' 条，检索词再精确些可收窄</div>' : '') +
+        '</div>';
+        container.insertAdjacentHTML('beforeend', bookHtml);
+    } catch (e) { /* 原书块失败不影响主结果 */ }
 }
 
 function searchYear() {

@@ -512,8 +512,19 @@ async function rdLoadLibrary(q) {
     const meta = document.getElementById('rdMeta');
     if (!list) return;
     list.innerHTML = '<div class="empty-hint">连接 Zotero……</div>';
+    let res;
     try {
-        const res = await fetch('/api/zotero/library' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
+        res = await fetch('/api/zotero/library' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
+    } catch (e) {
+        list.innerHTML = '<div class="empty-hint">连接失败：Zotero 客户端未启动（或本地 23119 端口不通）。打开 Zotero 后点搜索重试。</div>';
+        return;
+    }
+    if (res.status === 404) {
+        list.innerHTML = '<div class="empty-hint">Zotero 联动插件未启用。到「插件」管理页开启 zotero 插件后重试。</div>';
+        if (meta) meta.textContent = '';
+        return;
+    }
+    try {
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || 'fail');
         if (meta) meta.textContent = data.total + ' 篇文献' + (q ? (' · 关键词「' + q + '」') : '');

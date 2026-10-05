@@ -10,6 +10,16 @@ Obsidian 与 Zotero 可以在其内部连接，CBDB 与地图、社会网络分�
 六月息的推进只在于**降低连接的门槛**，并让每个使用者能按自己的研究领域自由装配——
 像 Zotero 和 Obsidian 那样，以插件扩展，而非以框架约束。
 
+## 界面预览
+
+|仪表盘（工作台首页）|CBDB 检索（人物/职官/地名/社会关系 全家桶）|
+|---|---|
+|![仪表盘](docs/screenshots/01-dashboard.png)|![CBDB](docs/screenshots/02-cbdb.png)|
+
+|史料地图（高德中文暗夜底图 + CHGIS 朝代图层）|插件管理（Zotero 式列表）|
+|---|---|
+|![地图](docs/screenshots/03-map.png)|![插件](docs/screenshots/04-plugins.png)|
+
 ## 功能全景
 
 | 模块 | 说明 |

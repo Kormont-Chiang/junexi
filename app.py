@@ -1074,6 +1074,58 @@ def open_external_url():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:150]})
 
+# ── 工具书数据: 年号考条目检索(李崇智《中国历代年号考》OCR结构化) ──
+_NIANHAO_BOOK = []
+_NIANHAO_BOOK_LOADED = False
+
+def _load_nianhao_book():
+    global _NIANHAO_BOOK, _NIANHAO_BOOK_LOADED
+    if _NIANHAO_BOOK_LOADED:
+        return
+    _NIANHAO_BOOK_LOADED = True
+    import json as _json
+    fp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "toolbooks", "nianhao_clean.jsonl")
+    try:
+        for ln in open(fp, encoding="utf-8"):
+            ln = ln.strip()
+            if ln:
+                _NIANHAO_BOOK.append(_json.loads(ln))
+    except Exception:
+        pass
+
+@app.route("/api/tools/era/book", methods=["GET"])
+def tools_era_book():
+    """年号原书条目检索: q 命中 ruler/era/note 即返，带书页码溯源"""
+    _load_nianhao_book()
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"ok": False, "error": "empty q", "total": 0, "items": []})
+    q_l = q.lower()
+    hits = []
+    for e in _NIANHAO_BOOK:
+        score = 0
+        if q_l in (e.get("ruler") or "").lower():
+            score += 3
+        for era in e.get("eras", []):
+            if q_l in era.lower():
+                score += 5
+        if q_l in (e.get("year_span") or "").lower():
+            score += 2
+        if q_l in (e.get("note") or "").lower():
+            score += 1
+        if score:
+            hits.append((score, e))
+    hits.sort(key=lambda x: -x[0])
+    items = []
+    for score, e in hits[:20]:
+        items.append({
+            "ruler": e.get("ruler", ""), "eras": e.get("eras", []),
+            "year_span": e.get("year_span", ""), "note": e.get("note", "")[:400],
+            "page": e.get("page"), "score": score,
+        })
+    return jsonify({"ok": True, "total": len(hits), "items": items,
+                    "source": u"李崇智《中国历代年号考》（修订本），中华书局 2001，PDF 书页"})
+
 # ── 学术写作技巧面板 ──────────────────────────────────────
 WRITING_TIPS = [
     ("史料长编", "动手写论文先做史料长编：把相关史料按类别或年代辑出、条理，再逐步分析，从中检出最能说明问题的材料。", "前言"),

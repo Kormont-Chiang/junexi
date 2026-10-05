@@ -3,7 +3,12 @@
 import os, sys
 os.environ.setdefault("CBDB_DATA_PATH", r"C:\Users\Lenovo\Documents\historia-data\cbdb\CBDB_20240208_DATA1.mdb")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from app import app, CBDBConnection
+from app import app
+import importlib.util as _ilu
+_spec = _ilu.spec_from_file_location("jx_plugin_cbdb", os.path.join(os.path.dirname(os.path.abspath(__file__)), "plugins", "cbdb", "routes.py"))
+_mod = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+CBDBConnection = _mod.CBDBConnection
 
 # 预热（Access 冷开 79s）
 print("warming up CBDB...")

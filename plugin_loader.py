@@ -81,9 +81,25 @@ def load_plugins(app):
             fpath = os.path.join(pdir, fname)
             spec = importlib.util.spec_from_file_location("jx_plugin_%s" % pid, fpath)
             mod = importlib.util.module_from_spec(spec)
+            # 插件内模块互引(如 warmup.py 的 from routes import X): 先注册到 sys.modules
+            import sys as _sys
+            _sys.modules["jx_plugin_%s" % pid] = mod
             spec.loader.exec_module(mod)
             bp = getattr(mod, var)
             app.register_blueprint(bp)
+            # manifest warmup 钩子(可选): "warmup.py:run", 加载后立即调用
+            warm_ref = manifest.get("warmup")
+            if warm_ref:
+                try:
+                    wf, wv = warm_ref.split(":")
+                    wpath = os.path.join(pdir, wf)
+                    wspec = importlib.util.spec_from_file_location("jx_plugin_%s_warmup" % pid, wpath)
+                    wmod = importlib.util.module_from_spec(wspec)
+                    _sys.modules["jx_plugin_%s_warmup" % pid] = wmod
+                    wspec.loader.exec_module(wmod)
+                    getattr(wmod, wv)(app)
+                except Exception:
+                    traceback.print_exc()
             nav = manifest.get("nav")
             if nav:
                 nav_injects.append({

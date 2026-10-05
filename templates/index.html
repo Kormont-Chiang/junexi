@@ -1280,7 +1280,23 @@
             </div>
         </div>
         <div id="_plugins" class="page">
-            <div class="page-header"><h2>🧩 插件管理</h2><p class="page-sub">插件 = plugins/ 下的一个文件夹（manifest.json + routes.py）。安装：放入文件夹后重启；卸载：删除文件夹。开关写盘即时，加载重启后生效。</p></div>
+            <div class="page-header"><h2>🧩 插件管理</h2><p class="page-sub">插件 = 带 manifest.json 的文件夹。内置插件随包分发；外部插件安装到用户目录（可写）。开关写盘即时，加载重启后生效。</p></div>
+            <div class="pm-install">
+                <div class="pm-install-title">📦 安装新插件 <span class="pm-hint-inline">.jxplugin = 插件文件夹打成的 zip，根内含 manifest.json</span></div>
+                <div class="pm-install-row">
+                    <input id="pmInstallUrl" type="text" placeholder="插件包 URL（https://... .zip）">
+                    <button class="btn btn-primary" onclick="installPluginFromUrl()">从 URL 安装</button>
+                </div>
+                <div class="pm-install-row">
+                    <input id="pmInstallLocal" type="text" placeholder="或本机路径，如 C:\Users\you\Downloads\myplugin.zip">
+                    <button class="btn" onclick="installPluginLocal()">从本机安装</button>
+                </div>
+                <div id="pmInstallMsg" class="pm-install-msg"></div>
+            </div>
+            <div class="pm-market">
+                <div class="pm-install-title">🛒 插件市场 <button class="btn btn-sm" onclick="loadPluginMarket()">拉取市场清单</button></div>
+                <div id="pmMarketList" class="pm-market-list"><div class="empty-hint">点上方按钮拉取 registry 清单（需网络）</div></div>
+            </div>
             <div id="pluginList" class="plugin-list"><div class="empty-hint">加载中…</div></div>
         </div>
     </main>

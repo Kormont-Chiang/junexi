@@ -19,6 +19,18 @@ def _plugins_dir():
 
 PLUGINS_DIR = _plugins_dir()
 
+
+def user_plugins_dir():
+    """用户插件目录(可写, 插件市场安装目标)。"""
+    d = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "JuneXi", "plugins")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def all_plugin_dirs():
+    """[用户目录(优先), 内置目录]; 同名插件用户目录覆盖内置。"""
+    return [user_plugins_dir(), PLUGINS_DIR]
+
 # 插件静态资源 {pid: {css:[url], js:[url]}}
 _plugin_assets = {}
 
@@ -61,69 +73,74 @@ def load_plugins(app):
     loaded = []
     skipped = []
     overrides = load_overrides()
-    if not os.path.isdir(PLUGINS_DIR):
-        return nav_injects, loaded, skipped
-    for pid in sorted(os.listdir(PLUGINS_DIR)):
-        pdir = os.path.join(PLUGINS_DIR, pid)
-        mf = os.path.join(pdir, "manifest.json")
-        if not os.path.isfile(mf):
+    seen = set()
+    for base_dir in all_plugin_dirs():
+        if not os.path.isdir(base_dir):
             continue
-        try:
-            manifest = json.load(open(mf, encoding="utf-8"))
-            if not effective_enabled(manifest, pid, overrides):
-                skipped.append((pid, "disabled"))
+        for pid in sorted(os.listdir(base_dir)):
+            if pid in seen:
                 continue
-            routes_ref = manifest.get("routes")
-            if not routes_ref:
-                skipped.append((pid, "no routes"))
+            seen.add(pid)
+            pdir = os.path.join(base_dir, pid)
+            mf = os.path.join(pdir, "manifest.json")
+            if not os.path.isfile(mf):
                 continue
-            fname, var = routes_ref.split(":")
-            fpath = os.path.join(pdir, fname)
-            spec = importlib.util.spec_from_file_location("jx_plugin_%s" % pid, fpath)
-            mod = importlib.util.module_from_spec(spec)
-            # 插件内模块互引(如 warmup.py 的 from routes import X): 先注册到 sys.modules
-            import sys as _sys
-            _sys.modules["jx_plugin_%s" % pid] = mod
-            spec.loader.exec_module(mod)
-            bp = getattr(mod, var)
-            app.register_blueprint(bp)
-            # manifest warmup 钩子(可选): "warmup.py:run", 加载后立即调用
-            warm_ref = manifest.get("warmup")
-            if warm_ref:
-                try:
-                    wf, wv = warm_ref.split(":")
-                    wpath = os.path.join(pdir, wf)
-                    wspec = importlib.util.spec_from_file_location("jx_plugin_%s_warmup" % pid, wpath)
-                    wmod = importlib.util.module_from_spec(wspec)
-                    _sys.modules["jx_plugin_%s_warmup" % pid] = wmod
-                    wspec.loader.exec_module(wmod)
-                    getattr(wmod, wv)(app)
-                except Exception:
-                    traceback.print_exc()
-            nav = manifest.get("nav")
-            if nav:
-                nav_injects.append({
-                    "tab": nav.get("tab", pid),
-                    "label": nav.get("label", pid),
-                    "icon": nav.get("icon", "🧩"),
-                    "plugin": pid,
-                })
-            # 插件静态资源: manifest assets {css:[], js:[]} + /plugin/<id>/static/<path> 伺服
-            sdir = os.path.join(pdir, "static")
-            assets = manifest.get("assets") or {}
-            css = [c for c in (assets.get("css") or []) if isinstance(c, str)]
-            js = [j for j in (assets.get("js") or []) if isinstance(j, str)]
-            if os.path.isdir(sdir) and (css or js):
-                import flask as _fl
-                bp_s = _fl.Blueprint("jx_pstatic_%s" % pid, __name__,
-                                     static_folder=sdir, static_url_path="/plugin/%s/static" % pid)
-                app.register_blueprint(bp_s)
-                _plugin_assets[pid] = {
-                    "css": ["/plugin/%s/static/%s" % (pid, c) for c in css],
-                    "js": ["/plugin/%s/static/%s" % (pid, j) for j in js],
-                }
-            loaded.append(pid)
-        except Exception as e:
-            skipped.append((pid, "%s: %s" % (type(e).__name__, str(e)[:120])))
-            traceback.print_exc()
+            try:
+                manifest = json.load(open(mf, encoding="utf-8"))
+                if not effective_enabled(manifest, pid, overrides):
+                    skipped.append((pid, "disabled"))
+                    continue
+                routes_ref = manifest.get("routes")
+                if not routes_ref:
+                    skipped.append((pid, "no routes"))
+                    continue
+                fname, var = routes_ref.split(":")
+                fpath = os.path.join(pdir, fname)
+                spec = importlib.util.spec_from_file_location("jx_plugin_%s" % pid, fpath)
+                mod = importlib.util.module_from_spec(spec)
+                # 插件内模块互引(如 warmup.py 的 from routes import X): 先注册到 sys.modules
+                import sys as _sys
+                _sys.modules["jx_plugin_%s" % pid] = mod
+                spec.loader.exec_module(mod)
+                bp = getattr(mod, var)
+                app.register_blueprint(bp)
+                # manifest warmup 钩子(可选): "warmup.py:run", 加载后立即调用
+                warm_ref = manifest.get("warmup")
+                if warm_ref:
+                    try:
+                        wf, wv = warm_ref.split(":")
+                        wpath = os.path.join(pdir, wf)
+                        wspec = importlib.util.spec_from_file_location("jx_plugin_%s_warmup" % pid, wpath)
+                        wmod = importlib.util.module_from_spec(wspec)
+                        _sys.modules["jx_plugin_%s_warmup" % pid] = wmod
+                        wspec.loader.exec_module(wmod)
+                        getattr(wmod, wv)(app)
+                    except Exception:
+                        traceback.print_exc()
+                nav = manifest.get("nav")
+                if nav:
+                    nav_injects.append({
+                        "tab": nav.get("tab", pid),
+                        "label": nav.get("label", pid),
+                        "icon": nav.get("icon", "🧩"),
+                        "plugin": pid,
+                    })
+                # 插件静态资源: manifest assets {css:[], js:[]} + /plugin/<id>/static/<path> 伺服
+                sdir = os.path.join(pdir, "static")
+                assets = manifest.get("assets") or {}
+                css = [c for c in (assets.get("css") or []) if isinstance(c, str)]
+                js = [j for j in (assets.get("js") or []) if isinstance(j, str)]
+                if os.path.isdir(sdir) and (css or js):
+                    import flask as _fl
+                    bp_s = _fl.Blueprint("jx_pstatic_%s" % pid, __name__,
+                                         static_folder=sdir, static_url_path="/plugin/%s/static" % pid)
+                    app.register_blueprint(bp_s)
+                    _plugin_assets[pid] = {
+                        "css": ["/plugin/%s/static/%s" % (pid, c) for c in css],
+                        "js": ["/plugin/%s/static/%s" % (pid, j) for j in js],
+                    }
+                loaded.append(pid)
+            except Exception as e:
+                skipped.append((pid, "%s: %s" % (type(e).__name__, str(e)[:120])))
+                traceback.print_exc()
     return nav_injects, loaded, skipped

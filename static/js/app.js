@@ -123,6 +123,94 @@ async function loadPluginManager() {
 }
 window.loadPluginManager = loadPluginManager;
 
+async function installPluginFromUrl() {
+    const url = (document.getElementById('pmInstallUrl')?.value || '').trim();
+    const msg = document.getElementById('pmInstallMsg');
+    if (!url) { if (msg) msg.textContent = '先填 URL'; return; }
+    if (msg) msg.textContent = '下载并校验中……';
+    try {
+        const d = await (await fetch('/api/plugins/install', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        })).json();
+        if (msg) msg.textContent = d.ok ? ('✅ 已安装 ' + (d.installed.name || '') + '（' + (d.installed.files || 0) + ' 个文件），重启 JuneXi 生效') : ('❌ ' + (d.error || '失败'));
+        if (d.ok) loadPluginManager();
+    } catch (e) {
+        if (msg) msg.textContent = '❌ ' + String(e).slice(0, 80);
+    }
+}
+window.installPluginFromUrl = installPluginFromUrl;
+
+async function installPluginLocal() {
+    const lp = (document.getElementById('pmInstallLocal')?.value || '').trim();
+    const msg = document.getElementById('pmInstallMsg');
+    if (!lp) { if (msg) msg.textContent = '先填本机路径'; return; }
+    if (msg) msg.textContent = '校验安装中……';
+    try {
+        const d = await (await fetch('/api/plugins/install', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ local_path: lp })
+        })).json();
+        if (msg) msg.textContent = d.ok ? ('✅ 已安装 ' + (d.installed.name || '') + '（' + (d.installed.files || 0) + ' 个文件），重启 JuneXi 生效') : ('❌ ' + (d.error || '失败'));
+        if (d.ok) loadPluginManager();
+    } catch (e) {
+        if (msg) msg.textContent = '❌ ' + String(e).slice(0, 80);
+    }
+}
+window.installPluginLocal = installPluginLocal;
+
+async function loadPluginMarket() {
+    const el = document.getElementById('pmMarketList');
+    if (!el) return;
+    el.innerHTML = '<div class="empty-hint">拉取 registry 中……</div>';
+    const REG = 'https://raw.githubusercontent.com/Kormont-Chiang/junexi/main/plugins-registry.json';
+    try {
+        const d = await (await fetch(REG, { cache: 'no-store' })).json();
+        if (!Array.isArray(d) || !d.length) {
+            el.innerHTML = '<div class="empty-hint">市场暂无条目。向仓库 plugins-registry.json 提 PR 即可上架。</div>';
+            return;
+        }
+        el.innerHTML = d.map(p => {
+            const can = !!(p.url && /^https:\/\//.test(p.url));
+            return '<div class="pm-row">' +
+                '<div class="pm-icon">🛒</div>' +
+                '<div class="pm-main">' +
+                    '<div class="pm-title"><span class="pm-name">' + escapeHtml(p.name || p.id) + '</span>' +
+                    '<span class="pm-ver">' + escapeHtml(String(p.version || '')) + '</span>' +
+                    '<span class="pm-status">' + escapeHtml(p.author || '') + '</span></div>' +
+                    '<div class="pm-desc">' + escapeHtml(p.desc || '') + '</div>' +
+                    '<div class="pm-skip">权限: ' + escapeHtml((p.permissions || ['未声明']).join('/')) + '</div>' +
+                '</div>' +
+                (can ? ('<button class="btn btn-primary btn-sm" onclick="installMarketPlugin(this)" data-url="' + escapeHtml(p.url) + '" data-sha="' + escapeHtml(p.sha256 || '') + '">安装</button>') : '<span class="pm-ver">未发布</span>') +
+            '</div>';
+        }).join('');
+    } catch (e) {
+        el.innerHTML = '<div class="empty-hint">市场清单拉取失败（网络或 registry 不存在）</div>';
+    }
+}
+window.loadPluginMarket = loadPluginMarket;
+
+async function installMarketPlugin(btn) {
+    const url = btn.getAttribute('data-url');
+    const sha = btn.getAttribute('data-sha') || undefined;
+    btn.disabled = true;
+    btn.textContent = '安装中…';
+    try {
+        const d = await (await fetch('/api/plugins/install', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, sha256: sha })
+        })).json();
+        btn.textContent = d.ok ? '已装 ✓' : '失败';
+        if (!d.ok) { btn.disabled = false; showToast(d.error || '安装失败', 'error'); }
+        else loadPluginManager();
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = '安装';
+        showToast(String(e).slice(0, 80), 'error');
+    }
+}
+window.installMarketPlugin = installMarketPlugin;
+
 async function togglePlugin(pid) {
     try {
         const d = await (await fetch('/api/plugins/' + encodeURIComponent(pid) + '/toggle', { method: 'POST' })).json();

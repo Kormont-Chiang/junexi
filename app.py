@@ -896,26 +896,30 @@ _plugin_nav, _plugin_loaded, _plugin_skipped = load_plugins(app)
 def _scan_plugin_manifests():
     """扫描 plugins/ 返回全部插件清单(含未加载/被禁用的), 供管理面板。"""
     import glob as _glob
-    from plugin_loader import load_overrides, effective_enabled
+    from plugin_loader import load_overrides, effective_enabled, all_plugin_dirs
     items = []
     _ov = load_overrides()
-    _pbase = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
-    for mf in sorted(_glob.glob(os.path.join(_pbase, "plugins", "*", "manifest.json"))):
-        try:
-            m = json.load(open(mf, encoding="utf-8"))
-            pid = m.get("id") or os.path.basename(os.path.dirname(mf))
-            items.append({
-                "id": pid,
-                "name": m.get("name", pid),
-                "version": m.get("version", "?"),
-                "desc": m.get("desc", ""),
-                "icon": m.get("icon", ""),
-                "enabled": effective_enabled(m, pid, _ov),
-                "loaded": pid in _plugin_loaded,
-                "skip_reason": dict(_plugin_skipped).get(pid, "") if not effective_enabled(m, pid, _ov) else "",
-            })
-        except Exception as e:
-            items.append({"id": os.path.basename(os.path.dirname(mf)), "name": "?", "version": "?", "desc": "", "enabled": False, "loaded": False, "skip_reason": "manifest 解析失败: %s" % str(e)[:80]})
+    _seen = set()
+    for _base in all_plugin_dirs():
+        for mf in sorted(_glob.glob(os.path.join(_base, "*", "manifest.json"))):
+            try:
+                m = json.load(open(mf, encoding="utf-8"))
+                pid = m.get("id") or os.path.basename(os.path.dirname(mf))
+                if pid in _seen:
+                    continue
+                _seen.add(pid)
+                items.append({
+                    "id": pid,
+                    "name": m.get("name", pid),
+                    "version": m.get("version", "?"),
+                    "desc": m.get("desc", ""),
+                    "icon": m.get("icon", ""),
+                    "enabled": effective_enabled(m, pid, _ov),
+                    "loaded": pid in _plugin_loaded,
+                    "skip_reason": dict(_plugin_skipped).get(pid, "") if not effective_enabled(m, pid, _ov) else "",
+                })
+            except Exception as e:
+                items.append({"id": os.path.basename(os.path.dirname(mf)), "name": "?", "version": "?", "desc": "", "enabled": False, "loaded": False, "skip_reason": "manifest 解析失败: %s" % str(e)[:80]})
     return items
 
 
@@ -943,6 +947,111 @@ def api_plugins_toggle(pid):
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)[:120]}), 500
     return jsonify({"ok": False, "error": "插件不存在"}), 404
+
+
+# ── 插件市场: 安装(本机文件/URL) ─────────────────────────
+_PLUGIN_ID_RE = __import__("re").compile(r"^[a-z0-9][a-z0-9\-_]{1,40}$")
+
+
+def _install_plugin_zip(zf, expect_sha=None):
+    """校验+解压插件包到用户插件目录。返回 (ok, info, err)。"""
+    import zipfile
+    import shutil
+    import hashlib
+    raw = open(zf, "rb").read()
+    if expect_sha:
+        h = hashlib.sha256(raw).hexdigest()
+        if h.lower() != expect_sha.lower():
+            return False, None, "SHA-256 校验失败(期望 %s, 实际 %s)" % (expect_sha[:16], h[:16])
+    try:
+        z = zipfile.ZipFile(__import__("io").BytesIO(raw))
+    except Exception as e:
+        return False, None, "zip 打不开: %s" % str(e)[:80]
+    # 防路径穿越 + 找 manifest
+    names = z.namelist()
+    root_prefix = None
+    manifest_name = None
+    for n in names:
+        norm = n.replace("\\", "/").lstrip("/")
+        if ".." in norm.split("/"):
+            return False, None, "zip 含路径穿越条目: %s" % norm[:60]
+        parts = [p for p in norm.split("/") if p]
+        if len(parts) == 2 and parts[1] == "manifest.json":
+            manifest_name = norm
+            root_prefix = parts[0]
+    if not manifest_name or not root_prefix:
+        # 单文件夹扁平: manifest.json 在根
+        if "manifest.json" in [n.replace("\\", "/") for n in names]:
+            manifest_name = "manifest.json"
+            root_prefix = ""
+        else:
+            return False, None, "zip 根下找不到 <插件文件夹>/manifest.json"
+    try:
+        m = json.loads(z.read(manifest_name).decode("utf-8"))
+    except Exception as e:
+        return False, None, "manifest.json 解析失败: %s" % str(e)[:80]
+    pid = (m.get("id") or root_prefix or "").strip()
+    if not _PLUGIN_ID_RE.match(pid):
+        return False, None, "插件 id 非法(%r): 需小写字母/数字/中划线, 2-40 字符" % pid[:40]
+    from plugin_loader import user_plugins_dir
+    dest = os.path.join(user_plugins_dir(), pid)
+    if os.path.isdir(dest):
+        shutil.rmtree(dest)
+    os.makedirs(dest)
+    n_files = 0
+    prefix = (root_prefix + "/") if root_prefix else ""
+    for n in names:
+        norm = n.replace("\\", "/")
+        if not norm.startswith(prefix):
+            continue
+        rel = norm[len(prefix):]
+        if not rel or norm.endswith("/"):
+            continue
+        target = os.path.join(dest, rel)
+        if not os.path.abspath(target).startswith(os.path.abspath(dest)):
+            return False, None, "解压路径越界: %s" % rel[:60]
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "wb") as f_out:
+            f_out.write(z.read(n))
+        n_files += 1
+    return True, {"id": pid, "name": m.get("name", pid), "version": m.get("version", "?"),
+                  "files": n_files, "permissions": m.get("permissions", ["未声明"])}, None
+
+
+@app.route("/api/plugins/install", methods=["POST"])
+def api_plugins_install():
+    """从 URL 或本机路径安装 .jxplugin(zip)。装完需重启生效。"""
+    body = request.get_json(force=True, silent=True) or {}
+    url = (body.get("url") or "").strip()
+    sha = (body.get("sha256") or "").strip() or None
+    tmp = os.path.join(os.path.expandvars("%TEMP%"), "_jx_install_%d.zip" % __import__("time").time())
+    try:
+        if url:
+            if not (url.startswith("http://") or url.startswith("https://")):
+                return jsonify({"ok": False, "error": "仅支持 http(s) URL"}), 400
+            import urllib.request as _ur
+            req = _ur.Request(url, headers={"User-Agent": "JuneXi-PluginInstaller/1.0"})
+            with _ur.urlopen(req, timeout=30) as r:
+                open(tmp, "wb").write(r.read())
+        elif body.get("local_path"):
+            lp = body["local_path"].strip().strip('"')
+            if not os.path.isfile(lp):
+                return jsonify({"ok": False, "error": "本机文件不存在: %s" % lp[:80]}), 400
+            import shutil as _sh
+            _sh.copyfile(lp, tmp)
+        else:
+            return jsonify({"ok": False, "error": "需要 url 或 local_path"}), 400
+        ok, info, err = _install_plugin_zip(tmp, sha)
+        if not ok:
+            return jsonify({"ok": False, "error": err}), 400
+        return jsonify({"ok": True, "installed": info, "note": "重启 JuneXi 后生效"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:150]}), 500
+    finally:
+        try:
+            os.remove(tmp)
+        except Exception:
+            pass
 
 # ── Zotero 附件 PDF 直读(内嵌阅读器用)────────────────────
 def _activity_path():

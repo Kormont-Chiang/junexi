@@ -93,4 +93,5 @@ Kanripo 汉籍 Repository · 荣新江《学术训练与学术规范》（知识
 
 | 文件 | SHA-256 |
 |---|---|
-| JuneXi-v0.2.0-windows.zip 内 JuneXi.exe | `d875f95d04e30a2a3b8a806f5130af88573119e776093da7920db503a6c748e4` （Windows Defender 2026-10-05 全量扫描无威胁） |
+| JuneXi-v0.2.1-windows.zip（最新 Release） | `cf34a4377be65dc9bc99f2f322944dd1067bac45f5ce125f28b25d9bbb1942c7` |
+| JuneXi.exe（含于 zip，v0.2.0 相同） | `d875f95d04e30a2a3b8a806f5130af88573119e776093da7920db503a6c748e4`（Windows Defender 2026-10-05 全量扫描无威胁） |

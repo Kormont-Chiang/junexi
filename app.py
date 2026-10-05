@@ -909,6 +909,7 @@ def _scan_plugin_manifests():
                 "name": m.get("name", pid),
                 "version": m.get("version", "?"),
                 "desc": m.get("desc", ""),
+                "icon": m.get("icon", ""),
                 "enabled": effective_enabled(m, pid, _ov),
                 "loaded": pid in _plugin_loaded,
                 "skip_reason": dict(_plugin_skipped).get(pid, "") if not effective_enabled(m, pid, _ov) else "",

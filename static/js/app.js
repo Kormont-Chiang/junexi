@@ -95,20 +95,30 @@ async function loadPluginManager() {
         const d = await (await fetch('/api/plugins')).json();
         const ps = d.plugins || [];
         if (!ps.length) {
-            list.innerHTML = '<div class="empty-hint">plugins/ 目录还没有插件。把插件文件夹放进去后重启即可。</div>';
+            list.innerHTML = '<div class="pm-empty">plugins/ 目录还没有插件——把带 manifest.json 的文件夹放进去，重启即装。</div>';
             return;
         }
-        list.innerHTML = ps.map(p => {
-            const status = p.loaded ? '<span class="plugin-badge on">运行中</span>' : (p.enabled ? '<span class="plugin-badge warn">待重启加载</span>' : '<span class="plugin-badge off">已停用</span>');
-            return '<div class="plugin-card">' +
-                '<div class="plugin-card-head"><span class="plugin-name">' + escapeHtml(p.name) + '</span><span class="plugin-ver">v' + escapeHtml(String(p.version)) + '</span>' + status + '</div>' +
-                '<div class="plugin-desc">' + escapeHtml(p.desc || '(无描述)') + '</div>' +
-                (p.skip_reason ? '<div class="plugin-skip">' + escapeHtml(p.skip_reason) + '</div>' : '') +
-                '<label class="plugin-toggle"><input type="checkbox" ' + (p.enabled ? 'checked' : '') + ' onchange="togglePlugin(\'' + p.id + '\')"> 启用</label>' +
-                '</div>';
+        const running = ps.filter(p => p.loaded).length;
+        const html = ps.map(p => {
+            const on = !!p.loaded;
+            const enabled = !!p.enabled;
+            const dot = on ? '<span class="pm-dot on"></span>运行中' : (enabled ? '<span class="pm-dot warn"></span>待重启' : '<span class="pm-dot"></span>已停用');
+            const icon = (p.icon || '🧩');
+            return '<div class="pm-row' + (on ? '' : ' off') + '">' +
+                '<div class="pm-icon">' + icon + '</div>' +
+                '<div class="pm-main">' +
+                    '<div class="pm-title"><span class="pm-name">' + escapeHtml(p.name) + '</span>' +
+                    '<span class="pm-ver">' + escapeHtml(String(p.version || '')) + '</span>' +
+                    '<span class="pm-status">' + dot + '</span></div>' +
+                    '<div class="pm-desc">' + escapeHtml(p.desc || '(无描述)') + '</div>' +
+                    (p.skip_reason ? '<div class="pm-skip">' + escapeHtml(p.skip_reason) + '</div>' : '') +
+                '</div>' +
+                '<label class="pm-switch"><input type="checkbox" ' + (enabled ? 'checked' : '') + ' onchange="togglePlugin(\'' + p.id + '\')"><span></span></label>' +
+            '</div>';
         }).join('');
+        list.innerHTML = '<div class="pm-summary">已安装 ' + ps.length + ' 个插件 · ' + running + ' 个运行中</div>' + html;
     } catch (e) {
-        list.innerHTML = '<div class="empty-hint">插件清单加载失败</div>';
+        list.innerHTML = '<div class="pm-empty">插件清单加载失败</div>';
     }
 }
 window.loadPluginManager = loadPluginManager;

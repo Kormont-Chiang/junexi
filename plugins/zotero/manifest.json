@@ -1,0 +1,9 @@
+{
+  "id": "zotero",
+  "name": "Zotero 联动",
+  "version": "1.0",
+  "desc": "本地 Zotero 代理(状态/检索/书库/附件) + 最近阅读 + PDF 内嵌直读 + 笔记落盘 Obsidian 文献笔记",
+  "enabled": true,
+  "routes": "routes.py:bp",
+  "icon": "📖"
+}

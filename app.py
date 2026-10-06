@@ -1002,6 +1002,41 @@ def update_check():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:100], "current": APP_VERSION})
 
+@app.route("/api/update/download", methods=["POST"])
+def update_download():
+    """下载最新 Release 的 zip 到 %LOCALAPPDATA%/JuneXi/updates/，返回本地路径。"""
+    import urllib.request as _ur
+    try:
+        req = _ur.Request("https://api.github.com/repos/%s/releases/latest" % APP_REPO,
+                          headers={"User-Agent": "JuneXi-UpdateCheck/1.0", "Accept": "application/vnd.github+json"})
+        with _ur.urlopen(req, timeout=8) as r:
+            d = json.loads(r.read().decode("utf-8"))
+        asset = None
+        for a in (d.get("assets") or []):
+            if (a.get("name") or "").endswith(".zip"):
+                asset = a
+                break
+        if not asset:
+            return jsonify({"ok": False, "error": "latest release 没有 zip 附件"}), 404
+        updir = os.path.join(os.path.expandvars("%LOCALAPPDATA%"), "JuneXi", "updates")
+        os.makedirs(updir, exist_ok=True)
+        dst = os.path.join(updir, asset["name"])
+        req2 = _ur.Request(asset["browser_download_url"],
+                           headers={"User-Agent": "JuneXi-UpdateCheck/1.0"})
+        with _ur.urlopen(req2, timeout=120) as r2, open(dst, "wb") as f:
+            while True:
+                chunk = r2.read(1 << 16)
+                if not chunk:
+                    break
+                f.write(chunk)
+        import hashlib as _hl
+        h = _hl.sha256(open(dst, "rb").read()).hexdigest()
+        return jsonify({"ok": True, "path": dst, "size": os.path.getsize(dst),
+                        "sha256": h, "tag": (d.get("tag_name") or "")})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:120]}), 500
+
+
 # ── 插件市场: 安装(本机文件/URL) ─────────────────────────
 _PLUGIN_ID_RE = __import__("re").compile(r"^[a-z0-9][a-z0-9\-_]{1,40}$")
 
@@ -1278,6 +1313,7 @@ def tools_era_book():
     if not q:
         return jsonify({"ok": False, "error": "empty q", "total": 0, "items": []})
     q_l = q.lower()
+    q_year = q.isdigit() and 1 <= len(q) <= 4
     hits = []
     for e in _NIANHAO_BOOK:
         score = 0
@@ -1288,6 +1324,8 @@ def tools_era_book():
                 score += 5
         if q_l in (e.get("year_span") or "").lower():
             score += 2
+            if q_year:
+                score += 4  # 纯数字年份查询:区间命中额外加权
         if q_l in (e.get("note") or "").lower():
             score += 1
         if score:

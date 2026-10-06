@@ -473,6 +473,25 @@ async function injectPluginTabs() {
 }
 window.injectPluginTabs = injectPluginTabs;
 
+async function downloadAppUpdate(el) {
+    if (el) { el.textContent = '下载中…'; el.style.pointerEvents = 'none'; }
+    try {
+        const d = await (await fetch('/api/update/download', { method: 'POST' })).json();
+        if (d.ok) {
+            showToast('已下载 ' + Math.round(d.size / 1048576) + 'MB', 'success');
+            const info = document.getElementById('appUpdateInfo');
+            if (info) info.innerHTML = ' · 已下载到 updates 目录（' + (d.tag || '') + '），解压覆盖安装目录即可';
+        } else {
+            showToast(d.error || '下载失败', 'error');
+            if (el) { el.textContent = '下载更新包'; el.style.pointerEvents = 'auto'; }
+        }
+    } catch (e) {
+        showToast(String(e).slice(0, 80), 'error');
+        if (el) { el.textContent = '下载更新包'; el.style.pointerEvents = 'auto'; }
+    }
+}
+window.downloadAppUpdate = downloadAppUpdate;
+
 async function checkAppUpdate(manual) {
     const tag = document.getElementById('appVerTag');
     const info = document.getElementById('appUpdateInfo');
@@ -486,8 +505,7 @@ async function checkAppUpdate(manual) {
         if (tag) tag.textContent = 'v' + d.current;
         if (d.update_available) {
             if (link) { link.textContent = '发现新版本 v' + d.latest; link.className = 'up-new'; }
-            if (info) info.textContent = '（' + (d.published_at || '') + '，点击前往下载）';
-            if (link) link.onclick = () => openExternal(d.url || 'https://github.com/Kormont-Chiang/junexi/releases');
+            if (info) info.innerHTML = '（' + (d.published_at || '') + ' · <a href="javascript:void(0)" onclick="downloadAppUpdate(this)">下载更新包</a> · <a href="javascript:void(0)" onclick="openExternal(\'' + (d.url || 'https://github.com/Kormont-Chiang/junexi/releases') + '\')">前往页面</a>）';
             if (manual) showToast('发现新版本 v' + d.latest, 'success');
         } else if (manual && info) {
             info.textContent = ' · 已是最新';

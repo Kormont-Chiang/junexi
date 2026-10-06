@@ -454,6 +454,25 @@ function toggleFeedSources() {
 }
 window.toggleFeedSources = toggleFeedSources;
 
+async function injectPluginTabs() {
+    try {
+        const d = await (await fetch('/api/plugins')).json();
+        const navs = d.nav || [];
+        const anchor = document.querySelector('.nav-tab[data-tab="_plugins"]');
+        if (!anchor) return;
+        navs.forEach(nv => {
+            if (document.querySelector('.nav-tab[data-tab="' + nv.tab + '"]')) return;
+            const b = document.createElement('button');
+            b.className = 'nav-tab';
+            b.dataset.tab = nv.tab;
+            b.textContent = (nv.icon || '🧩') + ' ' + (nv.label || nv.tab);
+            anchor.parentNode.insertBefore(b, anchor);
+            b.addEventListener('click', () => switchTab(nv.tab));
+        });
+    } catch (e) { /* nav 注入失败不影响核心导航 */ }
+}
+window.injectPluginTabs = injectPluginTabs;
+
 async function checkAppUpdate(manual) {
     const tag = document.getElementById('appVerTag');
     const info = document.getElementById('appUpdateInfo');
@@ -5169,6 +5188,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     checkStatus();
     checkAppUpdate(false);
+    injectPluginTabs();
     // 仪表盘为默认页时直接锁滚动(不经过 switchTab)
     const dash = document.getElementById('dashboard');
     if (dash && dash.classList.contains('active')) {

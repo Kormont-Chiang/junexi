@@ -31,8 +31,8 @@ Obsidian 与 Zotero 可以在其内部连接，CBDB 与地图、社会网络分�
 | 🔍 联合检索 | 一次输入多库并行：CBDB 本地计数、Kanripo 汉籍库、ctext、订阅库带词直达 |
 | 🛠️ 史学工具 | 避讳/音韵/年号/职官/地名/版本目录六件，结果附来源声明与在线核查路径 |
 | 🤖 AI 助手 | 多模型可选（DeepSeek 对话/深思、OpenClaw 网关），历史研究提示词库 17 条，荣新江《学术训练与学术规范》知识库注入 |
-| 🧩 插件系统 | 插件 = 带 manifest.json 的文件夹，管理页可视化开关；**插件市场**：URL/本机一键安装 .jxplugin，registry 即本仓库 plugins-registry.json（PR 提条目上架）；开发见 [插件开发指南](docs/插件开发指南.md) |
-| 📓 学术动态 | arXiv 数字人文/数字史学 + Medievalists.net + JSTOR Daily，RSS 多源 30min 缓存 |
+| 🧩 插件系统 | 插件 = 带 manifest.json 的文件夹，管理页可视化开关+一键卸载（用户目录插件）；**插件市场**：URL/本机安装 .jxplugin，市场卡片识别已安装/升级状态，registry 即本仓库 plugins-registry.json（PR 提条目上架）；开发见 [插件开发指南](docs/插件开发指南.md) |
+| 📓 学术动态 | arXiv 数字人文/数字史学 + Medievalists.net + JSTOR Daily + **自定义 RSS 源**（面板自加自删），30min 缓存 |
 
 ## ⚠️ 安全说明（杀毒软件警告）
 
@@ -101,5 +101,5 @@ Kanripo 汉籍 Repository · 荣新江《学术训练与学术规范》（知识
 
 | 文件 | SHA-256 |
 |---|---|
-| JuneXi-v0.2.2-windows.zip（最新 Release） | `601665d9bd16278253c49d3874f1845083f47c92942d802c92bc40bae97f3457` |
+| JuneXi-v0.2.3-windows.zip（最新 Release） | `68cbd8cdc0c4487d054c0a80a74101679cabb546a4ea9e8a2be83487f9e6748c` |
 | JuneXi.exe（含于 zip，自 v0.2.0 未变） | `d875f95d04e30a2a3b8a806f5130af88573119e776093da7920db503a6c748e4`（Windows Defender 2026-10-05 全量扫描无威胁） |

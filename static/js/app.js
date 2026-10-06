@@ -404,18 +404,25 @@ async function loadNews(force) {
         }
         const srcFilter = window._feedSrcFilter || '';
         const shown = srcFilter ? items.filter(it => it.source === srcFilter) : items;
+        const srcCount = {};
+        items.forEach(i => { srcCount[i.source || '?'] = (srcCount[i.source || '?'] || 0) + 1; });
+        const palette = ['#d08a72', '#7ea3d0', '#8fbf9f', '#c9a86a', '#b48ec9', '#7ec9c3'];
+        let pi = 0;
         const srcChips = `<div class="kb-chips news-src-chips">
-            <span class="kb-chip${!srcFilter ? ' on' : ''}" onclick="feedSetSrc('')">全部·${items.length}</span>
-            <span class="kb-chip${srcFilter === 'PubMed' ? ' on' : ''}" onclick="feedSetSrc('PubMed')" style="border-color:#7ea3d0;color:#7ea3d0">PubMed·${items.filter(i => i.source === 'PubMed').length}</span>
-            <span class="kb-chip${srcFilter === 'arXiv' ? ' on' : ''}" onclick="feedSetSrc('arXiv')" style="border-color:#d08a72;color:#d08a72">arXiv·${items.filter(i => i.source === 'arXiv').length}</span>
-        </div>`;
+            <span class="kb-chip${!srcFilter ? ' on' : ''}" onclick="feedSetSrc('')">全部·${items.length}</span>` +
+            Object.keys(srcCount).map(sk => {
+                const col = palette[pi++ % palette.length];
+                return `<span class="kb-chip${srcFilter === sk ? ' on' : ''}" onclick="feedSetSrc('${escapeHtml(sk)}')" style="border-color:${col};color:${col}">${escapeHtml(sk)}·${srcCount[sk]}</span>`;
+            }).join('') + `</div>`;
         shown.forEach(it => {
             it.title = _cleanFeedText(it.title);
             it.abstract = _cleanFeedText(it.abstract);
             it.authors = _cleanFeedText(it.authors);
         });
+        const srcKnown = Object.keys(srcCount);
         container.innerHTML = srcChips + shown.map((it, idx) => {
-            const srcCls = it.source === 'PubMed' ? 'news-src-pm' : 'news-src-ax';
+            const si = Math.max(0, srcKnown.indexOf(it.source));
+            const srcCls = 'news-src-c' + (si % 6);
             const abs = (it.abstract || '').trim();
             return `
             <div class="news-item news-feed-item">
@@ -427,7 +434,8 @@ async function loadNews(force) {
                 <div class="news-feed-meta">${escapeHtml(it.authors || '')}</div>
                 ${abs ? `<div class="news-feed-abs" id="newsAbs${idx}" onclick="this.classList.toggle('open')">${escapeHtml(abs)}</div>` : ''}
             </div>`;
-        }).join('') + (shown.length ? '' : '<div class="empty-hint">这个源暂时没有条目</div>') + `<div class="news-feed-foot"><button class="kb-nav-btn" onclick="loadNews(true)">↻ 刷新抓取</button><span class="news-date">${data.fetched_at ? '更新于 ' + data.fetched_at.slice(11, 16) : ''}${data.stale ? ' · 离线缓存' : ''}</span></div>`;
+        }).join('') + (shown.length ? '' : '<div class="empty-hint">这个源暂时没有条目</div>') + `<div class="news-feed-foot"><button class="kb-nav-btn" onclick="loadNews(true)">↻ 刷新抓取</button><button class="kb-nav-btn" onclick="toggleFeedSources()">⚙ 自定义源</button><span class="news-date">${data.fetched_at ? '更新于 ' + data.fetched_at.slice(11, 16) : ''}${data.stale ? ' · 离线缓存' : ''}</span></div><div id="feedSourcesPanel" style="display:none"></div>`;
+        loadFeedSourcesPanel();
     } catch (e) {
         container.innerHTML = '<div class="empty-hint">抓取失败：' + escapeHtml(String(e).slice(0, 80)) + '</div>';
     }
@@ -439,6 +447,58 @@ function feedSetSrc(s) {
     loadNews();
 }
 window.feedSetSrc = feedSetSrc;
+
+function toggleFeedSources() {
+    const p = document.getElementById('feedSourcesPanel');
+    if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+window.toggleFeedSources = toggleFeedSources;
+
+async function loadFeedSourcesPanel() {
+    const p = document.getElementById('feedSourcesPanel');
+    if (!p) return;
+    try {
+        const d = await (await fetch('/api/academic-feed/sources')).json();
+        const lst = d.sources || [];
+        p.innerHTML = '<div class="pm-install" style="margin-top:8px">' +
+            '<div class="pm-install-title">📡 自定义 RSS 源 <span class="pm-ver">随内置源一起抓取</span></div>' +
+            (lst.length ? lst.map((s, i) =>
+                '<div class="pm-row"><div class="pm-main"><div class="pm-title"><span class="pm-name">' + escapeHtml(s.name) + '</span></div>' +
+                '<div class="pm-desc">' + escapeHtml(s.url) + '</div></div>' +
+                '<button class="btn btn-sm pm-uninstall" onclick="delFeedSource(' + i + ')">🗑</button></div>'
+            ).join('') : '<div class="empty-hint">还没有自定义源</div>') +
+            '<div class="pm-install-row"><input id="feedSrcName" placeholder="源名称(可空)" style="flex:1;min-width:90px">' +
+            '<input id="feedSrcUrl" placeholder="https://…/feed.xml" style="flex:2;min-width:150px">' +
+            '<button class="btn btn-primary btn-sm" onclick="addFeedSource()">＋添加</button></div>' +
+            '<div class="pm-hint">添加后点"刷新抓取"生效；仅支持 https</div></div>';
+    } catch (e) {
+        p.innerHTML = '<div class="empty-hint">自定义源面板加载失败</div>';
+    }
+}
+
+async function addFeedSource() {
+    const name = (document.getElementById('feedSrcName') || {}).value || '';
+    const url = (document.getElementById('feedSrcUrl') || {}).value || '';
+    if (!url.trim()) { showToast('填 RSS 地址', 'error'); return; }
+    try {
+        const d = await (await fetch('/api/academic-feed/sources', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name.trim(), url: url.trim() })
+        })).json();
+        showToast(d.ok ? '已添加，刷新抓取后生效' : (d.error || '添加失败'), d.ok ? 'success' : 'error');
+        if (d.ok) { loadFeedSourcesPanel(); loadNews(true); }
+    } catch (e) { showToast(String(e).slice(0, 80), 'error'); }
+}
+window.addFeedSource = addFeedSource;
+
+async function delFeedSource(i) {
+    try {
+        const d = await (await fetch('/api/academic-feed/sources/' + i, { method: 'DELETE' })).json();
+        showToast(d.ok ? '已删除' : '删除失败', d.ok ? 'success' : 'error');
+        if (d.ok) { loadFeedSourcesPanel(); loadNews(true); }
+    } catch (e) { showToast(String(e).slice(0, 80), 'error'); }
+}
+window.delFeedSource = delFeedSource;
 
 // feed/arXiv 文本清洗: LaTeX 内联数学+HTML 实体+空白归一
 function _cleanFeedText(s) {

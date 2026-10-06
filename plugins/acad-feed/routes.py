@@ -34,6 +34,25 @@ def _feed_disk_save():
 
 _feed_disk_load()
 
+_CUSTOM_SRC_FILE = os.path.join(os.path.expandvars("%LOCALAPPDATA%"), "JuneXi", "acad_feed_sources.json")
+
+def _custom_load():
+    try:
+        if os.path.isfile(_CUSTOM_SRC_FILE):
+            d = json.loads(open(_CUSTOM_SRC_FILE, encoding="utf-8").read())
+            if isinstance(d, list):
+                return [s for s in d if isinstance(s, dict) and (s.get("url") or "").startswith("https://")]
+    except Exception:
+        pass
+    return []
+
+def _custom_save(lst):
+    try:
+        os.makedirs(os.path.dirname(_CUSTOM_SRC_FILE), exist_ok=True)
+        open(_CUSTOM_SRC_FILE, "w", encoding="utf-8").write(json.dumps(lst, ensure_ascii=False))
+    except Exception:
+        pass
+
 
 def _ts():
     import datetime
@@ -174,6 +193,10 @@ def academic_feed():
         ("Medievalists.net", lambda: _rss_fetch("https://www.medievalists.net/feed/", "Medievalists", 3)),
         ("JSTOR Daily", lambda: _rss_fetch("https://daily.jstor.org/feed/", "JSTOR Daily", 3)),
     ]
+    for _cs in _custom_load():
+        _cu = (_cs.get("url") or "").strip()
+        _cn = (_cs.get("name") or "").strip() or _cu
+        _jobs.append((_cn, (lambda u=_cu, n=_cn: _rss_fetch(u, n, 3))))
     with ThreadPoolExecutor(max_workers=3) as _ex:
         _futs = {_ex.submit(fn): name for name, fn in _jobs}
         for fut, name in [(f, _futs[f]) for f in _futs]:
@@ -198,3 +221,29 @@ def academic_feed():
         return jsonify({"ok": True, "items": _ACAD_FEED_CACHE["items"], "stale": True,
                         "error": "; ".join(errs)[:200]})
     return jsonify({"ok": False, "items": [], "error": "; ".join(errs)[:200] or "网络抓取失败"})
+
+
+@bp.route("/api/academic-feed/sources", methods=["GET", "POST"])
+def custom_sources():
+    """自定义 RSS 源: GET 列表 / POST 添加 {name,url}"""
+    if request.method == "GET":
+        return jsonify({"ok": True, "sources": _custom_load()})
+    d = request.get_json(force=True) or {}
+    url = (d.get("url") or "").strip()
+    name = (d.get("name") or "").strip() or url
+    if not url.startswith("https://"):
+        return jsonify({"ok": False, "error": "仅支持 https:// 的 RSS 地址"}), 400
+    lst = _custom_load()
+    if any(s.get("url") == url for s in lst):
+        return jsonify({"ok": False, "error": "该源已在列表中"}), 400
+    lst.append({"name": name, "url": url})
+    _custom_save(lst)
+    return jsonify({"ok": True, "sources": lst})
+
+@bp.route("/api/academic-feed/sources/<int:idx>", methods=["DELETE"])
+def custom_source_del(idx):
+    lst = _custom_load()
+    if 0 <= idx < len(lst):
+        lst.pop(idx)
+        _custom_save(lst)
+    return jsonify({"ok": True, "sources": lst})

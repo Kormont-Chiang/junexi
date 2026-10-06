@@ -454,6 +454,32 @@ function toggleFeedSources() {
 }
 window.toggleFeedSources = toggleFeedSources;
 
+async function checkAppUpdate(manual) {
+    const tag = document.getElementById('appVerTag');
+    const info = document.getElementById('appUpdateInfo');
+    const link = document.getElementById('appUpdateLink');
+    try {
+        const d = await (await fetch('/api/update/check', { cache: 'no-store' })).json();
+        if (!d.ok) {
+            if (manual && info) { info.textContent = ' · 检查失败（需要网络）'; setTimeout(() => { info.textContent = ''; }, 3000); }
+            return;
+        }
+        if (tag) tag.textContent = 'v' + d.current;
+        if (d.update_available) {
+            if (link) { link.textContent = '发现新版本 v' + d.latest; link.className = 'up-new'; }
+            if (info) info.textContent = '（' + (d.published_at || '') + '，点击前往下载）';
+            if (link) link.onclick = () => openExternal(d.url || 'https://github.com/Kormont-Chiang/junexi/releases');
+            if (manual) showToast('发现新版本 v' + d.latest, 'success');
+        } else if (manual && info) {
+            info.textContent = ' · 已是最新';
+            setTimeout(() => { info.textContent = ''; }, 3000);
+        }
+    } catch (e) {
+        if (manual && info) { info.textContent = ' · 检查失败'; setTimeout(() => { info.textContent = ''; }, 3000); }
+    }
+}
+window.checkAppUpdate = checkAppUpdate;
+
 async function loadFeedSourcesPanel() {
     const p = document.getElementById('feedSourcesPanel');
     if (!p) return;
@@ -5142,6 +5168,7 @@ function searchVersion() {
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     checkStatus();
+    checkAppUpdate(false);
     // 仪表盘为默认页时直接锁滚动(不经过 switchTab)
     const dash = document.getElementById('dashboard');
     if (dash && dash.classList.contains('active')) {

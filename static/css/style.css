@@ -12434,3 +12434,10 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .news-src-c3{background:#c9a86a22;color:#c9a86a;border:1px solid #c9a86a55}
 .news-src-c4{background:#b48ec922;color:#b48ec9;border:1px solid #b48ec955}
 .news-src-c5{background:#7ec9c322;color:#7ec9c3;border:1px solid #7ec9c355}
+
+/* 底部版本栏 */
+.app-footer{position:fixed;bottom:0;left:0;right:0;padding:3px 14px;font-size:11px;color:var(--text-muted,#888);background:transparent;pointer-events:none;z-index:5;display:flex;gap:6px;align-items:center}
+.app-footer a{pointer-events:auto;color:var(--text-muted,#888);text-decoration:none}
+.app-footer a:hover{color:var(--accent,#4a9)}
+.app-footer .up-new{color:#c9a86a;font-weight:600}
+.app-footer #appVerTag,#appUpdateInfo{pointer-events:none}

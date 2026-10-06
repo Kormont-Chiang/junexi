@@ -24,6 +24,8 @@ load_dotenv()
 # ── Config ──────────────────────────────────────────────
 OBSIDIAN_VAULT = "论文写作"
 OBSIDIAN_API_PORT = 27123  # Local REST API 插件默认端口
+APP_VERSION = "0.2.3"
+APP_REPO = "Kormont-Chiang/junexi"
 OBSIDIAN_API_KEY = os.environ.get("OBSIDIAN_API_KEY", "")
 DEEPSEEK_MODEL = "deepseek-chat"  # 默认模型
 
@@ -970,6 +972,35 @@ def api_plugins_uninstall(pid):
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:120]}), 500
 
+
+# ── 应用版本 & 更新检查 ─────────────────────────────────
+@app.route("/api/app/version", methods=["GET"])
+def app_version():
+    return jsonify({"ok": True, "version": APP_VERSION, "repo": APP_REPO})
+
+@app.route("/api/update/check", methods=["GET"])
+def update_check():
+    """查 GitHub latest release 对比当前版本。网络不通时优雅降级。"""
+    import urllib.request as _ur
+    import re as _re
+    try:
+        req = _ur.Request("https://api.github.com/repos/%s/releases/latest" % APP_REPO,
+                          headers={"User-Agent": "JuneXi-UpdateCheck/1.0", "Accept": "application/vnd.github+json"})
+        with _ur.urlopen(req, timeout=8) as r:
+            d = json.loads(r.read().decode("utf-8"))
+        tag = (d.get("tag_name") or "").lstrip("vV")
+        latest = tag or ""
+        cur = APP_VERSION
+        def _tp(v):
+            return tuple(int(x) for x in _re.findall(r"\d+", v)[:3]) if v else (0,)
+        avail = _tp(latest) > _tp(cur) if latest else False
+        return jsonify({"ok": True, "current": cur, "latest": latest,
+                        "update_available": avail,
+                        "url": d.get("html_url", ""),
+                        "published_at": (d.get("published_at") or "")[:10],
+                        "body": (d.get("body") or "")[:300]})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:100], "current": APP_VERSION})
 
 # ── 插件市场: 安装(本机文件/URL) ─────────────────────────
 _PLUGIN_ID_RE = __import__("re").compile(r"^[a-z0-9][a-z0-9\-_]{1,40}$")

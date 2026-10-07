@@ -894,6 +894,36 @@ def chgis_regime():
 from plugin_loader import load_plugins, plugin_assets
 _plugin_nav, _plugin_loaded, _plugin_skipped = load_plugins(app)
 
+# ── OCR provider 注册（capabilities: ["ocr"] 插件，见 docs/OCR插件化方案.md）──
+import ocr_service
+ocr_service.discover_ocr_providers()
+
+
+@app.route("/api/ocr/providers", methods=["GET"])
+def ocr_providers():
+    return jsonify(ocr_service.providers_status())
+
+
+@app.route("/api/ocr/run", methods=["POST"])
+def ocr_run():
+    """对本地图片跑一次 OCR。body: {"path": "<本地路径>"}，限 %TEMP% 或 JuneXi 用户数据目录内。"""
+    body = request.get_json(silent=True) or {}
+    p = (body.get("path") or "").strip()
+    if not p:
+        return jsonify({"ok": False, "error": "empty path"}), 400
+    ap = os.path.abspath(p)
+    allowed = [os.path.abspath(os.path.expandvars(r"%TEMP%")),
+               os.path.abspath(ocr_service and os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "JuneXi"))]
+    if not any(ap.startswith(pre) for pre in allowed):
+        return jsonify({"ok": False, "error": "path outside allowed dirs"}), 403
+    if not os.path.isfile(ap):
+        return jsonify({"ok": False, "error": "file not found"}), 404
+    try:
+        provider, lines = ocr_service.run_ocr(ap)
+    except ocr_service.OCRUnavailable as e:
+        return jsonify({"ok": False, "error": "no provider: %s" % e}), 503
+    return jsonify({"ok": True, "provider": provider, "lines": lines})
+
 
 def _scan_plugin_manifests():
     """扫描全部插件目录(用户目录优先,去重)生成清单(含未加载/已停用的), 带目录来源。"""

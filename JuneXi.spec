@@ -3,8 +3,9 @@
 # 构建: venv\Scripts\pyinstaller.exe JuneXi.spec --noconfirm --clean
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
-hiddenimports = ['pyodbc', 'clr', 'opencc']
+hiddenimports = ['pyodbc', 'clr', 'opencc', 'rapidocr']
 hiddenimports += collect_submodules('webview')
+hiddenimports += collect_submodules('rapidocr')
 
 datas = [
     ('templates', 'templates'),
@@ -16,6 +17,7 @@ datas = [
 datas += collect_data_files('webview')
 datas += collect_data_files('clr_loader')
 datas += collect_data_files('opencc')
+datas += collect_data_files('rapidocr')
 
 binaries = []
 binaries += collect_dynamic_libs('webview')

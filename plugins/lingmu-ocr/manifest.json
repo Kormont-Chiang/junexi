@@ -1,0 +1,15 @@
+{
+  "id": "lingmu-ocr",
+  "name": "灵眸 OCR（PP-OCRv6 本地引擎）",
+  "version": "0.1.0",
+  "author": "JuneXi",
+  "description": "本地离线 OCR：RapidOCR PP-OCRv6 引擎。自动词头分距，生僻字召回显著优于内置 v4。模型首启自动下载（约30MB）。",
+  "routes": "routes.py:bp",
+  "capabilities": ["ocr"],
+  "ocr": {
+    "priority": 100,
+    "local": true,
+    "module": "ocr.py:ocr_page"
+  },
+  "enabled": true
+}

@@ -1361,6 +1361,54 @@ def tools_era_book():
     return jsonify({"ok": True, "total": len(hits), "items": items,
                     "source": u"李崇智《中国历代年号考》（修订本），中华书局 2001，PDF 书页"})
 
+# ── 历史地名大辞典（OCR 管线产物，数据就绪前端点优雅降级）──────────
+_DIMING_BOOK = []
+_DIMING_BOOK_LOADED = False
+
+def _load_diming_book():
+    global _DIMING_BOOK, _DIMING_BOOK_LOADED
+    if _DIMING_BOOK_LOADED:
+        return
+    _DIMING_BOOK_LOADED = True
+    import json as _json
+    fp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "toolbooks", "diming_clean.jsonl")
+    try:
+        for ln in open(fp, encoding="utf-8"):
+            ln = ln.strip()
+            if ln:
+                _DIMING_BOOK.append(_json.loads(ln))
+    except Exception:
+        pass
+
+@app.route("/api/tools/diming/book", methods=["GET"])
+def tools_diming_book():
+    """地名原书条目检索: q 命中 head/note，复用 _fold_key 繁简+形近折叠；数据未就绪返回 404 pending"""
+    _load_diming_book()
+    if not _DIMING_BOOK:
+        return jsonify({"ok": False, "error": "diming data pending", "total": 0, "items": []}), 404
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"ok": False, "error": "empty q", "total": 0, "items": []})
+    q_l = _fold_key(q.lower())
+    hits = []
+    for e in _DIMING_BOOK:
+        score = 0
+        if q_l and q_l in _fold_key((e.get("head") or "").lower()):
+            score += 5
+        if q_l and q_l in _fold_key((e.get("note") or "").lower()):
+            score += 1
+        if score:
+            hits.append((score, e))
+    hits.sort(key=lambda x: -x[0])
+    items = []
+    for score, e in hits[:20]:
+        items.append({
+            "head": e.get("head", ""), "note": e.get("note", "")[:400],
+            "page": e.get("page"), "score": score,
+        })
+    return jsonify({"ok": True, "total": len(hits), "items": items,
+                    "source": u"史为乐《中国历史地名大辞典》，中国社会科学出版社 2005，PDF 书页"})
+
 # ── 学术写作技巧面板 ──────────────────────────────────────
 WRITING_TIPS = [
     ("史料长编", "动手写论文先做史料长编：把相关史料按类别或年代辑出、条理，再逐步分析，从中检出最能说明问题的材料。", "前言"),

@@ -925,6 +925,30 @@ def ocr_run():
     return jsonify({"ok": True, "provider": provider, "lines": lines})
 
 
+@app.route("/api/ocr/upload", methods=["POST"])
+def ocr_upload():
+    """浏览器上传图片 → 存 %TEMP% → OCR → 清理。multipart 字段名 file。"""
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"ok": False, "error": "no file"}), 400
+    ext = os.path.splitext(f.filename)[1].lower() or ".png"
+    if ext not in (".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tif", ".tiff"):
+        return jsonify({"ok": False, "error": "unsupported type %s" % ext}), 400
+    import time as _time
+    ap = os.path.join(os.path.abspath(os.path.expandvars(r"%TEMP%")), "jx_upload_%d%s" % (int(_time.time() * 1000), ext))
+    f.save(ap)
+    try:
+        provider, lines = ocr_service.run_ocr(ap)
+    except ocr_service.OCRUnavailable as e:
+        return jsonify({"ok": False, "error": "no provider: %s" % e}), 503
+    finally:
+        try:
+            os.remove(ap)
+        except Exception:
+            pass
+    return jsonify({"ok": True, "provider": provider, "lines": lines})
+
+
 def _scan_plugin_manifests():
     """扫描全部插件目录(用户目录优先,去重)生成清单(含未加载/已停用的), 带目录来源。"""
     import glob as _glob

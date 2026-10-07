@@ -83,6 +83,8 @@ async function loadPluginPage(tabId) {
             ? '<div class="plugin-page-wrap">' + await res.text() + '</div>'
             : '<div class="empty-hint">插件页面加载失败（HTTP ' + res.status + '）</div>';
         pageEl.dataset.loaded = '1';
+        // 插件页面就绪事件: 插件 js 可监听后初始化（innerHTML 不执行 inline script）
+        document.dispatchEvent(new CustomEvent('jx-plugin-page', { detail: { pid, tabId } }));
     } catch (e) {
         pageEl.innerHTML = '<div class="empty-hint">插件页面加载失败</div>';
     }

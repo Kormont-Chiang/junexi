@@ -31,27 +31,22 @@ NOTE_MIN = 4
 
 
 def _load_parser():
-    spec = importlib.util.spec_from_file_location("_diming_parser", os.path.join(HERE, "_parse_diming.py"))
+    spec = importlib.util.spec_from_file_location("parse_diming", os.path.join(HERE, "parse_diming.py"))
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["_diming_parser"] = mod
+    sys.modules["parse_diming"] = mod
     spec.loader.exec_module(mod)
     return mod
 
 
 def parse_all():
-    P = _load_parser()
-    pages = P.load_pages(P.IN)
-    entries, carry = [], None
-    stats = Counter()
-    for pno in sorted(pages):
-        lines = [l for l in pages[pno] if "text" in l and l.get("box")]
-        if P.is_index_page(lines):
-            stats["index_pages"] += 1
-            continue
-        stats["body_pages"] += 1
-        carry = P.parse_body(P.col_split(lines), pno, entries, carry)
-    stats["raw_entries"] = len(entries)
-    return entries, stats
+    """直接读 parse_diming 的产物 diming_entries.jsonl（单一事实源，不再重复解析）"""
+    entries = []
+    with open(os.path.join(DATA, "diming_entries.jsonl"), encoding="utf-8") as f:
+        for ln in f:
+            ln = ln.strip()
+            if ln:
+                entries.append(json.loads(ln))
+    return entries, Counter({"raw_entries": len(entries)})
 
 
 def clean(entries):

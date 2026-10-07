@@ -44,10 +44,10 @@ def _load_truth():
     global _TRUTH
     if _TRUTH is None:
         tp = os.path.join(DATA, '_idx_truth.json')
-        _TRUTH = set()
+        _TRUTH = {}
         try:
             import json as _json
-            _TRUTH = set(_json.load(open(tp, encoding='utf-8')))
+            _TRUTH = _json.load(open(tp, encoding='utf-8'))
         except Exception:
             pass
     return _TRUTH
@@ -121,18 +121,76 @@ def parse_body(lines, page_no, entries, carry):
             carry['note'] += t  # 续行并入
     return carry
 
+def _page_printed(lines):
+    """书眉双版式解析印刷页码：右页眉'4二画二' / 左页眉'二画二丁7'"""
+    for l in lines[:6] + lines[-4:]:
+        t = l.get('text', '').strip()
+        m = _HDR.match(t) or _HDR_TAIL.match(t)
+        if m:
+            return int(m.group(1))
+    return None
+
+
+_HDR = re.compile(u'^([0-9]{1,4})[一二三四五六七八九十]{1,3}画')
+_HDR_TAIL = re.compile(u'^[一二三四五六七八九十]{1,3}画.*?([0-9]{1,4})\s*$')
+
+
+def rescue_heads(pages, page_printed, entries, stats):
+    """v3 行首真词兜底：无信号词条头（"二江古代…的总称"）正常解析抓不到，
+    但索引真值知道它在哪页——行首命中即补建条目（note=该行余文）。
+    单字词头须行首+后随谓语/书名号/义项号，防正文行误配。
+    """
+    truth = _load_truth()
+    if not truth:
+        return
+    by_printed = {}
+    for h, pp in truth.items():
+        by_printed.setdefault(pp, []).append(h)
+    rescued = 0
+    parsed_by_page = {}
+    for e in entries:
+        parsed_by_page.setdefault(e["page"], set()).add(e["head"])
+    for pno, pr in page_printed.items():
+        lines = [l for l in pages.get(pno, []) if "text" in l]
+        got = parsed_by_page.get(pno, set())
+        for h in by_printed.get(pr, []):
+            if h in got or len(h) > 12:
+                continue
+            for l in lines:
+                t = l.get("text", "").lstrip(u"·•　 ")
+                if len(h) >= 2:
+                    ok = t.startswith(h)
+                else:
+                    ok = bool(re.match(
+                        u"^%s[①②③（(《]|[%s][指为即之古春战国本旧属在一]" % (re.escape(h), re.escape(h)), t))
+                if not ok:
+                    continue
+                rest = t[len(h):].strip(u"·•　 ，,。：:")
+                if len(rest) >= 4:
+                    entries.append({"head": h, "note": rest, "page": pno, "rescued": True})
+                    got.add(h)
+                    rescued += 1
+                break
+    stats["rescued"] = rescued
+
+
 def main():
     pages = load_pages(IN)
     entries = []
     stats = Counter()
     carry = None
+    page_printed = {}
     for pno in sorted(pages):
         lines = [l for l in pages[pno] if 'text' in l and l.get('box')]
         if is_index_page(lines):
             stats['index_pages'] += 1
             continue
         stats['body_pages'] += 1
+        pr = _page_printed(lines)
+        if pr:
+            page_printed[pno] = pr
         carry = parse_body(col_split(lines), pno, entries, carry)
+    rescue_heads(pages, page_printed, entries, stats)
     with open(OUT, 'w', encoding='utf-8') as f:
         for e in entries:
             f.write(json.dumps(e, ensure_ascii=False) + '\n')

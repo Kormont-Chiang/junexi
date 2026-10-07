@@ -1274,6 +1274,26 @@ def open_external_url():
 # ── 工具书数据: 年号考条目检索(李崇智《中国历代年号考》OCR结构化) ──
 _NIANHAO_BOOK = []
 _NIANHAO_BOOK_LOADED = False
+_T2S_MAP = None
+# 检索折叠：常见 OCR 形近误字组（已/己、癸/葵、卯/卵），与 T2S 叠加使用
+_FOLD_PAIRS = {u'已': u'己', u'葵': u'癸', u'卵': u'卯'}
+
+def _load_t2s():
+    global _T2S_MAP
+    if _T2S_MAP is None:
+        try:
+            fp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "toolbooks", "t2s_map.json")
+            _T2S_MAP = json.load(open(fp, encoding="utf-8"))
+        except Exception:
+            _T2S_MAP = {}
+    return _T2S_MAP
+
+def _fold_key(s):
+    """繁简统一 + 形近折叠 → 检索键（用于工具书原书检索的命中判定，不影响显示原文）"""
+    if not s:
+        return ""
+    t2s = _load_t2s()
+    return "".join(_FOLD_PAIRS.get(t2s.get(c, c), t2s.get(c, c)) for c in s)
 
 def _vault_path():
     """Obsidian vault 路径: 读 obsidian.json 选最近使用的 vault（插件化拆分时核心侧副本）。"""
@@ -1312,21 +1332,21 @@ def tools_era_book():
     q = (request.args.get("q") or "").strip()
     if not q:
         return jsonify({"ok": False, "error": "empty q", "total": 0, "items": []})
-    q_l = q.lower()
+    q_l = _fold_key(q.lower())
     q_year = q.isdigit() and 1 <= len(q) <= 4
     hits = []
     for e in _NIANHAO_BOOK:
         score = 0
-        if q_l in (e.get("ruler") or "").lower():
+        if q_l and q_l in _fold_key((e.get("ruler") or "").lower()):
             score += 3
         for era in e.get("eras", []):
-            if q_l in era.lower():
+            if q_l and q_l in _fold_key(era.lower()):
                 score += 5
         if q_l in (e.get("year_span") or "").lower():
             score += 2
             if q_year:
                 score += 4  # 纯数字年份查询:区间命中额外加权
-        if q_l in (e.get("note") or "").lower():
+        if q_l and q_l in _fold_key((e.get("note") or "").lower()):
             score += 1
         if score:
             hits.append((score, e))

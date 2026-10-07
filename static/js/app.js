@@ -4970,11 +4970,10 @@ function searchPlace() {
         (p.modern && p.modern.includes(query))
     );
 
+    // 主库无命中不急着提示——原书辞典块接着查（史为乐大辞典覆盖面更广）
     if (results.length === 0) {
-        container.innerHTML = '<p style="color:var(--text-muted)">未找到相关地名</p>';
-        return;
-    }
-
+        container.innerHTML = '';
+    } else {
     container.innerHTML = results.map(p => `
         <div class="result-card">
             <div class="result-card-title">${p.ancient}（今${p.modern}）</div>
@@ -4987,6 +4986,37 @@ function searchPlace() {
         </div>
     `).join('');
     container.innerHTML += toolSourcesHtml('place');
+    }
+    searchPlaceBook(query, container);
+}
+
+async function searchPlaceBook(query, container) {
+    // 史为乐《中国历史地名大辞典》原书检索块（数据就位自动生效；缺席静默跳过）
+    try {
+        const d = await (await fetch('/api/tools/diming/book?q=' + encodeURIComponent(query))).json();
+        if (!d.ok) {
+            if (!container.innerHTML) container.innerHTML = '<p style="color:var(--text-muted)">未找到相关地名</p>';
+            return;
+        }
+        if (!d.items || !d.items.length) {
+            if (!container.innerHTML) container.innerHTML = '<p style="color:var(--text-muted)">未找到相关地名</p>';
+            return;
+        }
+        const items = d.items.slice(0, 8);
+        container.insertAdjacentHTML('beforeend', '<div class="era-book-block">' +
+            '<div class="era-book-title">📖 原书释义 · 史为乐《中国历史地名大辞典》（中国社科版）</div>' +
+            items.map(it =>
+                '<div class="result-card era-book-item">' +
+                '<div class="result-card-title">' + escapeHtml(it.head) + '</div>' +
+                '<div class="result-card-body"><span class="result-card-badge">书页 ' + it.page + '</span></div>' +
+                '<div class="result-card-row"><span class="result-card-label">释义</span><span class="result-card-value">' + escapeHtml(it.note) + '</span></div>' +
+                '</div>'
+            ).join('') +
+            (d.total > 8 ? '<div class="era-book-more">共 ' + d.total + ' 条，检索词再精确些可收窄</div>' : '') +
+        '</div>');
+    } catch (e) {
+        if (!container.innerHTML) container.innerHTML = '<p style="color:var(--text-muted)">未找到相关地名</p>';
+    }
 }
 
 // ── 史学工具溯源层: 数据来源声明 + 在线核查路径 ──

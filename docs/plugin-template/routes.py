@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""最小插件示例: 一个路由 + 一个页面 + 足迹记录。
-复制本文件夹到 plugins/<你的插件id>/ 即可被加载。
+"""最小插件示例: 一个路由 + 一个独立页面 + 足迹记录。
+复制本文件夹为 JuneXi 的 plugins/<你的插件id>/ 即可被加载。
 """
 import os
 import json
 import urllib.request
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
 
 bp = Blueprint("myplugin", __name__)
 
@@ -38,3 +38,14 @@ def fetch_remote():
             return jsonify({"ok": True, "status": r.status, "head": r.read(300).decode("utf-8", "ignore")})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:120]}), 500
+
+
+# ---- 独立页面通道（可选）：manifest 声明 nav 后，核心会 fetch 本路由注入 tab ----
+@bp.route("/plugin/my-plugin/page")
+def page():
+    return Response(
+        u'<div style="padding:24px"><h3>我的插件页面</h3>'
+        u'<p>这个 HTML 来自插件。前端逻辑放 static/page.js（manifest assets 注入全站），'
+        u'初始化监听核心派发的 <code>jx-plugin-page</code> 事件。</p>'
+        u'<button onclick="myPluginPing()">ping 后端</button> <span id="mpp-out"></span></div>',
+        mimetype="text/html; charset=utf-8")

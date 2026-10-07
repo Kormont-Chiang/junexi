@@ -1,0 +1,30 @@
+# -*- coding: utf-8 -*-
+"""OCR provider 能力示例（可选）：manifest 声明 capabilities:["ocr"] 即成为 OCR 供应方。
+
+核心按 priority 降序调度；任一 provider 抛异常自动落到下一个，全部失败才报错。
+返回值契约: [{"box": [[x1,y1],[x2,y2],[x3,y3],[x4,y4]], "text": "...", "conf": 0.0-1.0}]
+惰性初始化（首次调用才加载模型），保持插件启用时启动轻量。
+"""
+
+_ENGINE = None
+
+
+def _engine():
+    global _ENGINE
+    if _ENGINE is None:
+        from rapidocr import RapidOCR  # 或任何 OCR 包
+        _ENGINE = RapidOCR()
+    return _ENGINE
+
+
+def ocr_page(image_path):
+    eng = _engine()
+    res = eng(image_path)
+    out = []
+    if res and res.txts:
+        boxes = res.boxes if res.boxes is not None else [None] * len(res.txts)
+        scores = res.scores if res.scores is not None else [None] * len(res.txts)
+        for b, t, s in zip(boxes, res.txts, scores):
+            out.append({"box": b.tolist() if b is not None else None,
+                        "text": t, "conf": float(s) if s is not None else None})
+    return out

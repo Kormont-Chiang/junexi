@@ -1,0 +1,17 @@
+{
+  "id": "baidu-ocr",
+  "name": "百度 OCR（云端高精度·繁体）",
+  "version": "0.1.0",
+  "author": "JuneXi",
+  "description": "百度通用文字识别高精度版（含位置，支持繁体）。需在 API 配置后使用；未配置或调用失败时核心自动回落本地引擎。图片上传百度，注意隐私。",
+  "enabled": true,
+  "routes": "routes.py:bp",
+  "icon": "☁️",
+  "permissions": ["network"],
+  "capabilities": ["ocr"],
+  "ocr": {
+    "priority": 50,
+    "local": false,
+    "module": "ocr.py:ocr_page"
+  }
+}

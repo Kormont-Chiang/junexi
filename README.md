@@ -59,6 +59,7 @@ python app.py                     # 默认 127.0.0.1:5000
 | 📖 Zotero 联动 | 本地代理（状态/检索/书库/附件）+ 最近阅读 + PDF 内嵌直读 + 笔记落盘 Obsidian |
 | 📰 学术动态 | arXiv 数字人文 + Medievalists.net + JSTOR Daily RSS 聚合，支持自定义源 |
 | 👁️ 灵眸 OCR | 本地离线 OCR（PP-OCRv6）：生僻字召回与词头分距显著优于旧引擎；`capabilities: ["ocr"]` 插件协议的首个实现，可被工具书管线/任意功能调用 |
+| ☁️ 百度 OCR | 云端高精度（繁体）选配：`plugins/baidu-ocr`，priority 低于灵眸；未配置 key 或失败自动回落本地；key 存用户数据目录 |
 
 ### OCR 插件协议
 

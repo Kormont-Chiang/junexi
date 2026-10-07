@@ -43,7 +43,7 @@ def ocr_page(image_path: str) -> list[dict]:
 | 内置 v4 | rapidocr_onnxruntime + PP-OCRv4 | ✅ | 0 | 丢字：幢/碥/搦；词条与释义粘连 | 兜底，存量不动 |
 | **灵眸（推荐本地）** | rapidocr ≥3.x + **PP-OCRv6** small | ✅ | 0 | **全部找回**，且词条/释义间自动加空格（白送的分词信号） | 官方选配插件 |
 | v5-server | rapidocr + PP-OCRv5 server_rec（繁体 93.29%） | ✅ | 0 | 未测；模型 ~81MB，繁体场景官方最强 | v6 遇挫时的备选 |
-| 云端高精度 | 百度通用文字识别（高精度含位置版），繁体模式 | ❌ | 按量（约 ¥0.02/千次起） | 未接入；古籍/刻本场景口碑最佳 | 选配插件，用户自备 key |
+| 云端高精度 | 百度通用文字识别（高精度含位置版），繁体模式 | ❌ | 按量（约 ¥0.02/千次起） | 未接入；古籍/刻本场景口碑最佳 | ✅ `plugins/baidu-ocr`，用户自备 key |
 
 实测记录（同页同 dpi=200，v6 引擎输出含 box 可排序）：
 - v4：`千仙镇金时泗州…` / v6：`千仙镇 金时泗州平山镇之讹。`（空格分离词头）
@@ -57,13 +57,15 @@ def ocr_page(image_path: str) -> list[dict]:
 - 云端 provider 只在用户显式启用 + 填 key 后生效；调用前弹确认，JSONL 存本地。
 - 学术场景建议：**普通工具书本地 v6 足够**；刻本/写本/虫蛀页再点云端。
 
-## 5. 落地路线
+## 5. 落地路线（2026-10-07 全部完成 ✅）
 
-1. 【下轮】核心侧 `ocr_runner`（capability 发现 + priority + 兜底）+ 灵眸插件骨架（manifest + ocr_page + 首启模型下载）
-2. 工具书管线 `_ocr_*.py` 改走 `ocr_runner`（保留直接 rapidocr 的离线后备参数）
-3. 官制大辞典 / 史讳辞典（等 Korm 重下完）**用 v6 起跑**——不再回填 v4 的坑
-4. 地名大辞典：现有 v4 全书数据**保留**（一致性好 + 解析器已适配），下版重印/再版时再用 v6 全量
-5. 云端 provider（百度）插件排期在 1-3 验证后
+1. ✅ 核心侧 `ocr_service`（capability 发现 + priority + 兜底）+ 灵眸插件（PP-OCRv6）
+2. ✅ 工具书管线 `_ocr_toolbook.py` 走 `ocr_service` 调度
+3. ⏳ 官制大辞典 / 史讳辞典（等 Korm 重下完）**用 v6 起跑**——不再回填 v4 的坑
+4. ✅ 地名大辞典：现有 v4 全书数据**保留**（全书一致性），v6 数据待全书重印时生成
+5. ✅ 云端 provider（百度）插件落地：`plugins/baidu-ocr`，priority 50 排在灵眸之后；未配置 key 或调用失败自动回落本地；key 存用户数据目录不入库
+
+配套：灵眸前端面板（👁️ 灵眸OCR tab：拖图识别+行级置信度）、独立页面通道 `/plugin/<id>/page` 首个真实用户、插件模板仓库 [jx-plugin-template](https://github.com/Kormont-Chiang/jx-plugin-template)。
 
 ## 6. 风险
 

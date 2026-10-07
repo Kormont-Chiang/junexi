@@ -57,7 +57,13 @@ python app.py                     # 默认 127.0.0.1:5000
 | --- | --- |
 | 🏛️ CBDB 检索 | 29 路由全功能：人名/官职/地名/入仕/社会区分/著作/亲属递归/社会关系/路径/GeoJSON/网络图，Access 本地库 + 预热 |
 | 📖 Zotero 联动 | 本地代理（状态/检索/书库/附件）+ 最近阅读 + PDF 内嵌直读 + 笔记落盘 Obsidian |
-| 📰 学术动态 | arXiv 数字人文 + Medievalists.net + JSTOR Daily RSS 聚合 |
+| 📰 学术动态 | arXiv 数字人文 + Medievalists.net + JSTOR Daily RSS 聚合，支持自定义源 |
+| 👁️ 灵眸 OCR | 本地离线 OCR（PP-OCRv6）：生僻字召回与词头分距显著优于旧引擎；`capabilities: ["ocr"]` 插件协议的首个实现，可被工具书管线/任意功能调用 |
+
+### OCR 插件协议
+
+插件 manifest 声明 `"capabilities": ["ocr"]` 并提供 `ocr_page(image_path)` 即成为 OCR provider，
+核心按 `priority` 调度、异常自动回落内置引擎。详见 [docs/OCR插件化方案.md](docs/OCR插件化方案.md)。
 
 ## 数据依赖（不在仓库内）
 

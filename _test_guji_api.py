@@ -98,7 +98,15 @@ if st2["state"] == "ready":
 else:
     check("punctuate runs", False, "chain blocked")
 
-# 5) 端点
+# 5) 回归：简体文言（含世/故/台等中性字）不得误判繁体
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from guji_punct import _looks_traditional
+_zhuangzi = u"天下大乱贤圣不明道德不一天下多得一察焉以自好譬如耳目皆有所明不能相通犹百家众技也皆有所长时有所用虽然不该不遍一之士也判天地之美析万物之理察古人之全寡能备于天地之美称神之容是故内圣外王之道暗而不明郁而不发天下之人各为其所欲焉以自为方悲夫百家往而不反必不合矣后世之学者不幸不见天地之纯古之大体道术将为天下裂"
+check("简体文言不误判繁体", _looks_traditional(_zhuangzi) is False)
+check("繁体文言检出", _looks_traditional(u"天下大亂賢聖不明道德不一") is True)
+check("现代简体不误判", _looks_traditional(u"今天我们学习历史地理知识，去北京和上海旅行。") is False)
+
+# 6) 端点
 from app import app
 c = app.test_client()
 r = c.get("/api/guji/status")

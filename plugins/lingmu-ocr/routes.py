@@ -48,6 +48,7 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
     <textarea class="lm-full" id="lmFull" readonly></textarea>
   </div>
 </div>
+<script src="/plugin/lingmu-ocr/static/panel.js"></script>
 <script>if (window.lingmuPanelInit) window.lingmuPanelInit();</script>
 """
 

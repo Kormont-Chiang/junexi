@@ -35,7 +35,7 @@ def _sig():
     d = _toolbook_dir()
     out = []
     for fn in ("diming_clean.jsonl", "nianhao_clean.jsonl",
-               "cbdb_persons.jsonl", "cbdb_offices.jsonl"):
+               "cbdb_persons.jsonl", "cbdb_offices.jsonl", "cbdb_places.jsonl"):
         p = os.path.join(d, fn)
         out.append((fn, os.path.getsize(p) if os.path.isfile(p) else 0,
                     int(os.path.getmtime(p)) if os.path.isfile(p) else 0))
@@ -113,6 +113,16 @@ def _build():
             add("lex", head, u"地名", u"中国历史地名大辞典", head, (e.get("note") or "")[:80])
             n += 1
     stats["diming_heads"] = n
+
+    # 地名补（CBDB ADDR_CODES 繁体库，简繁双索引补缺口如「洛阳/洛陽」；地名典优先）
+    n = 0
+    for e in _load_jsonl(os.path.join(d, "cbdb_places.jsonl")):
+        head = (e.get("head") or "").strip()
+        if head:
+            for surf in {head, _t2s(head)}:
+                add("lex", surf, u"地名", u"CBDB 地名", head, u"", e.get("aid"))
+            n += 1
+    stats["cbdb_places"] = n
 
     # 官名（CBDB，繁体→简繁双索引）
     n = 0

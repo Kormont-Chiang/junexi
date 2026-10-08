@@ -46,5 +46,18 @@ with io.open(os.path.join(OUT, "cbdb_offices.jsonl"), "w", encoding="utf-8") as 
                            ensure_ascii=False) + u"\n")
         n2 += 1
 print(u"offices: %d" % n2)
+
+# 地名（CBDB ADDR_CODES，限人物实际使用过的——补工具书词头缺口如「洛阳」）
+cur.execute(u"SELECT DISTINCT a.c_addr_id, a.c_name_chn FROM ADDR_CODES a INNER JOIN (SELECT c_addr_id FROM BIOG_ADDR_DATA UNION SELECT c_addr_id FROM POSTED_TO_ADDR_DATA) u ON a.c_addr_id = u.c_addr_id WHERE a.c_name_chn IS NOT NULL AND Len(a.c_name_chn) >= 2")
+n3 = 0
+with io.open(os.path.join(OUT, "cbdb_places.jsonl"), "w", encoding="utf-8") as f:
+    for aid, name in cur:
+        name = (name or "").strip()
+        if len(name) < 2 or len(name) > 12:
+            continue
+        f.write(json.dumps({"head": name, "aid": aid, "gloss": u""},
+                           ensure_ascii=False) + u"\n")
+        n3 += 1
+print(u"places: %d" % n3)
 conn.close()
 print(u"-> %s" % OUT)

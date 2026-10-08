@@ -40,6 +40,14 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
     .lm-ent:hover{filter:brightness(1.15)}
     .lm-pop{position:fixed;z-index:999;max-width:340px;background:var(--card,#fffdfb);border:1px solid var(--border,#d8d4c8);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.7;box-shadow:0 8px 28px rgba(0,0,0,.20)}
     .lm-pop b{color:var(--accent,#4a7a68)}
+    .lm-proof{border:1px solid var(--border,#d8d4c8);border-radius:6px;padding:8px 10px;max-height:260px;overflow:auto;font-size:12px}
+    .lm-proof h4{margin:6px 0 4px;font-size:12px;color:var(--muted,#8a8577)}
+    .lm-proof .lm-p-row{padding:3px 0;border-bottom:1px dashed var(--border,#e5e1d5);line-height:1.8}
+    .lm-proof .lm-p-fix{color:#8a3a3a;font-weight:700}
+    .lm-proof .lm-p-w{color:var(--accent,#4a7a68)}
+    .lm-proof .lm-p-unk{color:var(--muted,#8a8577)}
+    .lm-proof .lm-p-use{background:#4a7a68;color:#fff;border:none;border-radius:4px;padding:1px 8px;margin-left:8px;font-size:11px;cursor:pointer}
+    .lm-proof .lm-p-use:hover{filter:brightness(1.15)}
     .lm-copy{background:none;border:1px solid var(--border,#d8d4c8);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer}
     .lm-full{width:100%;margin-top:10px;font-size:12px;min-height:90px}
   </style>
@@ -69,10 +77,12 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
       <button class="lm-btn" id="lmGujiBtn" disabled>句读标点</button>
       <button class="lm-btn" id="lmGujiInstall" style="display:none;background:#8a6d3b">安装引擎（约1MB）</button>
       <button class="lm-btn" id="lmGujiAnno" style="display:none;background:#4a5d8a">标注实体</button>
+      <button class="lm-btn" id="lmProofBtn" style="display:none;background:#8a4a4a">校对</button>
       <button class="lm-btn" id="lmAnnoExport" style="display:none;background:#6b6b6b">导出 CSV</button>
     </div>
     <textarea class="lm-full" id="lmGujiOut" readonly style="margin-top:10px;min-height:140px"></textarea>
     <div class="lm-anno" id="lmAnno" style="display:none;margin-top:10px"></div>
+    <div class="lm-proof" id="lmProof" style="display:none;margin-top:10px"></div>
   </div>
 </div>
 <script src="/plugin/lingmu-ocr/static/panel.js"></script>

@@ -988,6 +988,19 @@ def guji_annotate():
     return jsonify(entity_tag.annotate(text))
 
 
+@app.route("/api/guji/proofread", methods=["POST"])
+def guji_proofread():
+    import error_check
+    body = request.get_json(force=True, silent=True) or {}
+    text = (body.get("text") or "").strip()
+    if not text:
+        return jsonify({"ok": False, "error": "empty text"}), 400
+    r = error_check.proofread(text)
+    if not r.get("ok"):
+        return jsonify(r), 400
+    return jsonify(r)
+
+
 def _scan_plugin_manifests():
     """扫描全部插件目录(用户目录优先,去重)生成清单(含未加载/已停用的), 带目录来源。"""
     import glob as _glob

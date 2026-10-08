@@ -143,7 +143,9 @@
       gujiOut.value = d.punctuated;
       annoBtn.style.display = '';
       annoBtn.disabled = false;
+      proofBtn.style.display = '';
       annoExportBtn.style.display = 'none';
+      proofDiv.style.display = 'none';
       annoOn = false;
       annoDiv.style.display = 'none';
       gujiOut.style.display = '';
@@ -153,7 +155,7 @@
     });
   });
 
-  // ── 实体标注（词典锚定）：句读结果 × 自家工具书 ──
+  // ── 实体标注（词典锚定）：句读结果 × 自家词库 ──
   var annoBtn = document.getElementById('lmGujiAnno');
   var annoExportBtn = document.getElementById('lmAnnoExport');
   var annoDiv = document.getElementById('lmAnno');
@@ -245,6 +247,78 @@
     a.download = 'lingmu_entities.csv';
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+  });
+
+  // ── 校对（词典反向校验）：未收录串 + 单错建议，可采用 ──
+  var proofBtn = document.getElementById('lmProofBtn');
+  var proofDiv = document.getElementById('lmProof');
+  var proofData = null;
+
+  function rebuildRowsFromFull() {
+    var lines = document.getElementById('lmFull').value.split('\n');
+    var html = '';
+    lines.forEach(function (t) {
+      var x = t.replace(/</g, '&lt;');
+      html += '<div class="lm-line"><span class="lm-conf">—</span><span class="lm-text" contenteditable="true" spellcheck="false">' + x + '</span></div>';
+    });
+    document.getElementById('lmLines').innerHTML = html;
+  }
+
+  proofDiv.addEventListener('click', function (e) {
+    var b = e.target;
+    if (!b || !b.classList || !b.classList.contains('lm-p-use')) return;
+    var idx = +b.getAttribute('data-i');
+    var sg = proofData && proofData.suggestions[idx];
+    if (!sg) return;
+    var lmFullEl = document.getElementById('lmFull');
+    var v = lmFullEl.value;
+    if (v.charAt(sg.pos) !== sg.orig) { b.textContent = '已偏移'; b.disabled = true; return; }
+    lmFullEl.value = v.slice(0, sg.pos) + sg.char + v.slice(sg.pos + 1);
+    rebuildRowsFromFull();
+    if (gujiOut.value) gujiOut.value = '';
+    if (annoOn) { annoOn = false; annoDiv.style.display = 'none'; gujiOut.style.display = ''; }
+    b.textContent = '已采用';
+    b.disabled = true;
+    gujiState.textContent = '已采用建议（全文已更新，可重新句读）';
+  });
+
+  proofBtn.addEventListener('click', function () {
+    var text = document.getElementById('lmFull').value;
+    if (!text) return;
+    proofBtn.disabled = true;
+    proofBtn.textContent = '校对中…';
+    fetch('/api/guji/proofread', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      proofBtn.disabled = false;
+      proofBtn.textContent = '校对';
+      if (!d.ok) { proofDiv.style.display = 'none'; gujiState.textContent = d.error || '校对失败'; return; }
+      proofData = d;
+      var html = '';
+      if (d.suggestions.length) {
+        html += '<h4>疑似错字 ' + d.suggestions.length + ' 处（建议供参考，点击采用）</h4>';
+        d.suggestions.forEach(function (sg, i) {
+          html += '<div class="lm-p-row">#' + (sg.pos) + ' <span class="lm-p-fix">' + esc(sg.orig) + '→' + esc(sg.char) +
+            '</span> 依据 <span class="lm-p-w">' + esc(sg.word) + '</span>〔' + esc(sg.type) + '·' + esc(sg.book) + '〕' +
+            (sg.gloss ? ' ' + esc(sg.gloss.slice(0, 30)) : '') +
+            ' <button class="lm-p-use" data-i="' + i + '">采用</button></div>';
+        });
+      }
+      if (d.unknown.length) {
+        html += '<h4>未收录串 ' + d.n_unknown + ' 处（词库无据，多为专名或连续错字）</h4>';
+        d.unknown.slice(0, 12).forEach(function (u) {
+          html += '<div class="lm-p-row lm-p-unk">#' + u.start + ' 「' + esc(u.text.slice(0, 20)) + '」</div>';
+        });
+      }
+      proofDiv.innerHTML = html || '<div class="lm-p-row">未发现可疑处。</div>';
+      proofDiv.style.display = 'block';
+      gujiState.textContent = '校对完成：疑似 ' + d.suggestions.length + ' / 未收录 ' + d.n_unknown;
+    }).catch(function () {
+      proofBtn.disabled = false;
+      proofBtn.textContent = '校对';
+    });
   });
 
   // OCR 结果落位后：亮出句读卡 + 解锁按钮

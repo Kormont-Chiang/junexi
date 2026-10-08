@@ -78,8 +78,7 @@ const editOk = await page.evaluate(() => {
     const row = document.querySelector('#lmLines .lm-line');
     if (!row) return 'no-row';
     const span = row.querySelector('.lm-text');
-    span.focus();
-    document.execCommand('insertText', false, '校对测试');
+    span.textContent = '校对测试' + span.textContent;
     span.dispatchEvent(new Event('input', { bubbles: true }));
     return 'ok';
 });
@@ -104,6 +103,22 @@ if (readyReal) {
     t('句读出真标点(' + gujiState2 + ')', /[，。！？；、]/.test(gujiText));
     console.log('--- 句读输出前 60 字 ---');
     console.log(gujiText.slice(0, 60));
+    // 实体标注：真点按钮 → annoDiv 渲染（此样张无年号地名，允许 0 命中但流程要通）
+    const annoBtnVisible = await page.evaluate(() => {
+        const b = document.getElementById('lmGujiAnno');
+        return b && b.style.display !== 'none';
+    });
+    t('标注按钮已显示', annoBtnVisible === true);
+    await page.evaluate(() => { document.getElementById('lmGujiAnno').click(); });
+    await page.waitForFunction(() => document.getElementById('lmAnno').style.display === 'block', { timeout: 30000 }).catch(() => {});
+    const annoShown = await page.evaluate(() => document.getElementById('lmAnno').style.display === 'block' && document.getElementById('lmAnno').innerHTML.length > 0);
+    t('实体标注渲染', annoShown);
+    // API 级：建安 必须命中年号
+    const annoApi = await page.evaluate(() => fetch('/api/guji/annotate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: '建安四年春' })
+    }).then(x => x.json()));
+    t('建安=年号(API)', annoApi.ok && annoApi.entities.some(e => e.text === '建安' && e.type === '年号'));
 } else {
     t('句读出真标点(跳过: 引擎未就绪)', true);
 }

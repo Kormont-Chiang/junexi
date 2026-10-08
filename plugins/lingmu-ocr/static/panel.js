@@ -141,9 +141,85 @@
       if (!d.ok) { gujiState.textContent = '失败：' + (d.error || '').slice(0, 60); refreshGujiStatus(); return; }
       gujiState.textContent = d.traditional ? '完成（繁体已转回）' : '完成';
       gujiOut.value = d.punctuated;
+      annoBtn.style.display = '';
+      annoBtn.disabled = false;
+      annoOn = false;
+      annoDiv.style.display = 'none';
+      gujiOut.style.display = '';
     }).catch(function () {
       gujiBtn.disabled = false;
       gujiState.textContent = '请求失败';
+    });
+  });
+
+  // ── 实体标注（词典锚定）：句读结果 × 自家工具书 ──
+  var annoBtn = document.getElementById('lmGujiAnno');
+  var annoDiv = document.getElementById('lmAnno');
+  var annoOn = false;
+  var annoEntities = [];
+  var popEl = null;
+
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function closePop() { if (popEl) { popEl.remove(); popEl = null; } }
+
+  function showPop(ent, x, y) {
+    closePop();
+    popEl = document.createElement('div');
+    popEl.className = 'lm-pop';
+    var gloss = ent.gloss ? esc(ent.gloss) : '<i>（词条无摘要，见原书考证）</i>';
+    popEl.innerHTML = '<b>[' + ent.type + '] ' + esc(ent.head) + '</b>　<span style="color:var(--muted,#8a8577)">' + esc(ent.book) + '</span><br>' + gloss;
+    document.body.appendChild(popEl);
+    var w = popEl.offsetWidth, h = popEl.offsetHeight;
+    popEl.style.left = Math.min(x, window.innerWidth - w - 12) + 'px';
+    popEl.style.top = Math.min(y, window.innerHeight - h - 12) + 'px';
+    setTimeout(function () {
+      document.addEventListener('click', function h(ev) {
+        if (popEl && !popEl.contains(ev.target)) { closePop(); document.removeEventListener('click', h); }
+      });
+    }, 0);
+  }
+
+  annoDiv.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t && t.classList && t.classList.contains('lm-ent')) {
+      var ent = annoEntities[+t.getAttribute('data-i')];
+      if (ent) showPop(ent, e.clientX + 8, e.clientY + 10);
+    }
+  });
+
+  annoBtn.addEventListener('click', function () {
+    var text = gujiOut.value;
+    if (!text) return;
+    if (annoOn) { annoOn = false; annoDiv.style.display = 'none'; gujiOut.style.display = ''; annoBtn.textContent = '标注实体'; return; }
+    annoBtn.disabled = true;
+    annoBtn.textContent = '标注中…';
+    fetch('/api/guji/annotate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      annoBtn.disabled = false;
+      annoBtn.textContent = '标注实体';
+      if (!d.ok) { annoDiv.style.display = 'none'; return; }
+      annoEntities = d.entities || [];
+      var html = '', pos = 0;
+      annoEntities.forEach(function (ent, i) {
+        if (ent.start < pos) return;  // 重叠丢弃
+        html += esc(text.slice(pos, ent.start));
+        html += '<span class="lm-ent lm-ent-' + ent.type + '" data-i="' + i + '" title="' + esc(ent.book) + '">' + esc(ent.text) + '</span>';
+        pos = ent.end;
+      });
+      html += esc(text.slice(pos));
+      if (d.truncated) html += ' <i style="color:var(--muted,#8a8577)">（已达上限）</i>';
+      annoDiv.innerHTML = html;
+      annoDiv.style.display = 'block';
+      gujiOut.style.display = 'none';
+      annoOn = true;
+      gujiState.textContent = '实体 ' + annoEntities.length + ' 处（' + (d.stats.diming_heads || 0) + ' 地名 / ' + (d.stats.nianhao_eras || 0) + ' 年号在库）';
+    }).catch(function () {
+      annoBtn.disabled = false;
+      annoBtn.textContent = '标注实体';
     });
   });
 

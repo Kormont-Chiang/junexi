@@ -978,6 +978,16 @@ def guji_punctuate():
         return jsonify({"ok": False, "error": str(e)[:200], "state": st.get("state")}), 503
 
 
+@app.route("/api/guji/annotate", methods=["POST"])
+def guji_annotate():
+    import entity_tag
+    body = request.get_json(force=True, silent=True) or {}
+    text = (body.get("text") or "").strip()
+    if not text:
+        return jsonify({"ok": False, "error": "empty text"}), 400
+    return jsonify(entity_tag.annotate(text))
+
+
 def _scan_plugin_manifests():
     """扫描全部插件目录(用户目录优先,去重)生成清单(含未加载/已停用的), 带目录来源。"""
     import glob as _glob

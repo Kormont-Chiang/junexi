@@ -172,8 +172,33 @@
     popEl = document.createElement('div');
     popEl.className = 'lm-pop';
     var gloss = ent.gloss ? esc(ent.gloss) : '<i>（词条无摘要，见原书考证）</i>';
-    popEl.innerHTML = '<b>[' + ent.type + '] ' + esc(ent.head) + '</b>　<span style="color:var(--muted,#8a8577)">' + esc(ent.book) + '</span><br>' + gloss;
+    var html = '<b>[' + ent.type + '] ' + esc(ent.head) + '</b>　<span style="color:var(--muted,#8a8577)">' + esc(ent.book) + '</span><br>' + gloss;
+    if (ent.type === '人名' && ent.ref) {
+      html += '<div class="lm-cbdb" id="lmCbdb' + ent.ref + '" style="margin-top:4px;color:var(--muted,#8a8577)">查 CBDB 履历中…</div>';
+    }
+    popEl.innerHTML = html;
     document.body.appendChild(popEl);
+    if (ent.type === '人名' && ent.ref) {
+      fetch('/api/cbdb/person/' + ent.ref).then(function (r) { return r.json(); }).then(function (d) {
+        var box = document.getElementById('lmCbdb' + ent.ref);
+        if (!box || !d || (!d.name_chn && !d.dynasty)) { if (box) box.remove(); return; }
+        var bits = [];
+        if (d.dynasty) bits.push(esc(d.dynasty));
+        if (d.birthyear || d.deathyear) bits.push((d.birthyear || '?') + '-' + (d.deathyear || '?'));
+        var alt = (d.alt_names || []).filter(function (a) { return a.type && a.name; })
+          .slice(0, 4).map(function (a) { return esc(a.type) + ' ' + esc(a.name); });
+        var addr = (d.addresses || []).filter(function (a) { return a.type; }).slice(0, 2)
+          .map(function (a) { return esc(a.type.replace(/\(.*\)/, '')) + ' ' + esc(a.place); });
+        var h = '<span style="color:var(--accent,#4a7a68)">' + bits.join(' · ') + '</span>';
+        if (alt.length) h += '<br>' + alt.join('　');
+        if (addr.length) h += '<br>' + addr.join('　');
+        h += '<br><span style="opacity:.7">CBDB #' + ent.ref + '</span>';
+        box.innerHTML = h;
+      }).catch(function () {
+        var box = document.getElementById('lmCbdb' + ent.ref);
+        if (box) box.remove();
+      });
+    }
     var w = popEl.offsetWidth, h = popEl.offsetHeight;
     popEl.style.left = Math.min(x, window.innerWidth - w - 12) + 'px';
     popEl.style.top = Math.min(y, window.innerHeight - h - 12) + 'px';

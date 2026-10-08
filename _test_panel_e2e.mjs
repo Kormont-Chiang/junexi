@@ -132,6 +132,29 @@ if (readyReal) {
         body: JSON.stringify({ text: '建安四年春，王芝石拜参知政事。' })
     }).then(x => x.json()));
     t('校对建议王安石', prApi.ok && prApi.suggestions.some(s => s.orig === '芝' && s.char === '安' && s.word === '王安石'));
+    // 人名 popover → CBDB 履历联动：改文本走完整链（识别结果→句读→标注→点击）
+    await page.evaluate(() => {
+        const span = document.querySelector('#lmLines .lm-text');
+        span.textContent = '王安石拜参知政事于洛阳。';
+        span.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.evaluate(() => { document.getElementById('lmGujiBtn').click(); });
+    await page.waitForFunction(() => /完成/.test(document.getElementById('lmGujiState').textContent), { timeout: 90000 }).catch(() => {});
+    await page.evaluate(() => { document.getElementById('lmGujiAnno').click(); });
+    await page.waitForFunction(() => document.getElementById('lmAnno').style.display === 'block' && document.querySelectorAll('#lmAnno .lm-ent').length > 0, { timeout: 30000 }).catch(() => {});
+    const personSpan = await page.evaluateHandle(() => {
+        const ss = document.querySelectorAll('#lmAnno .lm-ent');
+        for (const s of ss) { if (s.textContent === '王安石' && s.className.includes('人名')) return s; }
+        return null;
+    });
+    t('标注含王安石人名', !!personSpan);
+    if (personSpan) {
+        await page.evaluate(el => el.click(), personSpan);
+        const okCbdb = await page.waitForFunction(
+            () => document.querySelector('.lm-cbdb') && /CBDB #1762/.test(document.querySelector('.lm-cbdb').textContent),
+            { timeout: 240000 }).then(() => true).catch(() => false);
+        t('popover联动CBDB履历', okCbdb);
+    }
 } else {
     t('句读出真标点(跳过: 引擎未就绪)', true);
 }

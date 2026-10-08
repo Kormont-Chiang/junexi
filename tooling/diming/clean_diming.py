@@ -50,6 +50,9 @@ def parse_all():
 
 
 def clean(entries):
+    # 词头去重取首条。曾实测 (head,note) 双键放开同名异条：
+    # 真值词头中合法同名异条仅 192头/208行(0.76%)——辞典本身用 ①② 义项号合一处理同地名；
+    # 放开的代价是 ~4600 行引文人名/年号碎片噪声(清尹耕云x6/国徐曦x6/十一年x6)。精度优先，保持词头去重。
     fix_cnt, seen, out = Counter(), set(), []
     for e in entries:
         head = (e.get("head") or "").strip().strip(u"。，、·•")

@@ -58,13 +58,28 @@ python app.py                     # 默认 127.0.0.1:5000
 | 🏛️ CBDB 检索 | 29 路由全功能：人名/官职/地名/入仕/社会区分/著作/亲属递归/社会关系/路径/GeoJSON/网络图，Access 本地库 + 预热 |
 | 📖 Zotero 联动 | 本地代理（状态/检索/书库/附件）+ 最近阅读 + PDF 内嵌直读 + 笔记落盘 Obsidian |
 | 📰 学术动态 | arXiv 数字人文 + Medievalists.net + JSTOR Daily RSS 聚合，支持自定义源 |
-| 👁️ 灵眸 OCR | 本地离线 OCR（PP-OCRv6）：生僻字召回与词头分距显著优于旧引擎；`capabilities: ["ocr"]` 插件协议的首个实现，可被工具书管线/任意功能调用 |
+| 👁️ 灵眸 OCR | 本地离线 OCR（PP-OCRv6）：生僻字召回与词头分距显著优于旧引擎；行级校对编辑（改动 ✎ 标记、全文实时同步）；甲言 jiayan CRF 句读标点（见下节）；`capabilities: ["ocr"]` 插件协议的首个实现，可被工具书管线/任意功能调用 |
 | ☁️ 百度 OCR | 云端高精度（繁体）选配：`plugins/baidu-ocr`，priority 低于灵眸；未配置 key 或失败自动回落本地；key 存用户数据目录 |
 
 ### OCR 插件协议
 
 插件 manifest 声明 `"capabilities": ["ocr"]` 并提供 `ocr_page(image_path)` 即成为 OCR provider，
 核心按 `priority` 调度、异常自动回落内置引擎。详见 [docs/OCR插件化方案.md](docs/OCR插件化方案.md)。
+
+### 句读标点（甲言 jiayan，本地离线）
+
+OCR 出字串≠得到可读文本。灵眸面板在识别结果下方提供「句读标点」：
+CRF 断句+标点，全程本地。两级数据分离：
+
+- **引擎（~1MB）**：面板点「安装引擎」即从 PyPI 直拉 jiayan sdist + python-crfsuite wheel
+  到 `%LOCALAPPDATA%\JuneXi\pylib`（免 pip，冻结应用可自装）；kenlm/sklearn 以桩替代
+  （仅训练/eval 需要；推理路径不触，sentencizer 的 pmi 特征返回未登录值 'NA' 等效降权）。
+- **模型（数 MB）**：需自备——[jiayan 官方仓库](https://github.com/jiaeyan/Jiayan) README
+  百度网盘（码 `p0sc`），将 `cut_model` 与 `punc_model` 放入
+  `%LOCALAPPDATA%\JuneXi\jiayan_models\` 即可。
+
+端点：`/api/guji/status`、`/api/guji/install`（POST 触发后台下载）、`/api/guji/punctuate`（POST {text}）。
+简体外最佳；繁体输入经 OpenCC 转简标点后再转回。识别质量对标见 [docs/灵眸改进调研-吾与点.md](docs/灵眸改进调研-吾与点.md)。
 
 ## 数据依赖（不在仓库内）
 

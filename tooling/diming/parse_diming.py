@@ -169,10 +169,11 @@ def rescue_heads(pages, page_printed, entries, stats):
     for h, pp in truth.items():
         by_printed.setdefault(pp, []).append(h)
     rescued = 0
+    rescued_interp = 0
     parsed_by_page = {}
     for e in entries:
         parsed_by_page.setdefault(e["page"], set()).add(e["head"])
-    for pno, pr in page_printed.items():
+    for pno, (pr, was_interp) in ((k, v) for k, v in page_printed.items()):
         lines = [l for l in pages.get(pno, []) if "text" in l]
         got = parsed_by_page.get(pno, set())
         for h in by_printed.get(pr, []):
@@ -202,7 +203,32 @@ def rescue_heads(pages, page_printed, entries, stats):
                 entries.append({"head": h, "note": note, "page": pno, "rescued": True})
                 got.add(h)
                 rescued += 1
+                if was_interp:
+                    rescued_interp += 1
     stats["rescued"] = rescued
+    stats["rescued_interp"] = rescued_interp
+
+
+def _interpolate_printed(pages, page_printed):
+    """书眉缺失页补锚：印刷页↔PDF页偏移单调缓变（插页致漂移），相邻锚点间线性插值。
+    仅内插不外推；插值只决定'试哪些词头'，行首真词匹配的门不变，故精度无损、只增召回。
+    返回 {pdf: (印刷页, 是否插值)}。
+    """
+    anchored = sorted(page_printed)
+    out = {p: (page_printed[p], False) for p in anchored}
+    for a, b in zip(anchored, anchored[1:]):
+        pa, pb = page_printed[a], page_printed[b]
+        if pb <= pa:
+            continue
+        for pno in range(a + 1, b):
+            if pno not in pages:
+                continue
+            lines = [l for l in pages[pno] if 'text' in l and l.get('box')]
+            if is_index_page(lines):
+                continue
+            est = pa + round((pb - pa) * (pno - a) / float(b - a))
+            out[pno] = (est, True)
+    return out
 
 
 def main():
@@ -221,7 +247,9 @@ def main():
         if pr:
             page_printed[pno] = pr
         carry = parse_body(col_split(lines), pno, entries, carry)
-    rescue_heads(pages, page_printed, entries, stats)
+    interp = _interpolate_printed(pages, page_printed)
+    stats['pages_interpolated'] = sum(1 for _, f in interp.values() if f)
+    rescue_heads(pages, interp, entries, stats)
     with open(OUT, 'w', encoding='utf-8') as f:
         for e in entries:
             f.write(json.dumps(e, ensure_ascii=False) + '\n')

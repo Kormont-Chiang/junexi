@@ -35,6 +35,8 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
     .lm-ent{padding:0 3px;border-radius:3px;cursor:pointer}
     .lm-ent-地名{background:rgba(74,122,104,.22);box-shadow:0 0 0 1px rgba(74,122,104,.35)}
     .lm-ent-年号{background:rgba(168,132,44,.20);box-shadow:0 0 0 1px rgba(168,132,44,.40)}
+    .lm-ent-人名{background:rgba(70,98,160,.20);box-shadow:0 0 0 1px rgba(70,98,160,.38)}
+    .lm-ent-官名{background:rgba(128,82,140,.18);box-shadow:0 0 0 1px rgba(128,82,140,.38)}
     .lm-ent:hover{filter:brightness(1.15)}
     .lm-pop{position:fixed;z-index:999;max-width:340px;background:var(--card,#fffdfb);border:1px solid var(--border,#d8d4c8);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.7;box-shadow:0 8px 28px rgba(0,0,0,.20)}
     .lm-pop b{color:var(--accent,#4a7a68)}
@@ -67,6 +69,7 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
       <button class="lm-btn" id="lmGujiBtn" disabled>句读标点</button>
       <button class="lm-btn" id="lmGujiInstall" style="display:none;background:#8a6d3b">安装引擎（约1MB）</button>
       <button class="lm-btn" id="lmGujiAnno" style="display:none;background:#4a5d8a">标注实体</button>
+      <button class="lm-btn" id="lmAnnoExport" style="display:none;background:#6b6b6b">导出 CSV</button>
     </div>
     <textarea class="lm-full" id="lmGujiOut" readonly style="margin-top:10px;min-height:140px"></textarea>
     <div class="lm-anno" id="lmAnno" style="display:none;margin-top:10px"></div>

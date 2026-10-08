@@ -143,6 +143,7 @@
       gujiOut.value = d.punctuated;
       annoBtn.style.display = '';
       annoBtn.disabled = false;
+      annoExportBtn.style.display = 'none';
       annoOn = false;
       annoDiv.style.display = 'none';
       gujiOut.style.display = '';
@@ -154,6 +155,7 @@
 
   // ── 实体标注（词典锚定）：句读结果 × 自家工具书 ──
   var annoBtn = document.getElementById('lmGujiAnno');
+  var annoExportBtn = document.getElementById('lmAnnoExport');
   var annoDiv = document.getElementById('lmAnno');
   var annoOn = false;
   var annoEntities = [];
@@ -191,7 +193,7 @@
   annoBtn.addEventListener('click', function () {
     var text = gujiOut.value;
     if (!text) return;
-    if (annoOn) { annoOn = false; annoDiv.style.display = 'none'; gujiOut.style.display = ''; annoBtn.textContent = '标注实体'; return; }
+    if (annoOn) { annoOn = false; annoDiv.style.display = 'none'; gujiOut.style.display = ''; annoBtn.textContent = '标注实体'; annoExportBtn.style.display = 'none'; return; }
     annoBtn.disabled = true;
     annoBtn.textContent = '标注中…';
     fetch('/api/guji/annotate', {
@@ -216,11 +218,33 @@
       annoDiv.style.display = 'block';
       gujiOut.style.display = 'none';
       annoOn = true;
-      gujiState.textContent = '实体 ' + annoEntities.length + ' 处（' + (d.stats.diming_heads || 0) + ' 地名 / ' + (d.stats.nianhao_eras || 0) + ' 年号在库）';
+      annoExportBtn.style.display = annoEntities.length ? '' : 'none';
+      var counts = {};
+      annoEntities.forEach(function (e) { counts[e.type] = (counts[e.type] || 0) + 1; });
+      gujiState.textContent = '实体 ' + annoEntities.length + ' 处：' +
+        Object.keys(counts).map(function (k) { return k + ' ' + counts[k]; }).join(' / ');
     }).catch(function () {
       annoBtn.disabled = false;
       annoBtn.textContent = '标注实体';
     });
+  });
+
+  annoExportBtn.addEventListener('click', function () {
+    if (!annoEntities.length) return;
+    var rows = ['text,type,book,head,gloss,ref,start,end'];
+    annoEntities.forEach(function (e) {
+      rows.push([e.text, e.type, e.book, e.head, (e.gloss || '').replace(/[\r\n]/g, ' '),
+                 e.ref || '', e.start, e.end].map(function (v) {
+        v = String(v);
+        return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(','));
+    });
+    var blob = new Blob(['﻿' + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'lingmu_entities.csv';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
   });
 
   // OCR 结果落位后：亮出句读卡 + 解锁按钮

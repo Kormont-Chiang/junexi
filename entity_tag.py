@@ -1,18 +1,23 @@
 # -*- coding: utf-8 -*-
-"""实体标注（二期 v1 词典锚定）：OCR/句读文本 × 自家工具书 = 可点词条
+"""实体标注（二期 词典锚定）：OCR/句读文本 × 自家词库 = 可点词条
 
-思路：工具书本身就是实体表——年号考 eras、地名典 head。
-最长匹配扫文本，命中即带词条摘要返回，前端高亮+点击弹卡。
-地名典数据今晚 OCR 完工后自动变全量（加载期探测文件变化）。
+词库 = 工具书 + CBDB：
+- 年号（二十史朔闰表 3715 别名）——同位优先 + 纪年尾词抑制
+- 地名（中国历史地名大辞典 ~6.9 万）
+- 官名 / 人名（CBDB 5.3 万人、3.4 万官职）——点击弹生卒朝代，可接 CBDB 详情
+
+匹配：era 桶先查；其余 lex 桶（place/office/person 合并）按长度降序最长匹配。
+数据文件按签名热更新（投放新词库无需重启）。
 """
 import io
 import json
 import os
+import pickle
 import threading
-import time
 
 _LOCK = threading.Lock()
 _STATE = {"sig": None, "index": None, "stats": {}}
+_YEARISH = u"元一二三四五六七八九十百千〇零0123456789"
 
 TOOLBOOK_DIR_CANDIDATES = [
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "toolbooks"),
@@ -29,83 +34,144 @@ def _toolbook_dir():
 def _sig():
     d = _toolbook_dir()
     out = []
-    for fn in ("diming_clean.jsonl", "nianhao_clean.jsonl"):
+    for fn in ("diming_clean.jsonl", "nianhao_clean.jsonl",
+               "cbdb_persons.jsonl", "cbdb_offices.jsonl"):
         p = os.path.join(d, fn)
         out.append((fn, os.path.getsize(p) if os.path.isfile(p) else 0,
                     int(os.path.getmtime(p)) if os.path.isfile(p) else 0))
     return tuple(out)
 
 
+def _load_jsonl(path):
+    if not os.path.isfile(path):
+        return
+    for line in io.open(path, encoding="utf-8"):
+        line = line.strip()
+        if line:
+            try:
+                yield json.loads(line)
+            except Exception:
+                continue
+
+
+_T2S = None
+
+
+def _t2s(s):
+    """CBDB 官名为繁体，转简索引；失败原样返回。"""
+    global _T2S
+    if _T2S is None:
+        try:
+            from opencc import OpenCC
+            _T2S = OpenCC("t2s")
+        except Exception:
+            _T2S = False
+    if _T2S is False:
+        return s
+    try:
+        return _T2S.convert(s)
+    except Exception:
+        return s
+
+
+_TYPE_PRIO = {u"人名": 0, u"官名": 1, u"地名": 2}
+
+
 def _build():
-    """first_char -> [(surface, type, book, head, gloss)]，按 surface 长度降序。"""
     idx = {}
     stats = {}
     d = _toolbook_dir()
 
-    def add(bucket, surface, etype, book, head, gloss):
+    def add(bucket, surface, etype, book, head, gloss, ref=None):
         surface = (surface or "").strip()
         if len(surface) < 2:
             return
-        b = idx.setdefault(surface[0], {"era": [], "place": []})
-        b[bucket].append((surface, etype, book, head, gloss))
+        b = idx.setdefault(surface[0], {"era": [], "lex": []})
+        ent = (surface, etype, book, head, gloss, ref)
+        b[bucket].append(ent)
 
-    nh = os.path.join(d, "nianhao_clean.jsonl")
-    n_nh = 0
-    if os.path.isfile(nh):
-        for line in io.open(nh, encoding="utf-8"):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                e = json.loads(line)
-            except Exception:
-                continue
-            gloss = e.get("year_span") or ""
-            ruler = (e.get("ruler") or "").strip()
-            note = (e.get("note") or "").strip()
-            snippet = note[:80] if note else ""
-            for era in (e.get("eras") or []):
-                era = (era or "").strip()
-                if era:
-                    add("era", era, u"年号", u"二十史朔闰表", era,
-                        (gloss + u" " + snippet).strip() or ruler)
-                    n_nh += 1
-    stats["nianhao_eras"] = n_nh
+    # 年号
+    n = 0
+    for e in _load_jsonl(os.path.join(d, "nianhao_clean.jsonl")):
+        gloss = e.get("year_span") or ""
+        ruler = (e.get("ruler") or "").strip()
+        note = (e.get("note") or "").strip()
+        snippet = note[:80] if note else ""
+        for era in (e.get("eras") or []):
+            era = (era or "").strip()
+            if era:
+                add("era", era, u"年号", u"二十史朔闰表", era,
+                    (gloss + " " + snippet).strip() or ruler)
+                n += 1
+    stats["nianhao_eras"] = n
 
-    dm = os.path.join(d, "diming_clean.jsonl")
-    n_dm = 0
-    if os.path.isfile(dm):
-        for line in io.open(dm, encoding="utf-8"):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                e = json.loads(line)
-            except Exception:
-                continue
-            head = (e.get("head") or "").strip()
-            if head:
-                add("place", head, u"地名", u"中国历史地名大辞典", head, (e.get("note") or "")[:80])
-                n_dm += 1
-    stats["diming_heads"] = n_dm
+    # 地名
+    n = 0
+    for e in _load_jsonl(os.path.join(d, "diming_clean.jsonl")):
+        head = (e.get("head") or "").strip()
+        if head:
+            add("lex", head, u"地名", u"中国历史地名大辞典", head, (e.get("note") or "")[:80])
+            n += 1
+    stats["diming_heads"] = n
+
+    # 官名（CBDB，繁体→简繁双索引）
+    n = 0
+    for e in _load_jsonl(os.path.join(d, "cbdb_offices.jsonl")):
+        head = (e.get("head") or "").strip()
+        if head:
+            for surf in {head, _t2s(head)}:
+                add("lex", surf, u"官名", u"CBDB 历代官职", head,
+                    u"官职编号 %s" % e.get("oid"), e.get("oid"))
+            n += 1
+    stats["cbdb_offices"] = n
+
+    # 人名（CBDB，弹生卒朝代；简繁双索引）
+    n = 0
+    for e in _load_jsonl(os.path.join(d, "cbdb_persons.jsonl")):
+        head = (e.get("head") or "").strip()
+        if head:
+            for surf in {head, _t2s(head)}:
+                add("lex", surf, u"人名", u"CBDB 历代人物", head,
+                    (e.get("gloss") or "").strip(), e.get("pid"))
+            n += 1
+    stats["cbdb_persons"] = n
 
     for b in idx.values():
         b["era"].sort(key=lambda x: -len(x[0]))
-        b["place"].sort(key=lambda x: -len(x[0]))
+        # 等长 tie：人名 > 官名 > 地名（黄庭坚是人不是词牌地名）
+        b["lex"].sort(key=lambda x: (-len(x[0]), _TYPE_PRIO.get(x[1], 9)))
     return idx, stats
 
 
 def _index():
     with _LOCK:
         s = _sig()
-        if _STATE["index"] is None or _STATE["sig"] != s:
-            _STATE["index"], _STATE["stats"] = _build()
-            _STATE["sig"] = s
+        if _STATE["index"] is not None and _STATE["sig"] == s:
+            return _STATE["index"], _STATE["stats"]
+        # pickle 缓存：57 万词条首次全量建 10s，缓存命中 ~0.3s
+        cache = os.path.join(_toolbook_dir(), ".entity_idx_cache.pkl")
+        try:
+            if os.path.isfile(cache) and os.path.getmtime(cache) >= max(
+                    m for _, _, m in s if m):
+                with open(cache, "rb") as f:
+                    sig, idx, stats = pickle.load(f)
+                if sig == s:
+                    _STATE["index"], _STATE["stats"], _STATE["sig"] = idx, stats, s
+                    return idx, stats
+        except Exception:
+            pass
+        _STATE["index"], _STATE["stats"] = _build()
+        _STATE["sig"] = s
+        try:
+            with open(cache, "wb") as f:
+                pickle.dump((s, _STATE["index"], _STATE["stats"]), f, protocol=4)
+        except Exception:
+            pass
         return _STATE["index"], _STATE["stats"]
 
 
-def annotate(text, max_hits=200):
-    """实体标注。年号与地名同位时年号优先；"建安四年"切为 建安(年号)+四年(非实体)。"""
+def annotate(text, max_hits=300):
+    """实体标注。返回 {ok, entities:[{start,end,text,type,book,head,gloss,ref}], stats, truncated}"""
     if not text:
         return {"ok": False, "error": "empty text"}
     idx, stats = _index()
@@ -117,23 +183,20 @@ def annotate(text, max_hits=200):
         bucket = idx.get(ch)
         if bucket:
             hit = None
-            # 1) 年号同位优先（史文语境年号远多于同名地名）
-            for surface, etype, book, head, gloss in bucket["era"]:
+            # 1) 年号同位优先
+            for surface, etype, book, head, gloss, ref in bucket["era"]:
                 if text.startswith(surface, i):
-                    hit = (surface, etype, book, head, gloss)
+                    hit = (surface, etype, book, head, gloss, ref)
                     break
             if hit:
                 surface = hit[0]
-                ents.append({
-                    "start": i, "end": i + len(surface),
-                    "text": surface, "type": hit[1],
-                    "book": hit[2], "head": hit[3], "gloss": hit[4],
-                })
+                ents.append({"start": i, "end": i + len(surface),
+                             "text": surface, "type": hit[1], "book": hit[2],
+                             "head": hit[3], "gloss": hit[4], "ref": hit[5]})
                 i += len(surface)
                 continue
-            # 2) 地名最长匹配（年号后的"四年/元年"类纪年尾词不标地名，即便典中有同名条）
-            _YEARISH = u"元一二三四五六七八九十百千〇零0123456789"
-            for surface, etype, book, head, gloss in bucket["place"]:
+            # 2) lex 最长匹配（年号后纪年尾词抑制）
+            for surface, etype, book, head, gloss, ref in bucket["lex"]:
                 if text.startswith(surface, i):
                     if (surface.endswith(u"年") and len(surface) <= 5
                             and all(c in _YEARISH for c in surface[:-1])
@@ -141,15 +204,13 @@ def annotate(text, max_hits=200):
                             and ents[-1]["end"] == i):
                         hit = None
                         break
-                    hit = (surface, etype, book, head, gloss)
+                    hit = (surface, etype, book, head, gloss, ref)
                     break
             if hit:
-                surface, etype, book, head, gloss = hit
-                ents.append({
-                    "start": i, "end": i + len(surface),
-                    "text": surface, "type": etype,
-                    "book": book, "head": head, "gloss": gloss,
-                })
+                surface = hit[0]
+                ents.append({"start": i, "end": i + len(surface),
+                             "text": surface, "type": hit[1], "book": hit[2],
+                             "head": hit[3], "gloss": hit[4], "ref": hit[5]})
                 i += len(surface)
                 continue
         i += 1

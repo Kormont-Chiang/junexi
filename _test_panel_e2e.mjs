@@ -119,6 +119,13 @@ if (readyReal) {
         body: JSON.stringify({ text: '建安四年春' })
     }).then(x => x.json()));
     t('建安=年号(API)', annoApi.ok && annoApi.entities.some(e => e.text === '建安' && e.type === '年号'));
+    // API 级：CBDB 人名/官名（吾与点 NER 的本地词典实现）
+    const annoApi2 = await page.evaluate(() => fetch('/api/guji/annotate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: '王安石拜参知政事' })
+    }).then(x => x.json()));
+    t('王安石=人名(CBDB)', annoApi2.ok && annoApi2.entities.some(e => e.text === '王安石' && e.type === '人名' && e.ref));
+    t('参知政事=官名(CBDB)', annoApi2.ok && annoApi2.entities.some(e => e.text === '参知政事' && e.type === '官名'));
 } else {
     t('句读出真标点(跳过: 引擎未就绪)', true);
 }

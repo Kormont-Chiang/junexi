@@ -135,10 +135,32 @@ _HDR = re.compile(u'^([0-9]{1,4})[一二三四五六七八九十]{1,3}画')
 _HDR_TAIL = re.compile(u'^[一二三四五六七八九十]{1,3}画.*?([0-9]{1,4})\s*$')
 
 
+_FOLD_EXTRA = {u"剌": u"刺"}  # 地名典实测字形差（v4 OCR 剌/刺混淆，索引与正文互现）
+_t2s_cache = None
+
+def _load_t2s():
+    global _t2s_cache
+    if _t2s_cache is None:
+        fp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..",
+                          "data", "toolbooks", "t2s_map.json")
+        try:
+            _t2s_cache = json.load(open(fp, encoding="utf-8"))
+        except Exception:
+            _t2s_cache = {}
+    return _t2s_cache
+
+def _fold_h(s):
+    """词头匹配键：繁简折叠 + 形近折叠 + 地名典特有形差（不影响输出显示）"""
+    t2s = _load_t2s()
+    return "".join(_FOLD_EXTRA.get(t2s.get(c, c), t2s.get(c, c)) for c in s)
+
+
 def rescue_heads(pages, page_printed, entries, stats):
-    """v3 行首真词兜底：无信号词条头（"二江古代…的总称"）正常解析抓不到，
+    """v3/v4 行首真词兜底：无信号词条头（"二江古代…的总称"）正常解析抓不到，
     但索引真值知道它在哪页——行首命中即补建条目（note=该行余文）。
     单字词头须行首+后随谓语/书名号/义项号，防正文行误配。
+    v4 增：①行首剥离前导引号（’七沟村） ②折叠匹配（三不剌川≈三不刺川）
+          ③词头独占一行时接力下一行作释义（七里川）
     """
     truth = _load_truth()
     if not truth:
@@ -156,21 +178,30 @@ def rescue_heads(pages, page_printed, entries, stats):
         for h in by_printed.get(pr, []):
             if h in got or len(h) > 12:
                 continue
-            for l in lines:
-                t = l.get("text", "").lstrip(u"·•　 ")
+            fh = _fold_h(h)
+            note = None
+            for i, l in enumerate(lines):
+                t = l.get("text", "").lstrip(u"·•　 ‘’'“”\"「」『』")
                 if len(h) >= 2:
-                    ok = t.startswith(h)
+                    ok = t.startswith(h) or _fold_h(t[:len(h)]) == fh
                 else:
                     ok = bool(re.match(
                         u"^%s[①②③（(《]|[%s][指为即之古春战国本旧属在一]" % (re.escape(h), re.escape(h)), t))
                 if not ok:
                     continue
                 rest = t[len(h):].strip(u"·•　 ，,。：:")
-                if len(rest) >= 4:
-                    entries.append({"head": h, "note": rest, "page": pno, "rescued": True})
-                    got.add(h)
-                    rescued += 1
+                if len(rest) < 4 and i + 1 < len(lines):
+                    # 词头独占一行、释义接下一行（实测：七里川）：接力，门控防串条
+                    nt = lines[i + 1].get("text", "").strip()
+                    if (len(nt) >= 4 and not _HDR.match(nt) and not _HDR_TAIL.match(nt)
+                            and nt[:2] not in truth and not re.match(u"^[①②③（(《0-9A-Za-z]", nt)):
+                        rest = nt
+                note = rest.strip(u"·•　 ，,。：:）」』”’\"")
                 break
+            if note and len(note) >= 4:
+                entries.append({"head": h, "note": note, "page": pno, "rescued": True})
+                got.add(h)
+                rescued += 1
     stats["rescued"] = rescued
 
 

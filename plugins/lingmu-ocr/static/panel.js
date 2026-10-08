@@ -60,7 +60,7 @@
       d.lines.forEach(function (l) {
         var conf = (typeof l.conf === 'number') ? l.conf.toFixed(2) : '—';
         var t = (l.text || '').replace(/</g, '&lt;');
-        html += '<div class="lm-line"><span class="lm-conf">' + conf + '</span><span class="lm-text">' + t + '</span></div>';
+        html += '<div class="lm-line"><span class="lm-conf">' + conf + '</span><span class="lm-text" contenteditable="true" spellcheck="false">' + t + '</span></div>';
         full.push(l.text || '');
       });
       document.getElementById('lmLines').innerHTML = html;
@@ -156,5 +156,31 @@
     }
   });
   mo.observe(document.getElementById('lmLines'), { childList: true });
+
+  // ── 行级校对编辑：contenteditable 行 → 实时同步 lmFull；改动行记 ✎；旧句读作废 ──
+  var lmLinesEl = document.getElementById('lmLines');
+  function syncFull() {
+    var texts = [];
+    lmLinesEl.querySelectorAll('.lm-text').forEach(function (s) { texts.push(s.textContent); });
+    document.getElementById('lmFull').value = texts.join('\n');
+    if (gujiOut.value) gujiOut.value = '';   // 文本已变，旧句读结果作废
+  }
+  lmLinesEl.addEventListener('input', function (e) {
+    var row = e.target.closest ? e.target.closest('.lm-line') : null;
+    if (row && !row.classList.contains('edited')) {
+      row.classList.add('edited');
+      var badge = row.querySelector('.lm-conf');
+      if (badge) { badge.textContent = '✎'; badge.title = '已人工修改'; }
+    }
+    syncFull();
+  });
+  lmLinesEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+  });
+  lmLinesEl.addEventListener('paste', function (e) {
+    e.preventDefault();
+    var txt = (e.clipboardData || window.clipboardData).getData('text/plain');
+    document.execCommand('insertText', false, txt.replace(/\s+/g, ''));
+  });
   }
 })();

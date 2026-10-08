@@ -70,6 +70,25 @@ t('缺模型时按钮禁用', gujiDisabled === true);
 const r = await page.evaluate(() => fetch('/api/guji/status').then(x => x.json()));
 t('guji 端点 state=' + (r.state || '?'), r.ok === true && ['ready', 'no_models', 'not_installed'].includes(r.state));
 
+// ── 行级编辑：改第 1 行 → lmFull 同步 + ✎ 徽标 ──
+const editOk = await page.evaluate(() => {
+    const row = document.querySelector('#lmLines .lm-line');
+    if (!row) return 'no-row';
+    const span = row.querySelector('.lm-text');
+    span.focus();
+    document.execCommand('insertText', false, '校对测试');
+    span.dispatchEvent(new Event('input', { bubbles: true }));
+    return 'ok';
+});
+t('行编辑注入', editOk === 'ok');
+const afterEdit = await page.evaluate(() => ({
+    full: document.getElementById('lmFull').value,
+    badge: document.querySelector('#lmLines .lm-line .lm-conf').textContent,
+    edited: document.querySelector('#lmLines .lm-line').classList.contains('edited'),
+}));
+t('lmFull 同步新文本', afterEdit.full.indexOf('校对测试') !== -1);
+t('✎ 徽标', afterEdit.badge === '✎' && afterEdit.edited);
+
 await browser.close();
 console.log(`RESULT ${pass}/${pass + fail}`);
 process.exit(fail ? 1 : 0);

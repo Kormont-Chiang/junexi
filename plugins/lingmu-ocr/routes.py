@@ -27,6 +27,10 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
     .lm-line:nth-child(odd){background:rgba(0,0,0,.025)}
     .lm-conf{min-width:44px;text-align:right;font-size:11px;color:var(--muted,#8a8577)}
     .lm-text{flex:1}
+    .lm-text[contenteditable]{cursor:text;outline:none;border-radius:3px;padding:0 3px}
+    .lm-text[contenteditable]:hover{background:rgba(0,0,0,.05)}
+    .lm-text[contenteditable]:focus{background:rgba(74,122,104,.12);box-shadow:0 0 0 1px rgba(74,122,104,.45)}
+    .lm-line.edited .lm-conf{color:#a8842c;font-weight:700}
     .lm-copy{background:none;border:1px solid var(--border,#d8d4c8);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer}
     .lm-full{width:100%;margin-top:10px;font-size:12px;min-height:90px}
   </style>
@@ -41,7 +45,7 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
   </div>
   <div class="lm-card" id="lmResult" style="display:none">
     <div class="lm-result-head">
-      <div><span class="lm-badge" id="lmProvider"></span>　<span id="lmMeta" style="font-size:12px;color:var(--muted,#8a8577)"></span></div>
+      <div><span class="lm-badge" id="lmProvider"></span>　<span id="lmMeta" style="font-size:12px;color:var(--muted,#8a8577)"></span><span style="font-size:11px;color:var(--muted,#8a8577)">（行内文字可直接点击校对，改动自动同步全文）</span></div>
       <button class="lm-copy" id="lmCopy">复制全文</button>
     </div>
     <div class="lm-lines" id="lmLines"></div>

@@ -81,6 +81,20 @@ CRF 断句+标点，全程本地。两级数据分离：
 端点：`/api/guji/status`、`/api/guji/install`（POST 触发后台下载）、`/api/guji/punctuate`（POST {text}）。
 简体外最佳；繁体输入经 OpenCC 转简标点后再转回。识别质量对标见 [docs/灵眸改进调研-吾与点.md](docs/灵眸改进调研-吾与点.md)。
 
+### 实体标注（词典锚定，自家工具书=实体表）
+
+句读结果一键「标注实体」：文本中的年号标金、地名标绿，点词条弹自家工具书考证片段
+（哪本书、原文摘要）。思路——对工具书任务，词典最长匹配比神经网络 NER 更准、零模型、
+全本地；这是平台型产品没有的一层。
+
+- 端点：`/api/guji/annotate`（POST {text}），索引按数据文件签名热更新（投放新词库无需重启）
+- 消歧规则：年号与地名同位时**年号优先**（史文语境）；年号后的纪年尾词不吞为地名
+  （「建安四年」→ 建安[年号] + 四年不标）
+- 数据源：`data/toolbooks/nianhao_clean.jsonl`（二十史朔闰表，3715 年号别名）、
+  `data/toolbooks/diming_clean.jsonl`（中国历史地名大辞典 OCR 管线产出，
+  `tooling/diming/` + `_ocr_finish.py` 一键解析清洗入库）
+- 性能：61k 词首载 0.15s，热标注 ~2ms
+
 ## 数据依赖（不在仓库内）
 
 - **CBDB** 数据集：从 [CBDB 官网](https://projects.iq.harvard.edu/cbdb/) 下载 Access 版，

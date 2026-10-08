@@ -53,6 +53,23 @@ t('识别含关键词样例', headHit);
 console.log('--- 识别前 80 字 ---');
 console.log(full.slice(0, 80));
 
+// ── 句读卡（甲言）──
+const gujiCardVisible = await page.evaluate(() => {
+    const g = document.getElementById('lmGuji');
+    return g && getComputedStyle(g).display !== 'none';
+});
+t('句读卡显示', gujiCardVisible);
+await page.waitForFunction(
+    () => !/检查中/.test(document.getElementById('lmGujiState').textContent),
+    { timeout: 15000 }
+).catch(() => {});
+const gujiState = await page.$eval('#lmGujiState', el => el.textContent).catch(() => '');
+t('状态徽标: ' + gujiState, /就绪|缺模型|未安装|异常|失败/.test(gujiState));
+const gujiDisabled = await page.$eval('#lmGujiBtn', el => el.disabled).catch(() => null);
+t('缺模型时按钮禁用', gujiDisabled === true);
+const r = await page.evaluate(() => fetch('/api/guji/status').then(x => x.json()));
+t('guji 端点 state=' + (r.state || '?'), r.ok === true && ['ready', 'no_models', 'not_installed'].includes(r.state));
+
 await browser.close();
 console.log(`RESULT ${pass}/${pass + fail}`);
 process.exit(fail ? 1 : 0);

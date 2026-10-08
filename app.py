@@ -949,6 +949,35 @@ def ocr_upload():
     return jsonify({"ok": True, "provider": provider, "lines": lines})
 
 
+# ── 古语文后处理：jiayan 句读/标点（引擎自装 pylib，模型用户自备）──────────
+@app.route("/api/guji/status", methods=["GET"])
+def guji_status():
+    import guji_punct
+    return jsonify(guji_punct.status())
+
+
+@app.route("/api/guji/install", methods=["POST"])
+def guji_install():
+    import guji_punct
+    started = guji_punct.install_engine()
+    return jsonify({"ok": True, "started": started})
+
+
+@app.route("/api/guji/punctuate", methods=["POST"])
+def guji_punctuate():
+    import guji_punct
+    body = request.get_json(force=True, silent=True) or {}
+    text = (body.get("text") or "").strip()
+    if not text:
+        return jsonify({"ok": False, "error": "empty text"}), 400
+    try:
+        out, trad = guji_punct.punctuate_text(text)
+        return jsonify({"ok": True, "punctuated": out, "traditional": trad})
+    except RuntimeError as e:
+        st = guji_punct.status()
+        return jsonify({"ok": False, "error": str(e)[:200], "state": st.get("state")}), 503
+
+
 def _scan_plugin_manifests():
     """扫描全部插件目录(用户目录优先,去重)生成清单(含未加载/已停用的), 带目录来源。"""
     import glob as _glob

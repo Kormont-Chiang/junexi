@@ -47,6 +47,17 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
     <div class="lm-lines" id="lmLines"></div>
     <textarea class="lm-full" id="lmFull" readonly></textarea>
   </div>
+  <div class="lm-card" id="lmGuji" style="display:none">
+    <div class="lm-result-head">
+      <span>📜 句读标点（甲言 CRF 本地引擎，简体输入最佳；繁体自动转简标点后再转回）</span>
+      <span><span class="lm-badge" id="lmGujiState">检查中…</span></span>
+    </div>
+    <div class="lm-run" style="text-align:left">
+      <button class="lm-btn" id="lmGujiBtn" disabled>句读标点</button>
+      <button class="lm-btn" id="lmGujiInstall" style="display:none;background:#8a6d3b">安装引擎（约1MB）</button>
+    </div>
+    <textarea class="lm-full" id="lmGujiOut" readonly style="margin-top:10px;min-height:140px"></textarea>
+  </div>
 </div>
 <script src="/plugin/lingmu-ocr/static/panel.js"></script>
 <script>if (window.lingmuPanelInit) window.lingmuPanelInit();</script>

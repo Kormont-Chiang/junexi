@@ -80,5 +80,81 @@
     var self = this;
     setTimeout(function () { self.textContent = '复制全文'; }, 1200);
   });
+
+  // ── 句读标点（甲言）：引擎状态轮询 + 一键安装 + 标点 ──
+  var gujiCard = document.getElementById('lmGuji');
+  var gujiBtn = document.getElementById('lmGujiBtn');
+  var gujiInstall = document.getElementById('lmGujiInstall');
+  var gujiState = document.getElementById('lmGujiState');
+  var gujiOut = document.getElementById('lmGujiOut');
+  var hasResult = false;
+
+  function refreshGujiStatus() {
+    fetch('/api/guji/status').then(function (r) { return r.json(); }).then(function (d) {
+      if (!gujiCard) return;
+      var st = d.state;
+      if (st === 'ready') {
+        gujiState.textContent = '引擎就绪';
+        gujiBtn.disabled = !hasResult;
+        gujiInstall.style.display = 'none';
+      } else if (st === 'no_models') {
+        gujiState.textContent = '引擎就绪 · 缺模型';
+        gujiBtn.disabled = true;
+        gujiInstall.style.display = 'none';
+      } else if (d.install && d.install.running) {
+        gujiState.textContent = '安装中：' + (d.install.step || '…');
+        gujiBtn.disabled = true;
+        gujiInstall.style.display = 'none';
+        setTimeout(refreshGujiStatus, 1500);
+      } else if (st === 'not_installed') {
+        gujiState.textContent = '引擎未安装';
+        gujiBtn.disabled = true;
+        gujiInstall.style.display = '';
+      } else {
+        gujiState.textContent = '状态异常：' + (d.error || '').slice(0, 60);
+        gujiBtn.disabled = true;
+        gujiInstall.style.display = '';
+      }
+    }).catch(function () { gujiState.textContent = '状态查询失败'; });
+  }
+  refreshGujiStatus();
+
+  gujiInstall.addEventListener('click', function () {
+    this.style.display = 'none';
+    fetch('/api/guji/install', { method: 'POST' }).then(function () {
+      gujiState.textContent = '安装中…';
+      setTimeout(refreshGujiStatus, 1200);
+    });
+  });
+
+  gujiBtn.addEventListener('click', function () {
+    var text = document.getElementById('lmFull').value;
+    if (!text) return;
+    gujiBtn.disabled = true;
+    gujiState.textContent = '句读中…';
+    fetch('/api/guji/punctuate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      gujiBtn.disabled = false;
+      if (!d.ok) { gujiState.textContent = '失败：' + (d.error || '').slice(0, 60); refreshGujiStatus(); return; }
+      gujiState.textContent = d.traditional ? '完成（繁体已转回）' : '完成';
+      gujiOut.value = d.punctuated;
+    }).catch(function () {
+      gujiBtn.disabled = false;
+      gujiState.textContent = '请求失败';
+    });
+  });
+
+  // OCR 结果落位后：亮出句读卡 + 解锁按钮
+  var mo = new MutationObserver(function () {
+    if (document.getElementById('lmLines').children.length > 0) {
+      hasResult = true;
+      gujiCard.style.display = 'block';
+      if (gujiBtn.disabled) refreshGujiStatus();
+    }
+  });
+  mo.observe(document.getElementById('lmLines'), { childList: true });
   }
 })();

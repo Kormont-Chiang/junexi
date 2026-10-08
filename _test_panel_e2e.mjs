@@ -66,7 +66,10 @@ await page.waitForFunction(
 const gujiState = await page.$eval('#lmGujiState', el => el.textContent).catch(() => '');
 t('状态徽标: ' + gujiState, /就绪|缺模型|未安装|异常|失败/.test(gujiState));
 const gujiDisabled = await page.$eval('#lmGujiBtn', el => el.disabled).catch(() => null);
-t('缺模型时按钮禁用', gujiDisabled === true);
+const gujiStateNow = await page.$eval('#lmGujiState', el => el.textContent).catch(() => '');
+// 真就绪 → 已出结果 → 可点；缺模型/未安装/异常 → 禁用
+const readyReal = gujiStateNow === '引擎就绪';
+t('按钮状态与引擎态一致(' + gujiStateNow + ')', readyReal ? gujiDisabled === false : gujiDisabled === true);
 const r = await page.evaluate(() => fetch('/api/guji/status').then(x => x.json()));
 t('guji 端点 state=' + (r.state || '?'), r.ok === true && ['ready', 'no_models', 'not_installed'].includes(r.state));
 
@@ -88,6 +91,22 @@ const afterEdit = await page.evaluate(() => ({
 }));
 t('lmFull 同步新文本', afterEdit.full.indexOf('校对测试') !== -1);
 t('✎ 徽标', afterEdit.badge === '✎' && afterEdit.edited);
+
+// ── 真模型句读：点击按钮 → 出标点文本 ──
+if (readyReal) {
+    await page.click('#lmGujiBtn');
+    await page.waitForFunction(() => {
+        const v = document.getElementById('lmGujiOut').value;
+        return v && /[，。！？；、]/.test(v);
+    }, { timeout: 60000 }).catch(() => {});
+    const gujiText = await page.$eval('#lmGujiOut', el => el.value).catch(() => '');
+    const gujiState2 = await page.$eval('#lmGujiState', el => el.textContent).catch(() => '');
+    t('句读出真标点(' + gujiState2 + ')', /[，。！？；、]/.test(gujiText));
+    console.log('--- 句读输出前 60 字 ---');
+    console.log(gujiText.slice(0, 60));
+} else {
+    t('句读出真标点(跳过: 引擎未就绪)', true);
+}
 
 await browser.close();
 console.log(`RESULT ${pass}/${pass + fail}`);

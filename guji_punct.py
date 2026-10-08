@@ -177,13 +177,28 @@ def _try_load():
         _punctuator = pp
         _state["available"] = True
         _state["error"] = None
+        _state["sig"] = _env_signature()
     except Exception as e:
         _state["error"] = "%s: %s" % (type(e).__name__, str(e)[:200])
+
+
+def _env_signature():
+    """环境签名：模型在位 + pylib 引擎在位。变了就重检（用户运行中放入模型可即时生效）。"""
+    mdir = models_dir()
+    pylib_ok = os.path.isdir(os.path.join(pylib_dir(), "jiayan"))
+    sig = (os.path.isfile(os.path.join(mdir, "cut_model")),
+           os.path.isfile(os.path.join(mdir, "punc_model")),
+           pylib_ok)
+    return sig
 
 
 def status():
     with _lock:
         _ensure_pylib_on_path()
+        if _state["checked"] and _state.get("sig") != _env_signature():
+            _state.update(checked=False, available=False, error=None)
+            global _punctuator
+            _punctuator = None
         _try_load()
         st = "ready" if _state["available"] else ("no_models" if _state["error"] and "models missing" in _state["error"] else ("not_installed" if _state["error"] and "not installed" in _state["error"] else "error"))
         return {

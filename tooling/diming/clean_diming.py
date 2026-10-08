@@ -19,7 +19,7 @@ from collections import Counter
 sys.stdout.reconfigure(encoding="utf-8")
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.environ.get(u"DIMING_DATA", os.path.dirname(os.path.abspath(__file__)))
-REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
+REPO = os.environ.get("DIMING_REPO") or os.path.abspath(os.path.join(HERE, "..", ".."))
 
 # ── 高置信修正（仅词头；逐条人工核对后收录）──
 CORRECTIONS = {

@@ -42,11 +42,12 @@ def _build():
     stats = {}
     d = _toolbook_dir()
 
-    def add(surface, etype, book, head, gloss):
+    def add(bucket, surface, etype, book, head, gloss):
         surface = (surface or "").strip()
         if len(surface) < 2:
             return
-        idx.setdefault(surface[0], []).append((surface, etype, book, head, gloss))
+        b = idx.setdefault(surface[0], {"era": [], "place": []})
+        b[bucket].append((surface, etype, book, head, gloss))
 
     nh = os.path.join(d, "nianhao_clean.jsonl")
     n_nh = 0
@@ -66,7 +67,7 @@ def _build():
             for era in (e.get("eras") or []):
                 era = (era or "").strip()
                 if era:
-                    add(era, u"年号", u"二十史朔闰表", era,
+                    add("era", era, u"年号", u"二十史朔闰表", era,
                         (gloss + u" " + snippet).strip() or ruler)
                     n_nh += 1
     stats["nianhao_eras"] = n_nh
@@ -84,12 +85,13 @@ def _build():
                 continue
             head = (e.get("head") or "").strip()
             if head:
-                add(head, u"地名", u"中国历史地名大辞典", head, (e.get("note") or "")[:80])
+                add("place", head, u"地名", u"中国历史地名大辞典", head, (e.get("note") or "")[:80])
                 n_dm += 1
     stats["diming_heads"] = n_dm
 
-    for k in idx:
-        idx[k].sort(key=lambda x: -len(x[0]))
+    for b in idx.values():
+        b["era"].sort(key=lambda x: -len(x[0]))
+        b["place"].sort(key=lambda x: -len(x[0]))
     return idx, stats
 
 
@@ -103,7 +105,7 @@ def _index():
 
 
 def annotate(text, max_hits=200):
-    """最长匹配实体标注。返回 {ok, entities:[{start,end,text,type,book,head,gloss}], stats}"""
+    """实体标注。年号与地名同位时年号优先；"建安四年"切为 建安(年号)+四年(非实体)。"""
     if not text:
         return {"ok": False, "error": "empty text"}
     idx, stats = _index()
@@ -115,8 +117,30 @@ def annotate(text, max_hits=200):
         bucket = idx.get(ch)
         if bucket:
             hit = None
-            for surface, etype, book, head, gloss in bucket:
+            # 1) 年号同位优先（史文语境年号远多于同名地名）
+            for surface, etype, book, head, gloss in bucket["era"]:
                 if text.startswith(surface, i):
+                    hit = (surface, etype, book, head, gloss)
+                    break
+            if hit:
+                surface = hit[0]
+                ents.append({
+                    "start": i, "end": i + len(surface),
+                    "text": surface, "type": hit[1],
+                    "book": hit[2], "head": hit[3], "gloss": hit[4],
+                })
+                i += len(surface)
+                continue
+            # 2) 地名最长匹配（年号后的"四年/元年"类纪年尾词不标地名，即便典中有同名条）
+            _YEARISH = u"元一二三四五六七八九十百千〇零0123456789"
+            for surface, etype, book, head, gloss in bucket["place"]:
+                if text.startswith(surface, i):
+                    if (surface.endswith(u"年") and len(surface) <= 5
+                            and all(c in _YEARISH for c in surface[:-1])
+                            and ents and ents[-1]["type"] == u"年号"
+                            and ents[-1]["end"] == i):
+                        hit = None
+                        break
                     hit = (surface, etype, book, head, gloss)
                     break
             if hit:

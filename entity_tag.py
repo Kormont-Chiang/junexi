@@ -226,10 +226,19 @@ def _annotate_core(text, max_hits=300):
     n = len(text)
     while i < n and len(ents) < max_hits:
         ch = text[i]
+        # 0) 书名号《》内一律标「书名」——书名优先于一切词典（《史记》≠ 人名史記）
+        if ch == u"《":
+            j = text.find(u"》", i + 1)
+            if j > i + 1 and j - i <= 24:
+                ents.append({"start": i, "end": j + 1,
+                             "text": text[i:j + 1], "type": u"书名",
+                             "book": u"《》", "head": text[i + 1:j],
+                             "gloss": u"", "ref": None})
+                i = j + 1
+                continue
         bucket = idx.get(ch)
         if bucket:
             hit = None
-            # 1) 年号同位优先
             for surface, etype, book, head, gloss, ref in bucket["era"]:
                 if text.startswith(surface, i):
                     hit = (surface, etype, book, head, gloss, ref)

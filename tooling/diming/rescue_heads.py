@@ -41,11 +41,17 @@ print(u"known stems:", len(known))
 
 src = os.path.join(DATA, "diming_clean.jsonl")
 bak = src + ".bak"
-# 从 .bak 重跑（上次误杀版结果作废）
-if os.path.isfile(bak):
-    entries = [json.loads(l) for l in io.open(bak, encoding="utf-8") if l.strip()]
-    print(u"from backup:", len(entries))
-else:
+# 原始版在 tooling/diming/_archive/（68,663 条）；工作区 .bak 若存在但行数不符则忽略
+arch = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_archive", "diming_clean_68663.bak")
+entries = None
+for cand in (arch, bak if os.path.isfile(bak) else None):
+    if cand and os.path.isfile(cand):
+        tmp = [json.loads(l) for l in io.open(cand, encoding="utf-8") if l.strip()]
+        if len(tmp) > 67000:
+            entries = tmp
+            print(u"source:", cand, len(tmp))
+            break
+if entries is None:
     entries = [json.loads(l) for l in io.open(src, encoding="utf-8") if l.strip()]
 print(u"in:", len(entries))
 
@@ -59,23 +65,24 @@ for e in entries:
         n_garbage += 1
         continue
     # 2) 粘连修复：H = P + R，P 已知，R 以注文起始词开头
-    # 单字后缀 R ∈ {府,州,县,郡,军,路} 要求 len(P)>=3——保护 江宁府/开封府 这类全称；
-    # R=市/镇/堡/站/营/村/里 P>=2 即可（后缀基本非全称）；多字 R 一律安全
+    # 整词本身已知（如 江寧府∈cbdb_places）→ 是合法全称，保护；
+    # 否则单字后缀 R ∈ {府,州,县,郡,军,路} 的 2 字词干也可切（洛阳市=洛阳+市）
     GUARD3 = u"府州郡县军路"
     fixed = False
     if 3 <= len(h) <= 10:
-        for p in known:
-            if h.startswith(p):
-                r = h[len(p):]
-                if not (1 <= len(r) <= 6) or not r.startswith(NOTE_STARTERS):
-                    continue
-                if len(r) == 1 and r in GUARD3 and len(p) < 3:
-                    continue
-                note = (r + note) if note else r
-                h = p
-                n_split += 1
-                fixed = True
-                break
+        if h not in known:
+            for p in known:
+                if h.startswith(p):
+                    r = h[len(p):]
+                    if not (1 <= len(r) <= 6) or not r.startswith(NOTE_STARTERS):
+                        continue
+                    if len(r) == 1 and r in GUARD3 and len(p) < 3:
+                        continue
+                    note = (r + note) if note else r
+                    h = p
+                    n_split += 1
+                    fixed = True
+                    break
     if len(h) < 2 or len(note) < 2 or h in seen:
         n_drop += 1
         continue

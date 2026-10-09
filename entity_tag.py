@@ -181,7 +181,43 @@ def _index():
 
 
 def annotate(text, max_hits=300):
-    """实体标注。返回 {ok, entities:[{start,end,text,type,book,head,gloss,ref}], stats, truncated}"""
+    """实体标注入口。繁体文本自动走简体回退通道（位置逐字映射回原文）。"""
+    s, pos_map = _t2s_mapped(text)
+    result = _annotate_core(s, max_hits=max_hits)
+    if pos_map is not None:
+        for e in result["entities"]:
+            e["start"] = pos_map[e["start"]]
+            e["end"] = pos_map[e["end"] - 1] + 1
+            e["text"] = text[e["start"]:e["end"]]
+            e["surface"] = e["text"]
+        result["traditional_pass"] = True
+    return result
+
+
+def _looks_traditional(text):
+    sample = text[:500]
+    if not sample:
+        return False
+    hits = sum(1 for c in sample if _t2s(c) != c)
+    return hits / float(len(sample)) > 0.12
+
+
+def _t2s_mapped(text):
+    """逐字转简体并记录位置映射；任一字转出不为一字则放弃回退（返回 None 映射）。"""
+    if not _looks_traditional(text):
+        return text, None
+    out = []
+    pos_map = []
+    for i, c in enumerate(text):
+        c2 = _t2s(c)
+        if len(c2) != 1:
+            return text, None
+        out.append(c2)
+        pos_map.append(i)
+    return u"".join(out), pos_map
+
+
+def _annotate_core(text, max_hits=300):
     if not text:
         return {"ok": False, "error": "empty text"}
     idx, stats = _index()

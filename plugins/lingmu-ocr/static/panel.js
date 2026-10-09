@@ -175,6 +175,8 @@
     var html = '<b>[' + ent.type + '] ' + esc(ent.head) + '</b>　<span style="color:var(--muted,#8a8577)">' + esc(ent.book) + '</span><br>' + gloss;
     if (ent.type === '人名' && ent.ref) {
       html += '<div class="lm-cbdb" id="lmCbdb' + ent.ref + '" style="margin-top:4px;color:var(--muted,#8a8577)">查 CBDB 履历中…</div>';
+    } else if (ent.type === '官名' || ent.type === '地名') {
+      html += '<div class="lm-cbdb" id="lmLink' + ent.start + '" style="margin-top:4px;color:var(--muted,#8a8577)">查 CBDB 关联人物中…</div>';
     }
     popEl.innerHTML = html;
     document.body.appendChild(popEl);
@@ -198,6 +200,54 @@
         var box = document.getElementById('lmCbdb' + ent.ref);
         if (box) box.remove();
       });
+    } else if (ent.type === '官名' || ent.type === '地名') {
+      var boxId = 'lmLink' + ent.start;
+      var label = ent.type === '官名' ? '职官' : '地名';
+      var personsUrl = null;
+      function loadPersons() {
+        if (!personsUrl) return;
+        fetch(personsUrl).then(function (r) { return r.json(); }).then(function (list) {
+          var box = document.getElementById(boxId);
+          if (!box) return;
+          list = Array.isArray(list) ? list : (list.persons || []);
+          if (!list.length) { box.textContent = 'CBDB 暂无关联人物'; return; }
+          var top = list.slice(0, 4).map(function (p) {
+            return esc(p.name_chn || p.name || '') + ' <span style="opacity:.75">' +
+              esc(p.dynasty || '') + (p.birthyear ? ' ' + p.birthyear + '-' + (p.deathyear || '?') : '') + '</span>';
+          });
+          box.innerHTML = '<span style="color:var(--accent,#4a7a68)">CBDB ' + label + '关联 ' + list.length + ' 人</span>：' + top.join('　');
+        }).catch(function () {
+          var box = document.getElementById(boxId);
+          if (box) box.remove();
+        });
+      }
+      if (ent.type === '地名' && ent.ref) {
+        personsUrl = '/api/cbdb/places/' + ent.ref + '/persons';
+        loadPersons();
+      } else {
+        var searchUrl = ent.type === '官名'
+          ? '/api/cbdb/offices/search?q=' + encodeURIComponent(ent.head)
+          : '/api/cbdb/places/search?q=' + encodeURIComponent(ent.head);
+        fetch(searchUrl).then(function (r) { return r.json(); }).then(function (arr) {
+          var box = document.getElementById(boxId);
+          if (!box) return;
+          arr = Array.isArray(arr) ? arr : [];
+          var hit = null;
+          for (var i = 0; i < arr.length; i++) {
+            var nm = arr[i].office_chn || arr[i].name_chn || '';
+            if (nm === ent.head || nm === ent.text) { hit = arr[i]; break; }
+          }
+          hit = hit || arr[0];
+          if (!hit) { box.textContent = 'CBDB 无此' + label + '记录'; return; }
+          personsUrl = ent.type === '官名'
+            ? '/api/cbdb/offices/' + hit.office_id + '/persons'
+            : '/api/cbdb/places/' + hit.addr_id + '/persons';
+          loadPersons();
+        }).catch(function () {
+          var box = document.getElementById(boxId);
+          if (box) box.remove();
+        });
+      }
     }
     var w = popEl.offsetWidth, h = popEl.offsetHeight;
     popEl.style.left = Math.min(x, window.innerWidth - w - 12) + 'px';

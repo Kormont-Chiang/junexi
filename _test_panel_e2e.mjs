@@ -155,6 +155,34 @@ if (readyReal) {
             { timeout: 240000 }).then(() => true).catch(() => false);
         t('popover联动CBDB履历', okCbdb);
     }
+    // 官名 popover → 职官关联人物
+    await page.evaluate(() => { document.body.click(); });
+    const officeSpan = await page.evaluateHandle(() => {
+        const ss = document.querySelectorAll('#lmAnno .lm-ent');
+        for (const s of ss) { if (s.textContent === '参知政事') return s; }
+        return null;
+    });
+    if (officeSpan) {
+        await page.evaluate(el => el.click(), officeSpan);
+        const okOffice = await page.waitForFunction(
+            () => document.querySelector('.lm-cbdb') && /CBDB 职官关联 \d+ 人/.test(document.querySelector('.lm-cbdb').textContent),
+            { timeout: 240000 }).then(() => true).catch(() => false);
+        t('官名popover关联人物', okOffice);
+    }
+    // 地名 popover → 地名关联人物
+    await page.evaluate(() => { document.body.click(); });
+    const placeSpan = await page.evaluateHandle(() => {
+        const ss = document.querySelectorAll('#lmAnno .lm-ent');
+        for (const s of ss) { if (s.textContent === '洛阳') return s; }
+        return null;
+    });
+    if (placeSpan) {
+        await page.evaluate(el => el.click(), placeSpan);
+        const okPlace = await page.waitForFunction(
+            () => { const b = document.querySelector('.lm-cbdb'); return b && (/CBDB 地名关联 \d+ 人/.test(b.textContent) || b.textContent.includes('无此') || b.textContent.includes('暂无')); },
+            { timeout: 240000 }).then(() => true).catch(() => false);
+        t('地名popover关联人物', okPlace);
+    }
 } else {
     t('句读出真标点(跳过: 引擎未就绪)', true);
 }

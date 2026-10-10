@@ -5,6 +5,7 @@ Flask + DeepSeek + CBDB + Obsidian Local REST API
 """
 
 import os
+import io
 import re
 import sys
 import json
@@ -276,8 +277,8 @@ def _lib_proxy_whitelist():
             u = m.group(1) or m.group(2)
             if u:
                 hosts.add(urlparse(u).netloc.lower())
-    except Exception:
-        pass
+    except Exception as _wl_err:
+        print("[lib-proxy] whitelist extraction failed:", repr(_wl_err))
     if not hosts:  # 兜底：模板读不到时给核心文史站点
         hosts = {"ctext.org", "www.kanripo.org", "cbdb.fas.harvard.edu", "zh.wikisource.org"}
     _LIB_PROXY_WHITELIST = hosts

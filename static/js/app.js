@@ -5590,6 +5590,38 @@ if (typeof loadAiModels === 'function') loadAiModels();
 })();
 
 
+// ── 全局 Enter 检索：输入框/主查询文本域回车=点同面板检索按钮（输入法组词中不触发；Shift+Enter 换行）──
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+  var el = e.target;
+  if (!el) return;
+  var isInput = el.tagName === 'INPUT' && /^(text|search)?$/i.test(el.getAttribute('type') || 'text');
+  var isMainTextarea = el.tagName === 'TEXTAREA';  // 只有找到同面板检索按钮才触发，笔记类文本域天然安全
+  if (!isInput && !isMainTextarea) return;
+  // 已有自己的 Enter 绑定的输入框不代劳（内联属性或已登记 id）
+  if ((el.getAttribute('onkeydown') || '').indexOf('Enter') > -1) return;
+  if (el.id === 'globalSearch' || el.id === 'fedQuery') return;
+  // 就近找"检索/查询"按钮：向上最多 4 层，防止跨面板误触
+  var node = el, btn = null;
+  for (var i = 0; i < 4 && node && !btn; i++) {
+    node = node.parentElement;
+    if (!node) break;
+    var bs = node.querySelectorAll('button');
+    for (var j = 0; j < bs.length; j++) {
+      var b = bs[j];
+      if (b.disabled) continue;
+      var txt = (b.textContent || '').trim();
+      var oc = b.getAttribute('onclick') || '';
+      if (/检索|搜索|查询/.test(txt) || /search|query/i.test(oc)) { btn = b; break; }
+    }
+  }
+  if (btn) {
+    e.preventDefault();
+    if (el.tagName === 'TEXTAREA' && e.shiftKey) return; // Shift+Enter 换行
+    btn.click();
+  }
+});
+
 // ── 史料库内嵌查看器：平台内打开 + 笔记空间（R37）──
 function initLibViewer() {
   var lv = document.getElementById('libViewer');

@@ -324,6 +324,13 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
   });
 
+  // ── 示例载入：一键填入真古籍片段，走全链验收零成本 ──
+  var SAMPLE_TEXT = '建安元年秋七月，天子还洛阳。太祖乃诣洛阳，卫京都。二年春，袁绍与公孙瓒战于界桥。三年夏四月，司徒王允与吕布共杀卓。卓将李傕、郭汜等攻长安，城陷，杀允。太祖迎天子都许。';
+  document.getElementById('lmGujiSample').addEventListener('click', function () {
+    document.getElementById('lmFull').value = SAMPLE_TEXT;
+    rebuildRowsFromFull();
+  });
+
   // ── 校对（词典反向校验）：未收录串 + 单错建议，可采用 ──
   var proofBtn = document.getElementById('lmProofBtn');
   var proofDiv = document.getElementById('lmProof');

@@ -53,6 +53,18 @@ t('识别含关键词样例', headHit);
 console.log('--- 识别前 80 字 ---');
 console.log(full.slice(0, 80));
 
+// 示例载入按钮：点击后行区填入建安片段（验收零成本入口）
+await page.evaluate(() => { document.getElementById('lmGujiSample').click(); });
+const sampleOk = await page.waitForFunction(
+    () => document.getElementById('lmFull').value.includes('建安元年'),
+    { timeout: 10000 }).then(() => true).catch(() => false);
+t('示例载入填入全文', sampleOk);
+const sampleLine = await page.evaluate(() => {
+    const s = document.querySelector('#lmLines .lm-text');
+    return s ? s.textContent : '';
+});
+t('示例载入重建行', sampleLine.includes('建安元年'));
+
 // ── 句读卡（甲言）──
 const gujiCardVisible = await page.evaluate(() => {
     const g = document.getElementById('lmGuji');

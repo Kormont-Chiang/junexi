@@ -74,6 +74,7 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
       <span><span class="lm-badge" id="lmGujiState">检查中…</span></span>
     </div>
     <div class="lm-run" style="text-align:left">
+      <button class="lm-btn" id="lmGujiSample" style="background:#5a7a5a">载入示例（建安片段）</button>
       <button class="lm-btn" id="lmGujiBtn" disabled>句读标点</button>
       <button class="lm-btn" id="lmGujiInstall" style="display:none;background:#8a6d3b">安装引擎（约1MB）</button>
       <button class="lm-btn" id="lmGujiAnno" style="display:none;background:#4a5d8a">标注实体</button>

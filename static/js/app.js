@@ -5588,3 +5588,158 @@ window._logActivity = function (type, label) {
     if (typeof loadPluginNav === 'function') loadPluginNav();
 if (typeof loadAiModels === 'function') loadAiModels();
 })();
+
+
+// ── 史料库内嵌查看器：平台内打开 + 笔记空间（R37）──
+function initLibViewer() {
+  var lv = document.getElementById('libViewer');
+  if (!lv) return;
+  var lvTitle = document.getElementById('lvTitle');
+  var lvUrl = document.getElementById('lvUrl');
+  var lvFrame = document.getElementById('lvFrame');
+  var lvFallbackLink = document.getElementById('lvFallbackLink');
+  var lvnEditor = document.getElementById('lvnEditor');
+  var lvnList = document.getElementById('lvnList');
+  var lvnCount = document.getElementById('lvnCount');
+  var lvnState = document.getElementById('lvnState');
+  var curUrl = '', curName = '';
+  var LS_KEY = 'junxi-libnotes';
+
+  function loadAll() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function saveAll(d) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(d)); return true; } catch (e) { return false; }
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function fmtTs(ts) {
+    var d = new Date(ts);
+    function z(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+  }
+  function notesOf(url) {
+    var all = loadAll();
+    return all[url] || [];
+  }
+  function renderNotes() {
+    var arr = notesOf(curUrl);
+    lvnCount.textContent = arr.length;
+    if (!arr.length) {
+      lvnList.innerHTML = '<div style="font-size:12px;color:var(--muted,#8a8577);padding:8px 2px">还没有笔记。写点什么，点「存为笔记」。</div>';
+      return;
+    }
+    lvnList.innerHTML = arr.map(function (n, i) {
+      return '<div class="lvn-item"><div class="lvn-time">' + fmtTs(n.ts) +
+        '</div><div class="lvn-text">' + esc(n.text) +
+        '</div><div class="lvn-ops"><button data-del="' + i + '">删除</button>' +
+        '<button data-obs="' + i + '">存入 Obsidian</button></div></div>';
+    }).join('');
+  }
+  function setState(msg) {
+    lvnState.textContent = msg || '';
+    if (msg) setTimeout(function () { if (lvnState.textContent === msg) lvnState.textContent = ''; }, 3000);
+  }
+  function addNote() {
+    var text = (lvnEditor.value || '').trim();
+    if (!text) return;
+    var all = loadAll();
+    var arr = all[curUrl] || [];
+    arr.unshift({ ts: Date.now(), text: text });
+    all[curUrl] = arr;
+    if (saveAll(all)) {
+      lvnEditor.value = '';
+      renderNotes();
+      setState('✓ 已存本机');
+    } else setState('保存失败：本机存储不可用');
+  }
+  function delNote(i) {
+    var all = loadAll();
+    var arr = all[curUrl] || [];
+    arr.splice(i, 1);
+    all[curUrl] = arr;
+    saveAll(all);
+    renderNotes();
+  }
+  function slug(s) {
+    return String(s || '资源').replace(/[\/:*?"<>|]/g, '').replace(/\s+/g, '').slice(0, 24) || '资源';
+  }
+  function noteToObsidian(n, quietState) {
+    var fname = '史料库笔记/' + slug(curName) + '-' + fmtTs(n.ts).replace(/[-: ]/g, '') + '.md';
+    var md = '# ' + curName + ' · 笔记\n\n' + n.text +
+      '\n\n---\n*来源：' + curUrl + '*\n*记入：六月息史料库查看器*\n';
+    return fetch('/api/obsidian/note/' + encodeURIComponent(fname), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: md })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && !d.error) { if (quietState !== false) setState('✓ 已入 Obsidian'); return true; }
+      if (quietState !== false) setState('Obsidian：' + (d && d.error ? String(d.error).slice(0, 40) : '失败'));
+      return false;
+    }).catch(function () {
+      if (quietState !== false) setState('Obsidian：网络错误');
+      return false;
+    });
+  }
+  function obsAll() {
+    var arr = notesOf(curUrl);
+    if (!arr.length) { setState('没有笔记可存'); return; }
+    var md = '# ' + curName + ' · 笔记合集（' + arr.length + ' 条）\n\n*来源：' + curUrl + '*\n\n';
+    arr.slice().reverse().forEach(function (n) { md += '## ' + fmtTs(n.ts) + '\n\n' + n.text + '\n\n'; });
+    var fname = '史料库笔记/' + slug(curName) + '-合集' + new Date().getFullYear() +
+      String(new Date().getMonth() + 101).slice(1) + String(new Date().getDate() + 100).slice(1) + '.md';
+    fetch('/api/obsidian/note/' + encodeURIComponent(fname), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: md })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      setState(d && !d.error ? '✓ 合集已入 Obsidian' : 'Obsidian：' + (d && d.error ? String(d.error).slice(0, 40) : '失败'));
+    }).catch(function () { setState('Obsidian：网络错误'); });
+  }
+  function openViewer(url, name) {
+    curUrl = url; curName = name || url;
+    lvTitle.textContent = curName;
+    lvUrl.textContent = url;
+    lvFrame.src = url;
+    lvFallbackLink.href = url;
+    lvnEditor.value = '';
+    renderNotes();
+    lv.style.display = 'flex';
+  }
+  function closeViewer() {
+    lv.style.display = 'none';
+    lvFrame.src = 'about:blank';
+    curUrl = ''; curName = '';
+  }
+  document.getElementById('lvClose').addEventListener('click', closeViewer);
+  document.getElementById('lvExternal').addEventListener('click', function () {
+    if (curUrl) window.open(curUrl, '_blank');
+  });
+  document.getElementById('lvnAdd').addEventListener('click', addNote);
+  document.getElementById('lvnObs').addEventListener('click', obsAll);
+  lvnList.addEventListener('click', function (e) {
+    var b = e.target;
+    if (!b || !b.dataset) return;
+    if (b.dataset.del != null) delNote(+b.dataset.del);
+    else if (b.dataset.obs != null) {
+      var arr = notesOf(curUrl);
+      if (arr[+b.dataset.obs]) noteToObsidian(arr[+b.dataset.obs]);
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && lv.style.display !== 'none') closeViewer();
+  });
+  lv.addEventListener('click', function (e) { if (e.target === lv) closeViewer(); });
+
+  // 拦截史料库卡片点击 → 平台内打开
+  document.addEventListener('click', function (e) {
+    var card = e.target && e.target.closest ? e.target.closest('#library .db-card') : null;
+    if (!card) return;
+    var href = card.getAttribute('href') || '';
+    if (!href || href.indexOf('http') !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var name = (card.querySelector('.db-name') || {}).textContent || href;
+    openViewer(href, name.trim());
+  }, true);
+}
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initLibViewer); } else { initLibViewer(); }

@@ -30,3 +30,5 @@ Thumbs.db
 .DS_Store
 
 node_modules/
+
+data/toolbooks/.entity_idx_cache.pkl

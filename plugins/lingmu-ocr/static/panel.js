@@ -301,8 +301,9 @@
       obsidianBtn.style.display = annoEntities.length ? '' : 'none';
       var counts = {};
       annoEntities.forEach(function (e) { counts[e.type] = (counts[e.type] || 0) + 1; });
-      gujiState.textContent = '实体 ' + annoEntities.length + ' 处：' +
-        Object.keys(counts).map(function (k) { return k + ' ' + counts[k]; }).join(' / ');
+      gujiState.textContent = '实体 ' + annoEntities.length + ' 处' +
+        (d.truncated ? '（词库命中过多，仅标前 ' + annoEntities.length + ' 处；可分段处理）' : '') +
+        '：' + Object.keys(counts).map(function (k) { return k + ' ' + counts[k]; }).join(' / ');
     }).catch(function () {
       annoBtn.disabled = false;
       annoBtn.textContent = '标注实体';

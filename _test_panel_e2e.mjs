@@ -183,6 +183,41 @@ if (readyReal) {
             { timeout: 240000 }).then(() => true).catch(() => false);
         t('地名popover关联人物', okPlace);
     }
+    // 校对「采用」写回全链：识别结果区改成错字文本 → 校对 → 点采用 → 编辑层/全文更新
+    await page.evaluate(() => {
+        document.getElementById('lmProof').style.display = 'none';
+        const span = document.querySelector('#lmLines .lm-text');
+        span.textContent = '王芝石拜参知政事于洛阝。';
+        span.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.evaluate(() => { document.getElementById('lmGujiBtn').click(); });
+    await page.waitForFunction(() => /完成/.test(document.getElementById('lmGujiState').textContent), { timeout: 90000 }).catch(() => {});
+    await page.evaluate(() => { document.getElementById('lmProofBtn').click(); });
+    const proofRendered = await page.waitForFunction(
+        () => document.querySelectorAll('#lmProof .lm-p-use').length > 0,
+        { timeout: 60000 }).then(() => true).catch(() => false);
+    t('校对建议列表渲染', proofRendered);
+    if (proofRendered) {
+        const clicked = await page.evaluate(() => {
+            const btns = document.querySelectorAll('#lmProof .lm-p-use');
+            for (const b of btns) {
+                const row = b.parentElement.textContent;
+                if (row.includes('王安石')) { b.click(); return true; }
+            }
+            return false;
+        });
+        if (clicked) {
+            await new Promise(r => setTimeout(r, 1500));
+            const after = await page.evaluate(() => ({
+                state: document.getElementById('lmGujiState').textContent,
+                rows: Array.from(document.querySelectorAll('#lmLines .lm-text')).map(s => s.textContent).join(''),
+                lmFull: document.getElementById('lmFull').value
+            }));
+            t('采用后全文写回', after.lmFull.includes('王安石') && after.rows.includes('王安石'));
+        } else {
+            t('采用后全文写回', false);
+        }
+    }
 } else {
     t('句读出真标点(跳过: 引擎未就绪)', true);
 }

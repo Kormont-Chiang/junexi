@@ -1,16 +1,12 @@
-// 史料库内嵌查看器 E2E：puppeteer-core + 系统 Edge headless
-import puppeteer from 'puppeteer-core';
+﻿// 史料库内嵌查看器 E2E：puppeteer-core + 系统 Edge headless
+import { launchE2E } from './_e2e_browser.mjs';
 
 const BASE = process.env.BASE || 'http://127.0.0.1:5188';
 let pass = 0, fail = 0;
 const t = (label, v) => { if (v) { pass++; console.log('[OK  ]', label); } else { fail++; console.log('[FAIL]', label); } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-const browser = await puppeteer.launch({
-    executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    headless: true,
-    args: ['--disable-features=msHubApps', '--window-size=1400,900']
-});
+const browser = await launchE2E();
 const page = await browser.newPage();
 await page.setViewport({ width: 1400, height: 900 });
 page.on('pageerror', e => console.log('[pageerror]', String(e).slice(0, 200)));

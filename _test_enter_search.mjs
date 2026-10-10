@@ -1,13 +1,10 @@
-// Enter 检索 E2E：CBDB 人名输入框回车=查询
-import puppeteer from 'puppeteer-core';
+﻿// Enter 检索 E2E：CBDB 人名输入框回车=查询
+import { launchE2E } from './_e2e_browser.mjs';
 const BASE = process.env.BASE || 'http://127.0.0.1:5188';
 let pass = 0, fail = 0;
 const t = (l, v) => { if (v) { pass++; console.log('[OK  ]', l); } else { fail++; console.log('[FAIL]', l); } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const browser = await puppeteer.launch({
-    executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    headless: true, args: ['--disable-features=msHubApps', '--window-size=1400,900']
-});
+const browser = await launchE2E();
 const page = await browser.newPage();
 await page.setViewport({ width: 1400, height: 900 });
 page.on('pageerror', e => console.log('[pageerror]', String(e).slice(0, 160)));

@@ -1,6 +1,6 @@
-// 灵眸 OCR 面板 E2E：puppeteer-core + 系统 Edge headless
+﻿// 灵眸 OCR 面板 E2E：puppeteer-core + 系统 Edge headless
 // 断言链：页面渲染 → provider 状态 → 上传测试图 → 运行 OCR → 行级结果+全文落位
-import puppeteer from 'puppeteer-core';
+import { launchE2E } from './_e2e_browser.mjs';
 import path from 'node:path';
 
 const BASE = 'http://127.0.0.1:5188';
@@ -9,11 +9,7 @@ let pass = 0, fail = 0;
 const t = (label, v) => { if (v) { pass++; console.log('[OK  ]', label); } else { fail++; console.log('[FAIL]', label); } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-const browser = await puppeteer.launch({
-    executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
-    headless: true,
-    args: ['--disable-features=msHubApps', '--window-size=1400,900']
-});
+const browser = await launchE2E();
 const page = await browser.newPage();
 await page.setViewport({ width: 1400, height: 900 });
 page.on('pageerror', e => console.log('[pageerror]', String(e).slice(0, 200)));

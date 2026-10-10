@@ -201,6 +201,12 @@ if (readyReal) {
         () => /存入失败|未连接/.test(document.getElementById('lmGujiState').textContent),
         { timeout: 15000 }).then(() => true).catch(() => false);
     t('Obsidian未连接优雅降级', obsGraceful);
+    // 繁体示例：载入后全文为繁体片段
+    await page.evaluate(() => { document.getElementById('lmGujiSampleTrad').click(); });
+    const tradOk = await page.waitForFunction(
+        () => document.getElementById('lmFull').value.includes('洛陽'),
+        { timeout: 10000 }).then(() => true).catch(() => false);
+    t('繁体示例载入', tradOk);
     // 校对「采用」写回全链：识别结果区改成错字文本 → 校对 → 点采用 → 编辑层/全文更新
     await page.evaluate(() => {
         document.getElementById('lmProof').style.display = 'none';
@@ -232,6 +238,14 @@ if (readyReal) {
                 lmFull: document.getElementById('lmFull').value
             }));
             t('采用后全文写回', after.lmFull.includes('王安石') && after.rows.includes('王安石'));
+            // 撤销采用：全文恢复错字原状
+            await page.evaluate(() => { document.getElementById('lmProofUndo').click(); });
+            await new Promise(r => setTimeout(r, 800));
+            const undone = await page.evaluate(() => ({
+                state: document.getElementById('lmGujiState').textContent,
+                lmFull: document.getElementById('lmFull').value
+            }));
+            t('撤销采用恢复原文', undone.lmFull.includes('王芝石') && /已撤销/.test(undone.state));
         } else {
             t('采用后全文写回', false);
         }

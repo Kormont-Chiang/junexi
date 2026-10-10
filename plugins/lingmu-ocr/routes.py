@@ -75,10 +75,12 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
     </div>
     <div class="lm-run" style="text-align:left">
       <button class="lm-btn" id="lmGujiSample" style="background:#5a7a5a">载入示例（建安片段）</button>
+      <button class="lm-btn" id="lmGujiSampleTrad" style="background:#7a6a5a">繁体示例</button>
       <button class="lm-btn" id="lmGujiBtn" disabled>句读标点</button>
       <button class="lm-btn" id="lmGujiInstall" style="display:none;background:#8a6d3b">安装引擎（约1MB）</button>
       <button class="lm-btn" id="lmGujiAnno" style="display:none;background:#4a5d8a">标注实体</button>
       <button class="lm-btn" id="lmProofBtn" style="display:none;background:#8a4a4a">校对</button>
+      <button class="lm-btn" id="lmProofUndo" style="display:none;background:#4a6a8a">撤销采用</button>
       <button class="lm-btn" id="lmAnnoExport" style="display:none;background:#6b6b6b">导出 CSV</button>
       <button class="lm-btn" id="lmObsidianBtn" style="display:none;background:#5a4a8a">存入 Obsidian</button>
     </div>

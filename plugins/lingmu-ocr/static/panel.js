@@ -358,8 +358,13 @@
 
   // ── 示例载入：一键填入真古籍片段，走全链验收零成本 ──
   var SAMPLE_TEXT = '建安元年秋七月，天子还洛阳。太祖乃诣洛阳，卫京都。二年春，袁绍与公孙瓒战于界桥。三年夏四月，司徒王允与吕布共杀卓。卓将李傕、郭汜等攻长安，城陷，杀允。太祖迎天子都许。';
+  var SAMPLE_TRAD = '建安四年春，帝至洛陽。曹操為大將軍，袁紹據河北。備將關羽屯下邳，行太守事。';
   document.getElementById('lmGujiSample').addEventListener('click', function () {
     document.getElementById('lmFull').value = SAMPLE_TEXT;
+    rebuildRowsFromFull();
+  });
+  document.getElementById('lmGujiSampleTrad').addEventListener('click', function () {
+    document.getElementById('lmFull').value = SAMPLE_TRAD;
     rebuildRowsFromFull();
   });
 
@@ -378,6 +383,7 @@
     document.getElementById('lmLines').innerHTML = html;
   }
 
+  var proofUndoStack = [];
   proofDiv.addEventListener('click', function (e) {
     var b = e.target;
     if (!b || !b.classList || !b.classList.contains('lm-p-use')) return;
@@ -387,13 +393,29 @@
     var lmFullEl = document.getElementById('lmFull');
     var v = lmFullEl.value;
     if (v.charAt(sg.pos) !== sg.orig) { b.textContent = '已偏移'; b.disabled = true; return; }
+    proofUndoStack.push({ snapshot: v, label: sg.orig + '→' + sg.char });
+    if (proofUndoStack.length > 20) proofUndoStack.shift();
     lmFullEl.value = v.slice(0, sg.pos) + sg.char + v.slice(sg.pos + 1);
     rebuildRowsFromFull();
     if (gujiOut.value) gujiOut.value = '';
     if (annoOn) { annoOn = false; annoDiv.style.display = 'none'; gujiOut.style.display = ''; }
     b.textContent = '已采用';
     b.disabled = true;
+    var undoBtn = document.getElementById('lmProofUndo');
+    if (undoBtn) undoBtn.style.display = '';
     gujiState.textContent = '已采用建议（全文已更新，可重新句读）';
+  });
+
+  var proofUndoBtn = document.getElementById('lmProofUndo');
+  proofUndoBtn.addEventListener('click', function () {
+    var item = proofUndoStack.pop();
+    if (!item) { this.style.display = 'none'; return; }
+    document.getElementById('lmFull').value = item.snapshot;
+    rebuildRowsFromFull();
+    if (gujiOut.value) gujiOut.value = '';
+    if (annoOn) { annoOn = false; annoDiv.style.display = 'none'; gujiOut.style.display = ''; }
+    if (!proofUndoStack.length) this.style.display = 'none';
+    gujiState.textContent = '已撤销：' + item.label;
   });
 
   proofBtn.addEventListener('click', function () {

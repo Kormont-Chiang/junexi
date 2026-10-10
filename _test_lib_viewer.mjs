@@ -34,7 +34,7 @@ const opened = await page.evaluate(() => ({
     title: document.getElementById('lvTitle').textContent
 }));
 t('查看器打开', opened.display === 'flex');
-t('iframe 指向卡片链接', opened.src === cardInfo.href);
+t('iframe 走本地代理且指向卡片链接', opened.src.indexOf('/api/lib-proxy?url=') > -1 && decodeURIComponent(opened.src.split('url=')[1]) === cardInfo.href);
 t('标题=站点名', opened.title === cardInfo.name.trim());
 
 // 笔记：写入 → 存为笔记 → localStorage 落盘 → 列表渲染

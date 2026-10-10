@@ -14,7 +14,7 @@ import requests
 import subprocess
 from datetime import datetime
 from urllib.parse import quote, unquote
-from flask import Flask, jsonify, request, render_template, send_from_directory, send_file
+from flask import Flask, jsonify, request, render_template, send_from_directory, send_file, Response
 from flask_cors import CORS
 from dotenv import load_dotenv
 
@@ -257,6 +257,149 @@ def obsidian_get_note(filepath):
         except Exception as e:
             return jsonify({"error": str(e)})
     return jsonify({"error": "文件不存在或 Obsidian 未连接"})
+
+# ── 史料库本地反向代理（R38：破解 X-Frame-Options 内嵌失败）──
+from urllib.parse import urlparse, urljoin
+
+_LIB_PROXY_WHITELIST = None
+
+def _lib_proxy_whitelist():
+    """从 index.html 的 db-card 链接动态提取白名单域名（卡片增删自动跟随）。"""
+    global _LIB_PROXY_WHITELIST
+    if _LIB_PROXY_WHITELIST is not None:
+        return _LIB_PROXY_WHITELIST
+    hosts = set()
+    try:
+        base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        html = io.open(os.path.join(base, "templates", "index.html"), encoding="utf-8").read()
+        for m in re.finditer(r'href="(https?://[^"]+)"[^>]*class="db-card"|class="db-card"[^>]*href="(https?://[^"]+)"', html):
+            u = m.group(1) or m.group(2)
+            if u:
+                hosts.add(urlparse(u).netloc.lower())
+    except Exception:
+        pass
+    if not hosts:  # 兜底：模板读不到时给核心文史站点
+        hosts = {"ctext.org", "www.kanripo.org", "cbdb.fas.harvard.edu", "zh.wikisource.org"}
+    _LIB_PROXY_WHITELIST = hosts
+    return hosts
+
+
+def _wl_hit(host):
+    host = (host or "").lower()
+    if not host:
+        return False
+    wl = _lib_proxy_whitelist()
+    bare = host[4:] if host.startswith("www.") else host
+    for w in wl:
+        wb = w[4:] if w.startswith("www.") else w
+        if host == w or bare == wb:
+            return True
+    return False
+
+
+def _requests_with_proxy_fallback(url, **kw):
+    """先直连；失败则走本机 Clash 代理重试（若 7890 可用）。"""
+    try:
+        r = requests.get(url, allow_redirects=False, **kw)
+        return r, None
+    except Exception as e1:
+        try:
+            import socket
+            s = socket.create_connection(("127.0.0.1", 7890), timeout=2)
+            s.close()
+        except Exception:
+            raise e1
+        proxies = {"http": "http://127.0.0.1:7890", "https": "http://127.0.0.1:7890"}
+        return requests.get(url, allow_redirects=False, proxies=proxies, **kw), "proxy"
+
+
+_STRIP_HEADERS = ("content-encoding", "content-length", "transfer-encoding",
+                  "x-frame-options", "content-security-policy",
+                  "content-security-policy-report-only", "set-cookie")
+_CAP = 10 * 1024 * 1024
+
+
+@app.route("/api/lib-proxy", methods=["GET"])
+def lib_proxy():
+    url = (request.args.get("url") or "").strip()
+    try:
+        pu = urlparse(url)
+        if pu.scheme not in ("http", "https") or not pu.netloc:
+            return Response("invalid url", status=400)
+    except Exception:
+        return Response("invalid url", status=400)
+    if not _wl_hit(pu.netloc):
+        return Response("not in library whitelist", status=403)
+
+    cur = url
+    used_proxy = False
+    try:
+        for _hop in range(6):
+            kw = dict(timeout=(8, 25), stream=True,
+                      headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+                               "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"})
+            r, via = _requests_with_proxy_fallback(cur, **kw)
+            if via:
+                used_proxy = True
+            loc = r.headers.get("Location")
+            if r.is_redirect or r.is_permanent_redirect:
+                nxt = urljoin(cur, loc)
+                h = urlparse(nxt).netloc
+                if not _wl_hit(h):
+                    return Response("redirect out of whitelist: " + h, status=403)
+                cur = nxt
+                r.close()
+                continue
+            break
+        else:
+            return Response("too many redirects", status=502)
+
+        ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        chunks, size = [], 0
+        for ch in r.iter_content(65536):
+            size += len(ch)
+            if size > _CAP:
+                r.close()
+                return Response("page too large", status=502)
+            chunks.append(ch)
+        r.close()
+        raw = b"".join(chunks)
+    except Exception as e:
+        return Response("fetch failed: %s" % type(e).__name__, status=502)
+
+    if ctype == "text/html" or (not ctype and b"<html" in raw[:4096].lower()):
+        enc = "utf-8"
+        m = re.search(r"charset=[\"']?([\w\-]+)", r.headers.get("Content-Type") or "", re.I)
+        if m:
+            enc = m.group(1)
+        else:
+            try:
+                from charset_normalizer import from_bytes
+                enc = from_bytes(raw).best().encoding or "utf-8"
+            except Exception:
+                enc = "utf-8"
+        try:
+            text = raw.decode(enc, errors="replace")
+        except Exception:
+            text = raw.decode("utf-8", errors="replace")
+        base_href = urljoin(cur, ".")
+        # 剥页面内 CSP meta，注入 <base> 让相对资源回源站加载
+        text = re.sub(r"<meta[^>]+http-equiv=[\"' ]*Content-Security-Policy[\"'][^>]*>", "", text, flags=re.I)
+        if re.search(r"<base\s", text[:8192], re.I):
+            pass
+        elif re.search(r"<head[^>]*>", text, re.I):
+            text = re.sub(r"(<head[^>]*>)", r"\1<base href=\"%s\">" % base_href, text, count=1, flags=re.I)
+        else:
+            text = '<base href="%s">' % base_href + text
+        out = Response(text, content_type="text/html; charset=utf-8")
+    else:
+        out = Response(raw, content_type=ctype or "application/octet-stream")
+
+    for h in _STRIP_HEADERS:
+        out.headers.pop(h, None)
+    out.headers["Cache-Control"] = "no-store"
+    return out
+
 
 @app.route("/api/obsidian/note/<path:filepath>", methods=["PUT"])
 def obsidian_update_note(filepath):

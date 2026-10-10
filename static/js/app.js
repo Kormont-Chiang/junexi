@@ -5699,7 +5699,8 @@ function initLibViewer() {
     curUrl = url; curName = name || url;
     lvTitle.textContent = curName;
     lvUrl.textContent = url;
-    lvFrame.src = url;
+    // R38：走本地反向代理（服务端剥 X-Frame-Options 限制头），失败时底部仍可新窗口
+    lvFrame.src = '/api/lib-proxy?url=' + encodeURIComponent(url);
     lvFallbackLink.href = url;
     lvnEditor.value = '';
     renderNotes();

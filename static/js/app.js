@@ -5700,6 +5700,8 @@ function initLibViewer() {
     lvTitle.textContent = curName;
     lvUrl.textContent = url;
     // R38：走本地反向代理（服务端剥 X-Frame-Options 限制头），失败时底部仍可新窗口
+    var loading = document.getElementById('lvLoading');
+    if (loading) loading.style.display = 'flex';
     lvFrame.src = '/api/lib-proxy?url=' + encodeURIComponent(url);
     lvFallbackLink.href = url;
     lvnEditor.value = '';
@@ -5730,6 +5732,10 @@ function initLibViewer() {
     if (e.key === 'Escape' && lv.style.display !== 'none') closeViewer();
   });
   lv.addEventListener('click', function (e) { if (e.target === lv) closeViewer(); });
+  lvFrame.addEventListener('load', function () {
+    var loading = document.getElementById('lvLoading');
+    if (loading) loading.style.display = 'none';
+  });
 
   // 拦截史料库卡片点击 → 平台内打开（放行修饰键/中键，保留外部打开习惯）
   document.addEventListener('click', function (e) {

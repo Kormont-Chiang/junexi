@@ -320,17 +320,31 @@ _STRIP_HEADERS = ("content-encoding", "content-length", "transfer-encoding",
 _CAP = 10 * 1024 * 1024
 
 
+def _proxy_fail(status, msg, url=""):
+    """代理失败的友好错误页：大按钮新窗口打开（iframe 内展示）。"""
+    esc = (msg or "").replace("&", "&amp;").replace("<", "&lt;")
+    return Response(
+        '<!doctype html><html><head><meta charset="utf-8"><style>'
+        'body{font-family:system-ui,"Microsoft YaHei",sans-serif;background:#faf9f6;color:#2b2924;'
+        'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;gap:14px}'
+        '.ic{font-size:42px}a{display:inline-block;padding:10px 26px;background:#4a7a68;color:#fff;'
+        'border-radius:8px;text-decoration:none;font-size:15px}.msg{font-size:13px;color:#8a8577;max-width:70%%;text-align:center}'
+        '</style></head><body><div class="ic">🍃</div><div class="msg">六月息代理：%s</div>'
+        '<a href="%s" target="_blank">新窗口打开原站</a></body></html>' % (esc, url),
+        status=status, content_type="text/html; charset=utf-8")
+
+
 @app.route("/api/lib-proxy", methods=["GET"])
 def lib_proxy():
     url = (request.args.get("url") or "").strip()
     try:
         pu = urlparse(url)
         if pu.scheme not in ("http", "https") or not pu.netloc:
-            return Response("invalid url", status=400)
+            return _proxy_fail(400, "链接格式无效", url)
     except Exception:
-        return Response("invalid url", status=400)
+        return _proxy_fail(400, "链接格式无效", url)
     if not _wl_hit(pu.netloc):
-        return Response("not in library whitelist", status=403)
+        return _proxy_fail(403, "该站不在史料库白名单内", url)
 
     cur = url
     used_proxy = False
@@ -347,13 +361,13 @@ def lib_proxy():
                 nxt = urljoin(cur, loc)
                 h = urlparse(nxt).netloc
                 if not _wl_hit(h):
-                    return Response("redirect out of whitelist: " + h, status=403)
+                    return _proxy_fail(403, "重定向跳出白名单：" + h, url)
                 cur = nxt
                 r.close()
                 continue
             break
         else:
-            return Response("too many redirects", status=502)
+            return _proxy_fail(502, "重定向次数过多", url)
 
         ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
         chunks, size = [], 0
@@ -361,12 +375,12 @@ def lib_proxy():
             size += len(ch)
             if size > _CAP:
                 r.close()
-                return Response("page too large", status=502)
+                return _proxy_fail(502, "页面超过 10MB，请新窗口打开", url)
             chunks.append(ch)
         r.close()
         raw = b"".join(chunks)
     except Exception as e:
-        return Response("fetch failed: %s" % type(e).__name__, status=502)
+        return _proxy_fail(502, "抓取失败（%s），该站可能拒绝代理访问" % type(e).__name__, url)
 
     if ctype == "text/html" or (not ctype and b"<html" in raw[:4096].lower()):
         enc = "utf-8"

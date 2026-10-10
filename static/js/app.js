@@ -5730,8 +5730,9 @@ function initLibViewer() {
   });
   lv.addEventListener('click', function (e) { if (e.target === lv) closeViewer(); });
 
-  // 拦截史料库卡片点击 → 平台内打开
+  // 拦截史料库卡片点击 → 平台内打开（放行修饰键/中键，保留外部打开习惯）
   document.addEventListener('click', function (e) {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
     var card = e.target && e.target.closest ? e.target.closest('#library .db-card') : null;
     if (!card) return;
     var href = card.getAttribute('href') || '';

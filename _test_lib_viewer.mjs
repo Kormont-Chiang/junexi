@@ -72,6 +72,15 @@ const reopen = await page.evaluate(() => ({
 t('重新打开状态复位', reopen.display === 'flex' && reopen.count === '0');
 await page.evaluate(() => { document.getElementById('lvClose').click(); });
 
+// 修饰键放行：Ctrl+点击不拦截（保留外部打开习惯）
+await page.evaluate(() => {
+    const c = document.querySelector('#library .db-card');
+    c.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ctrlKey: true }));
+});
+await sleep(300);
+const ctrlPass = await page.evaluate(() => document.getElementById('libViewer').style.display);
+t('Ctrl+点击放行（不拦截）', ctrlPass === 'none');
+
 console.log('RESULT ' + pass + '/' + (pass + fail));
 await browser.close();
 process.exit(fail ? 1 : 0);

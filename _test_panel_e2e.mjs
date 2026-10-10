@@ -195,6 +195,12 @@ if (readyReal) {
             { timeout: 240000 }).then(() => true).catch(() => false);
         t('地名popover关联人物', okPlace);
     }
+    // 存入 Obsidian 优雅降级：Obsidian 未开时显示错误而非崩溃
+    await page.evaluate(() => { document.getElementById('lmObsidianBtn').click(); });
+    const obsGraceful = await page.waitForFunction(
+        () => /存入失败|未连接/.test(document.getElementById('lmGujiState').textContent),
+        { timeout: 15000 }).then(() => true).catch(() => false);
+    t('Obsidian未连接优雅降级', obsGraceful);
     // 校对「采用」写回全链：识别结果区改成错字文本 → 校对 → 点采用 → 编辑层/全文更新
     await page.evaluate(() => {
         document.getElementById('lmProof').style.display = 'none';

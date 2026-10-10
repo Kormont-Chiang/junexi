@@ -145,6 +145,7 @@
       annoBtn.disabled = false;
       proofBtn.style.display = '';
       annoExportBtn.style.display = 'none';
+      obsidianBtn.style.display = 'none';
       proofDiv.style.display = 'none';
       annoOn = false;
       annoDiv.style.display = 'none';
@@ -158,6 +159,7 @@
   // ── 实体标注（词典锚定）：句读结果 × 自家词库 ──
   var annoBtn = document.getElementById('lmGujiAnno');
   var annoExportBtn = document.getElementById('lmAnnoExport');
+  var obsidianBtn = document.getElementById('lmObsidianBtn');
   var annoDiv = document.getElementById('lmAnno');
   var annoOn = false;
   var annoEntities = [];
@@ -296,6 +298,7 @@
       gujiOut.style.display = 'none';
       annoOn = true;
       annoExportBtn.style.display = annoEntities.length ? '' : 'none';
+      obsidianBtn.style.display = annoEntities.length ? '' : 'none';
       var counts = {};
       annoEntities.forEach(function (e) { counts[e.type] = (counts[e.type] || 0) + 1; });
       gujiState.textContent = '实体 ' + annoEntities.length + ' 处：' +
@@ -322,6 +325,35 @@
     a.download = 'lingmu_entities.csv';
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+  });
+
+  // ── 存入 Obsidian：标注结果 → vault/灵眸标注/*.md ──
+  obsidianBtn.addEventListener('click', function () {
+    if (!annoEntities.length) return;
+    var btn = this;
+    btn.disabled = true;
+    var old = btn.textContent;
+    btn.textContent = '写入中…';
+    fetch('/api/plugins/lingmu-ocr/save_obsidian', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: gujiOut.value, entities: annoEntities })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      btn.disabled = false;
+      if (d.ok) {
+        btn.textContent = '✓ 已存入';
+        gujiState.textContent = '已存入 Obsidian：' + d.path;
+        setTimeout(function () { btn.textContent = old; }, 2500);
+      } else {
+        btn.textContent = 'Obsidian 未连接';
+        gujiState.textContent = '存入失败：' + (d.error || '未知错误');
+        setTimeout(function () { btn.textContent = old; }, 3000);
+      }
+    }).catch(function () {
+      btn.disabled = false;
+      btn.textContent = old;
+      gujiState.textContent = '存入失败：网络错误';
+    });
   });
 
   // ── 示例载入：一键填入真古籍片段，走全链验收零成本 ──

@@ -80,6 +80,7 @@ PAGE_HTML = u"""<div class="lingmu-wrap">
       <button class="lm-btn" id="lmGujiAnno" style="display:none;background:#4a5d8a">标注实体</button>
       <button class="lm-btn" id="lmProofBtn" style="display:none;background:#8a4a4a">校对</button>
       <button class="lm-btn" id="lmAnnoExport" style="display:none;background:#6b6b6b">导出 CSV</button>
+      <button class="lm-btn" id="lmObsidianBtn" style="display:none;background:#5a4a8a">存入 Obsidian</button>
     </div>
     <textarea class="lm-full" id="lmGujiOut" readonly style="margin-top:10px;min-height:140px"></textarea>
     <div class="lm-anno" id="lmAnno" style="display:none;margin-top:10px"></div>
@@ -112,3 +113,62 @@ def status():
         "error": pkg_err,
         "lazy": True,
     })
+
+
+def build_note_md(text, entities):
+    """标注结果 → Obsidian markdown（纯函数，可单测）。"""
+    import datetime
+    now = datetime.datetime.now()
+    lines = [
+        u"# 灵眸标注 · " + now.strftime("%Y-%m-%d %H:%M"),
+        u"",
+        u"## 原文",
+        u"",
+        text or u"",
+        u"",
+        u"## 实体（%d）" % len(entities),
+        u"",
+        u"| 词 | 类型 | 依据 | 摘要 | CBDB |",
+        u"|---|---|---|---|---|",
+    ]
+    for e in entities:
+        ref = e.get("ref")
+        cbdb = u"#%s" % ref if ref else u""
+        gloss = (e.get("gloss") or u"").replace(u"|", u"｜").replace(u"\n", u" ")[:80]
+        lines.append(u"| %s | %s | %s | %s | %s |" % (
+            (e.get("text") or e.get("head") or u"").replace(u"|", u"｜"),
+            e.get("type") or u"", e.get("book") or u"", gloss, cbdb))
+    lines += [
+        u"",
+        u"## 管线",
+        u"",
+        u"六月息·灵眸 OCR → 行级校对 → 甲言句读 → 词典锚定标注（年号/地名/人名/官名，点击弹层可回查 CBDB）",
+        u"",
+    ]
+    return u"\n".join(lines)
+
+
+@bp.route("/api/plugins/lingmu-ocr/save_obsidian", methods=["POST"])
+def save_obsidian():
+    from flask import request
+    payload = request.get_json(force=True) or {}
+    text = (payload.get("text") or u"").strip()
+    entities = payload.get("entities") or []
+    if not text:
+        return jsonify({"ok": False, "error": "empty text"}), 400
+    md = build_note_md(text, entities)
+    try:
+        from app import obsidian_api, OBSIDIAN_VAULT
+    except Exception as e:
+        return jsonify({"ok": False, "error": "core import failed: %s" % e})
+    import datetime, re
+    now = datetime.datetime.now()
+    safe_date = now.strftime("%Y%m%d-%H%M")
+    fname = u"灵眸标注-%s.md" % safe_date
+    vault = OBSIDIAN_VAULT or u""
+    folder = (u"%s/灵眸标注" % vault).strip(u"/")
+    path = u"%s/%s" % (folder, fname)
+    r = obsidian_api("PUT", u"/vault/%s" % path, {"content": md})
+    if isinstance(r, dict) and r.get("error"):
+        return jsonify({"ok": False, "error": r["error"]})
+    return jsonify({"ok": True, "path": path})

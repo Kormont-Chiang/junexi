@@ -1734,6 +1734,71 @@ def open_external_url():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:150]})
 
+
+@app.route("/api/window/shrink-left", methods=["POST"])
+def window_shrink_left():
+    """R70: 把 JuneXi 窗口缩小并靠左半屏——配合外部浏览器分屏使用"""
+    try:
+        import ctypes
+        import ctypes.wintypes as wt
+        hwnd = None
+        # 找 JuneXi 窗口
+        enum_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, wt.HWND, wt.LPARAM)
+        def _cb(h, l):
+            nonlocal hwnd
+            buf = ctypes.create_unicode_buffer(256)
+            ctypes.windll.user32.GetWindowTextW(h, buf, 256)
+            if "六月息" in buf.value:
+                hwnd = h
+                return False
+            return True
+        ctypes.windll.user32.EnumWindows(enum_proc(_cb), 0)
+        if not hwnd:
+            return jsonify({"ok": False, "error": "窗口未找到"})
+        
+        # 获取屏幕尺寸
+        screen_w = ctypes.windll.user32.GetSystemMetrics(0)
+        screen_h = ctypes.windll.user32.GetSystemMetrics(1)
+        
+        # 缩小到左半屏 45%
+        target_w = int(screen_w * 0.45)
+        target_h = screen_h
+        ctypes.windll.user32.MoveWindow(hwnd, 0, 0, target_w, target_h, True)
+        return jsonify({"ok": True, "w": target_w, "h": target_h})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:150]})
+
+
+@app.route("/api/window/restore", methods=["POST"])
+def window_restore():
+    """R70: 恢复 JuneXi 窗口到原始大小"""
+    try:
+        import ctypes
+        import ctypes.wintypes as wt
+        hwnd = None
+        enum_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, wt.HWND, wt.LPARAM)
+        def _cb(h, l):
+            nonlocal hwnd
+            buf = ctypes.create_unicode_buffer(256)
+            ctypes.windll.user32.GetWindowTextW(h, buf, 256)
+            if "六月息" in buf.value:
+                hwnd = h
+                return False
+            return True
+        ctypes.windll.user32.EnumWindows(enum_proc(_cb), 0)
+        if not hwnd:
+            return jsonify({"ok": False, "error": "窗口未找到"})
+        
+        # 恢复到 1440x900 居中
+        screen_w = ctypes.windll.user32.GetSystemMetrics(0)
+        screen_h = ctypes.windll.user32.GetSystemMetrics(1)
+        x = (screen_w - 1440) // 2
+        y = (screen_h - 900) // 2
+        ctypes.windll.user32.MoveWindow(hwnd, x, y, 1440, 900, True)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)[:150]})
+
 # ── 工具书数据: 年号考条目检索(李崇智《中国历代年号考》OCR结构化) ──
 _NIANHAO_BOOK = []
 _NIANHAO_BOOK_LOADED = False

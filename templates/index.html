@@ -1369,65 +1369,7 @@
     <script src="/static/js/reading.js?v={{ auto_version('js/reading.js') }}"></script>
     <div id="appFooterBar" class="app-footer">六月息 <span id="appVerTag">…</span> · <a href="javascript:void(0)" onclick="checkAppUpdate(true)" id="appUpdateLink">检查更新</a><span id="appUpdateInfo"></span></div>
 
-    <!-- 📖 史料库内嵌查看器：平台内打开 + 笔记空间 -->
-    <div class="lib-viewer" id="libViewer" style="display:none">
-      <style>
-        .lib-viewer{position:fixed;inset:0;z-index:1200;background:rgba(20,18,14,.45);display:flex;align-items:center;justify-content:center}
-        .lib-viewer-box{background:var(--panel,#fff);border:1px solid var(--border,#e3e0d8);border-radius:12px;width:94vw;height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.28)}
-        .lib-viewer-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border,#e3e0d8);flex-wrap:wrap}
-        .lib-viewer-title{font-weight:600}
-        .lib-viewer-url{font-size:12px;color:var(--muted,#8a8577);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .lib-viewer-head button{border:1px solid var(--border,#d8d4c8);background:var(--panel,#fff);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px}
-        .lib-viewer-head button:hover{border-color:var(--accent,#4a7a68)}
-        .lib-viewer-body{flex:1;display:flex;min-height:0}
-        .lib-viewer-frame{flex:1;position:relative;display:flex;flex-direction:column;min-width:0}
-        .lib-viewer-frame iframe{flex:1;border:0;width:100%}
-        .lib-viewer-fallback{padding:6px 12px;font-size:12px;color:var(--muted,#8a8577);border-top:1px dashed var(--border,#e3e0d8)}
-        .lib-viewer-fallback a{color:var(--accent,#4a7a68)}
-        .lib-viewer-notes{width:320px;border-left:1px solid var(--border,#e3e0d8);display:flex;flex-direction:column;background:var(--bg,#faf9f6)}
-        .lvn-head{padding:10px 12px;font-weight:600;border-bottom:1px solid var(--border,#e3e0d8)}
-        #lvnEditor{margin:10px 12px 6px;height:110px;border:1px solid var(--border,#d8d4c8);border-radius:8px;padding:8px;font-size:13px;resize:vertical;background:var(--panel,#fff);color:var(--fg,#2b2924);font-family:inherit}
-        .lvn-actions{display:flex;align-items:center;gap:8px;padding:0 12px 8px}
-        .lvn-actions button{border:1px solid var(--border,#d8d4c8);background:var(--panel,#fff);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px}
-        .lvn-actions button:hover{border-color:var(--accent,#4a7a68)}
-        .lvn-actions .lvn-obs{color:#5a4a8a}
-        #lvnState{font-size:12px;color:var(--muted,#8a8577)}
-        .lvn-list{flex:1;overflow:auto;padding:6px 12px}
-        .lvn-item{border:1px solid var(--border,#e3e0d8);border-radius:8px;padding:8px;margin-bottom:8px;background:var(--panel,#fff)}
-        .lvn-item .lvn-time{font-size:11px;color:var(--muted,#8a8577);margin-bottom:4px}
-        .lvn-item .lvn-text{font-size:13px;white-space:pre-wrap;word-break:break-word}
-        .lvn-item .lvn-ops{margin-top:6px;display:flex;gap:6px}
-        .lvn-item .lvn-ops button{font-size:11px;border:1px solid var(--border,#d8d4c8);background:transparent;border-radius:4px;padding:2px 8px;cursor:pointer}
-        @media (max-width:1100px){.lib-viewer-body{flex-direction:column}.lib-viewer-notes{width:100%;height:38%;border-left:0;border-top:1px solid var(--border,#e3e0d8)}}
-        @keyframes lvSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-      </style>
-      <div class="lib-viewer-box">
-        <div class="lib-viewer-head">
-          <span class="lib-viewer-title" id="lvTitle"></span>
-          <span class="lib-viewer-url" id="lvUrl"></span>
-          <button id="lvExternal" title="在系统浏览器新窗口打开">↗ 新窗口</button>
-          <button id="lvClose">✕ 关闭（Esc）</button>
-        </div>
-        <div class="lib-viewer-body">
-          <div class="lib-viewer-frame">
-            <div id="lvLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:var(--bg,#faf9f6);z-index:5;color:var(--muted,#8a8577);font-size:13px"><div style="font-size:30px;animation:lvSpin 1.2s linear infinite">🍃</div><div>正在代为加载…（需要登录的站会停在登录页）</div></div>
-            <div id="lvBlocked" style="display:none;position:absolute;inset:0;z-index:6;background:var(--bg,#faf9f6);color:var(--text-secondary,#5a5648);font-size:13px;padding:40px;text-align:center;flex-direction:column;align-items:center;justify-content:center;gap:12px"><div style="font-size:36px">🔒</div><div>此网站禁止内嵌（X-Frame-Options / CSP / Cloudflare）</div><div style="font-size:12px;color:var(--muted,#8a8577)">部分网站即使代理也无法内嵌——它们拒绝了任何 iframe 加载</div><a id="lvBlockedLink" target="_blank" rel="noopener" style="color:var(--accent,#4a7a68);font-size:14px">→ 在系统浏览器中打开</a></div>
-            <iframe id="lvFrame" referrerpolicy="no-referrer"></iframe>
-            <div class="lib-viewer-fallback">左侧由本地代理代为加载（自动绕开内嵌限制）；若显示抓取失败 → <a id="lvFallbackLink" target="_blank" rel="noopener">点此新窗口打开</a></div>
-          </div>
-          <div class="lib-viewer-notes">
-            <div class="lvn-head">📝 笔记空间 · <span id="lvnCount">0</span> 条<span style="font-weight:400;font-size:11px;color:var(--muted,#8a8577)">（存本机，可同步 Obsidian）</span></div>
-            <textarea id="lvnEditor" placeholder="为这个资源记点什么……查到了什么、下次从哪进、感想都行"></textarea>
-            <div class="lvn-actions">
-              <button id="lvnAdd">＋存为笔记</button>
-              <button id="lvnObs" class="lvn-obs">⇪ 全部存入 Obsidian</button>
-              <span id="lvnState"></span>
-            </div>
-            <div class="lvn-list" id="lvnList"></div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- R70: iframe 内嵌查看器已废弃——改用 libOpenExternal 三步走(浏览器+窗口缩小+Obsidian) -->
 <script>
 /* R46c: 前端全局错误捕获——未捕获异常记录到 console.error 并可选择上报 */
 window.addEventListener('error', function(e){

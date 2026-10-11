@@ -5670,7 +5670,7 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-// ── R49: 键盘快捷键——Ctrl+1~9 切换页签;Ctrl+0 回仪表盘;Ctrl+/ 聚焦搜索 ──
+// ── R49: 键盘快捷键——Ctrl+1~8 切换主 tab;Ctrl+0 回仪表盘;Ctrl+/ 聚焦搜索 ──
 document.addEventListener('keydown', function (e) {
   if (!e.ctrlKey && !e.metaKey) return;
   if (e.altKey || e.shiftKey) return;
@@ -5684,16 +5684,18 @@ document.addEventListener('keydown', function (e) {
     return;
   }
   if (inInput) return;
-  var tabs = document.querySelectorAll('.nav-tab[data-tab]');
-  var idx = -1;
-  if (key === '0') idx = 0; // 仪表盘
+  // R49b: 用 data-tab 精确匹配主 tab（排除插件注入的 tab）
+  var MAIN_TABS = ['dashboard','workspace','library','map','tools','cbdb','ai','_plugins'];
+  var target = null;
+  if (key === '0') target = 'dashboard';
   else {
     var n = parseInt(key, 10);
-    if (n >= 1 && n <= 9) idx = n; // Ctrl+1=第一个 tab
+    if (n >= 1 && n <= MAIN_TABS.length) target = MAIN_TABS[n - 1];
   }
-  if (idx >= 0 && idx < tabs.length) {
+  if (target) {
     e.preventDefault();
-    tabs[idx].click();
+    var btn = document.querySelector('.nav-tab[data-tab="' + target + '"]');
+    if (btn) btn.click();
   }
 });
 

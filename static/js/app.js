@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 六月息 · 历史学学术面板前端
  * API 驱动的交互逻辑
  */
@@ -97,7 +97,7 @@ async function loadPluginPage(tabId) {
     }
     if (pageEl.dataset.loaded === '1') return;
     try {
-        const res = await fetch('/plugin/' + pid + '/page');
+        const res = await apiFetch('/plugin/' + pid + '/page');
         pageEl.innerHTML = res.ok
             ? '<div class="plugin-page-wrap">' + await res.text() + '</div>'
             : '<div class="empty-hint">插件页面加载失败（HTTP ' + res.status + '）</div>';
@@ -113,7 +113,7 @@ async function loadPluginManager() {
     const list = document.getElementById('pluginList');
     if (!list) return;
     try {
-        const d = await (await fetch('/api/plugins')).json();
+        const d = await (await apiFetch('/api/plugins')).json();
         const ps = d.plugins || [];
         if (!ps.length) {
             list.innerHTML = '<div class="pm-empty">plugins/ 目录还没有插件——把带 manifest.json 的文件夹放进去，重启即装。</div>';
@@ -151,7 +151,7 @@ async function installPluginFromUrl() {
     if (!url) { if (msg) msg.textContent = '先填 URL'; return; }
     if (msg) msg.textContent = '下载并校验中……';
     try {
-        const d = await (await fetch('/api/plugins/install', {
+        const d = await (await apiFetch('/api/plugins/install', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })
         })).json();
@@ -169,7 +169,7 @@ async function installPluginLocal() {
     if (!lp) { if (msg) msg.textContent = '先填本机路径'; return; }
     if (msg) msg.textContent = '校验安装中……';
     try {
-        const d = await (await fetch('/api/plugins/install', {
+        const d = await (await apiFetch('/api/plugins/install', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ local_path: lp })
         })).json();
@@ -188,11 +188,11 @@ async function loadPluginMarket() {
     const REG = 'https://raw.githubusercontent.com/Kormont-Chiang/junexi/main/plugins-registry.json';
     let installedMap = {};
     try {
-        const pd = await (await fetch('/api/plugins')).json();
+        const pd = await (await apiFetch('/api/plugins')).json();
         (pd.plugins || []).forEach(p => { installedMap[p.id] = p.version; });
     } catch (e) {}
     try {
-        const d = await (await fetch(REG, { cache: 'no-store' })).json();
+        const d = await (await apiFetch(REG, { cache: 'no-store' })).json();
         if (!Array.isArray(d) || !d.length) {
             el.innerHTML = '<div class="empty-hint">市场暂无条目。向仓库 plugins-registry.json 提 PR 即可上架。</div>';
             return;
@@ -222,7 +222,7 @@ window.loadPluginMarket = loadPluginMarket;
 async function uninstallPlugin(pid) {
     if (!confirm('卸载插件 ' + pid + '？其文件将被删除。')) return;
     try {
-        const d = await (await fetch('/api/plugins/' + encodeURIComponent(pid) + '/uninstall', { method: 'POST' })).json();
+        const d = await (await apiFetch('/api/plugins/' + encodeURIComponent(pid) + '/uninstall', { method: 'POST' })).json();
         showToast(d.ok ? '已卸载，重启后移除' : (d.error || '卸载失败'), d.ok ? 'success' : 'error');
         loadPluginManager();
     } catch (e) {
@@ -237,7 +237,7 @@ async function installMarketPlugin(btn) {
     btn.disabled = true;
     btn.textContent = '安装中…';
     try {
-        const d = await (await fetch('/api/plugins/install', {
+        const d = await (await apiFetch('/api/plugins/install', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url, sha256: sha })
         })).json();
@@ -254,7 +254,7 @@ window.installMarketPlugin = installMarketPlugin;
 
 async function togglePlugin(pid) {
     try {
-        const d = await (await fetch('/api/plugins/' + encodeURIComponent(pid) + '/toggle', { method: 'POST' })).json();
+        const d = await (await apiFetch('/api/plugins/' + encodeURIComponent(pid) + '/toggle', { method: 'POST' })).json();
         showToast(d.ok ? (d.enabled ? '已启用，重启后加载' : '已停用，重启后卸载') : ('失败：' + (d.error || '')), d.ok ? 'success' : 'error');
         loadPluginManager();
     } catch (e) {
@@ -310,7 +310,7 @@ function openObsidianURI(path) {
 
 async function openObsidianNote(path) {
     try {
-        const res = await fetch(`/api/obsidian/note/${encodeURIComponent(path)}`);
+        const res = await apiFetch(`/api/obsidian/note/${encodeURIComponent(path)}`);
         const data = await res.json();
         if (!data.error) return data;
     } catch {}
@@ -321,7 +321,7 @@ async function openObsidianNote(path) {
 async function createDailyNote() {
     const content = prompt('今日札记内容（可选）：', '');
     try {
-        const res = await fetch('/api/obsidian/daily', {
+        const res = await apiFetch('/api/obsidian/daily', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: content || '' })
@@ -344,7 +344,7 @@ async function createExcerptNote() {
     const content = prompt('史料摘录内容：', '');
     if (!content) return;
     try {
-        const res = await fetch(`/api/obsidian/note/${encodeURIComponent('史料/史料摘录 ' + new Date().toISOString().slice(0, 10) + '.md')}`, {
+        const res = await apiFetch(`/api/obsidian/note/${encodeURIComponent('史料/史料摘录 ' + new Date().toISOString().slice(0, 10) + '.md')}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: `# 史料摘录\n\n${content}\n\n---\n*摘录时间：${new Date().toLocaleString()}*` })
@@ -366,7 +366,7 @@ async function saveQuickNote() {
     const content = textarea.value.trim();
     if (!content) { showToast('请先输入内容', 'warning'); return; }
     try {
-        const res = await fetch('/api/obsidian/daily', {
+        const res = await apiFetch('/api/obsidian/daily', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: '\n\n## 快速笔记\n' + content })
@@ -390,7 +390,7 @@ async function loadDashboard() {
 
 async function loadStats() {
     try {
-        const res = await fetch('/api/obsidian/stats');
+        const res = await apiFetch('/api/obsidian/stats');
         const data = await res.json();
         const legacy = data.legacy || {};
         const folders = data.folders || {};
@@ -416,7 +416,7 @@ async function loadNews(force) {
     if (!container) return;
     container.innerHTML = '<div class="empty-hint">正在抓取学术资讯…</div>';
     try {
-        const res = await fetch('/api/academic-feed' + (force ? '?refresh=1' : ''));
+        const res = await apiFetch('/api/academic-feed' + (force ? '?refresh=1' : ''));
         const data = await res.json();
         const items = data.items || [];
         if (!items.length) {
@@ -477,7 +477,7 @@ window.toggleFeedSources = toggleFeedSources;
 
 async function injectPluginTabs() {
     try {
-        const d = await (await fetch('/api/plugins')).json();
+        const d = await (await apiFetch('/api/plugins')).json();
         const navs = d.nav || [];
         const anchor = document.querySelector('.nav-tab[data-tab="_plugins"]');
         if (!anchor) return;
@@ -497,7 +497,7 @@ window.injectPluginTabs = injectPluginTabs;
 async function downloadAppUpdate(el) {
     if (el) { el.textContent = '下载中…'; el.style.pointerEvents = 'none'; }
     try {
-        const d = await (await fetch('/api/update/download', { method: 'POST' })).json();
+        const d = await (await apiFetch('/api/update/download', { method: 'POST' })).json();
         if (d.ok) {
             showToast('已下载 ' + Math.round(d.size / 1048576) + 'MB', 'success');
             const info = document.getElementById('appUpdateInfo');
@@ -518,7 +518,7 @@ async function checkAppUpdate(manual) {
     const info = document.getElementById('appUpdateInfo');
     const link = document.getElementById('appUpdateLink');
     try {
-        const d = await (await fetch('/api/update/check', { cache: 'no-store' })).json();
+        const d = await (await apiFetch('/api/update/check', { cache: 'no-store' })).json();
         if (!d.ok) {
             if (manual && info) { info.textContent = ' · 检查失败（需要网络）'; setTimeout(() => { info.textContent = ''; }, 3000); }
             return;
@@ -542,7 +542,7 @@ async function loadFeedSourcesPanel() {
     const p = document.getElementById('feedSourcesPanel');
     if (!p) return;
     try {
-        const d = await (await fetch('/api/academic-feed/sources')).json();
+        const d = await (await apiFetch('/api/academic-feed/sources')).json();
         const lst = d.sources || [];
         p.innerHTML = '<div class="pm-install" style="margin-top:8px">' +
             '<div class="pm-install-title">📡 自定义 RSS 源 <span class="pm-ver">随内置源一起抓取</span></div>' +
@@ -565,7 +565,7 @@ async function addFeedSource() {
     const url = (document.getElementById('feedSrcUrl') || {}).value || '';
     if (!url.trim()) { showToast('填 RSS 地址', 'error'); return; }
     try {
-        const d = await (await fetch('/api/academic-feed/sources', {
+        const d = await (await apiFetch('/api/academic-feed/sources', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: name.trim(), url: url.trim() })
         })).json();
@@ -577,7 +577,7 @@ window.addFeedSource = addFeedSource;
 
 async function delFeedSource(i) {
     try {
-        const d = await (await fetch('/api/academic-feed/sources/' + i, { method: 'DELETE' })).json();
+        const d = await (await apiFetch('/api/academic-feed/sources/' + i, { method: 'DELETE' })).json();
         showToast(d.ok ? '已删除' : '删除失败', d.ok ? 'success' : 'error');
         if (d.ok) { loadFeedSourcesPanel(); loadNews(true); }
     } catch (e) { showToast(String(e).slice(0, 80), 'error'); }
@@ -605,7 +605,7 @@ async function fedSearch() {
     box.style.display = '';
     box.innerHTML = '<div class="fed-loading">正在并行检索各库…</div>';
     try {
-        const d = await (await fetch('/api/federated/search?q=' + encodeURIComponent(q))).json();
+        const d = await (await apiFetch('/api/federated/search?q=' + encodeURIComponent(q))).json();
         if (!d.ok) { box.innerHTML = '<div class="fed-loading">检索失败</div>'; return; }
         const r = d.results || {};
         const local = r.local || {};
@@ -724,11 +724,11 @@ function libAISend() {
         '4) 涉及访问限制（需校园网/VPN/翻墙）要提醒。已收录站点：\n' + siteLines;
     const history = window._libAIHistory.slice(-6);
     history.push({ role: 'user', content: q });
-    fetch('/api/ai/chat', {
+    apiFetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'system', content: system }].concat(history) })
-    }).then(r => r.json()).then(d => {
+    }, 60000).then(r => r.json()).then(d => {
         const thinking = document.getElementById('libAIThinking');
         let answer = (d.response || d.message || d.text || '').trim() || '（没有收到回答）';
         answer = escapeHtml(answer);
@@ -766,7 +766,7 @@ async function rdLoadLibrary(q) {
     list.innerHTML = '<div class="empty-hint">连接 Zotero……</div>';
     let res;
     try {
-        res = await fetch('/api/zotero/library' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
+        res = await apiFetch('/api/zotero/library' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
     } catch (e) {
         list.innerHTML = '<div class="empty-hint">连接失败：Zotero 客户端未启动（或本地 23119 端口不通）。打开 Zotero 后点搜索重试。</div>';
         return;
@@ -805,7 +805,7 @@ let _rdCurrent = null; // { key, title, attKey, creators, year, itemType }
 
 async function rdOpen(key) {
     try {
-        const res = await fetch('/api/zotero/item/' + key + '/attachments');
+        const res = await apiFetch('/api/zotero/item/' + key + '/attachments');
         const data = await res.json();
         if (!data.ok || !data.attachments || !data.attachments.length) {
             showToast('这条文献没有 PDF 附件', 'error');
@@ -815,7 +815,7 @@ async function rdOpen(key) {
         // 取该条题录信息(作者/年份/标题)
         let meta = { creators: '', year: '', title: '', itemType: '' };
         try {
-            const libRes = await fetch('/api/zotero/library');
+            const libRes = await apiFetch('/api/zotero/library');
             const lib = await libRes.json();
             const it = (lib.items || []).find(x => x.key === key);
             if (it) meta = it;
@@ -869,7 +869,7 @@ async function rdSaveNote() {
     if (!area || !area.value.trim()) { showToast('先写点内容再保存', 'error'); return; }
     if (!_rdCurrent) return;
     try {
-        const res = await fetch('/api/obsidian/zotero-note', {
+        const res = await apiFetch('/api/obsidian/zotero-note', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -896,7 +896,7 @@ async function rdLoadRecentAdd() {
     const box = document.getElementById('rdRecentAdd');
     if (!box) return;
     try {
-        const res = await fetch('/api/zotero/recent?limit=6');
+        const res = await apiFetch('/api/zotero/recent?limit=6');
         const data = await res.json();
         if (!data.ok || !data.items.length) { box.innerHTML = '<div class="empty-hint">暂无</div>'; return; }
         box.innerHTML = data.items.map(it => `
@@ -912,7 +912,7 @@ async function rdLoadRecentRead() {
     const resumePanel = document.getElementById('rdResumePanel');
     if (!box) return;
     try {
-        const res = await fetch('/api/zotero/recently-read?limit=6');
+        const res = await apiFetch('/api/zotero/recently-read?limit=6');
         const data = await res.json();
         const items = data.items || [];
         if (!items.length) {
@@ -960,7 +960,7 @@ async function loadRecentActivity() {
     if (!container) return;
     const ICONS = { read: '📖', note: '✏️', search: '🔍' };
     try {
-        const res = await fetch('/api/activity/recent?limit=6');
+        const res = await apiFetch('/api/activity/recent?limit=6');
         const data = await res.json();
         if (data.ok && data.items && data.items.length) {
             container.innerHTML = data.items.map(a => {
@@ -1377,7 +1377,7 @@ async function loadPapersList() {
     if (!container) return;
     try {
         if (!_kbData) {
-            const res = await fetch('/api/writing-kb');
+            const res = await apiFetch('/api/writing-kb');
             const data = await res.json();
             if (!data.ok) throw new Error('kb fail');
             _kbData = data;
@@ -1392,7 +1392,7 @@ window.refreshTips = async function () {
     const container = document.getElementById('papersList');
     if (!container) return;
     try {
-        const res = await fetch('/api/writing-tips?n=3&refresh=1');
+        const res = await apiFetch('/api/writing-tips?n=3&refresh=1');
         renderTips(container, await res.json());
     } catch (e) { /* 忽略 */ }
 };
@@ -1460,7 +1460,7 @@ async function savePaper() {
     const content = `# ${title.replace('.md', '')}\n\n${body}\n`;
 
     try {
-        const res = await fetch(`/api/obsidian/note/${encodeURIComponent(path)}`, {
+        const res = await apiFetch(`/api/obsidian/note/${encodeURIComponent(path)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content })
@@ -1486,7 +1486,7 @@ async function savePaper() {
 async function loadWorkspace() {
     const container = document.getElementById('workspacePapers');
     try {
-        const res = await fetch('/api/obsidian/notes?folder=论文');
+        const res = await apiFetch('/api/obsidian/notes?folder=论文');
         const data = await res.json();
 
         document.getElementById('wsPaperCount').textContent = Array.isArray(data) ? data.length : 0;
@@ -1538,7 +1538,7 @@ async function viewPaper(path) {
     `;
 
     try {
-        const res = await fetch(`/api/obsidian/note/${encodeURIComponent(path)}`);
+        const res = await apiFetch(`/api/obsidian/note/${encodeURIComponent(path)}`);
         const data = await res.json();
         if (data.error) {
             preview.innerHTML = `
@@ -1588,7 +1588,7 @@ function editCurrentPaper() {
 
 async function loadWorkspaceStats() {
     try {
-        const res = await fetch('/api/obsidian/stats');
+        const res = await apiFetch('/api/obsidian/stats');
         const stats = await res.json();
         const legacy = stats.legacy || {};
 
@@ -1617,7 +1617,7 @@ async function viewLibraryFile(path) {
     detail.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
 
     try {
-        const res = await fetch(`/api/obsidian/note/${encodeURIComponent(path)}`);
+        const res = await apiFetch(`/api/obsidian/note/${encodeURIComponent(path)}`);
         const data = await res.json();
         const preview = data.content ? data.content.split('\n').slice(0, 30).join('\n') : '(空文件)';
 
@@ -1642,7 +1642,7 @@ async function viewLibraryFile(path) {
 async function initVaultFolders() {
     showToast('正在创建标准文件夹...', 'info');
     try {
-        const res = await fetch('/api/obsidian/init-folders', { method: 'POST' });
+        const res = await apiFetch('/api/obsidian/init-folders', { method: 'POST' });
         const data = await res.json();
         if (data.created && data.created.length > 0) {
             showToast(`已创建：${data.created.join(', ')}`, 'success');
@@ -1667,7 +1667,7 @@ async function searchVault() {
     resultsDiv.innerHTML = '<div class="loading"></div> 搜索中...';
 
     try {
-        const res = await fetch(`/api/obsidian/search?q=${encodeURIComponent(query)}`);
+        const res = await apiFetch(`/api/obsidian/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
             resultsDiv.innerHTML = data.slice(0, 10).map(f => `
@@ -1837,7 +1837,7 @@ function renderCBDBSearchArea(type) {
                 <div class="cbdb-hint">全部条件按"且"组合；留空的条件不参与筛选</div>
             </div>`;
         const placeFetcher = async q => {
-            const res = await fetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
+            const res = await apiFetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             return (Array.isArray(data) ? data : []).map(p => ({ id: p.addr_id, label: p.name_chn, sub: p.firstyear ? `${p.firstyear}${p.lastyear ? '-' + p.lastyear : ''}` : (p.admin_type || '') }));
         };
@@ -1849,35 +1849,35 @@ function renderCBDBSearchArea(type) {
         bindCBDBAutocomplete('cbdbAdvPlace', 'cbdbAdvPlaceList', placeFetcher, pick('place', 'cbdbAdvPlace'));
         bindCBDBAutocomplete('cbdbAdvEntry', 'cbdbAdvEntryList',
             async q => {
-                const res = await fetch(`/api/cbdb/entries/search?q=${encodeURIComponent(q)}`);
+                const res = await apiFetch(`/api/cbdb/entries/search?q=${encodeURIComponent(q)}`);
                 const data = await res.json();
                 return (Array.isArray(data) ? data : []).map(e => ({ id: e.code, label: e.name_chn, sub: e.name_eng }));
             },
             pick('entry', 'cbdbAdvEntry'));
         bindCBDBAutocomplete('cbdbAdvOffice', 'cbdbAdvOfficeList',
             async q => {
-                const res = await fetch(`/api/cbdb/offices/search?q=${encodeURIComponent(q)}`);
+                const res = await apiFetch(`/api/cbdb/offices/search?q=${encodeURIComponent(q)}`);
                 const data = await res.json();
                 return (Array.isArray(data) ? data : []).map(o => ({ id: o.office_id, label: o.office_chn, sub: [o.dynasty, o.category].filter(Boolean).join(' · ') }));
             },
             pick('office', 'cbdbAdvOffice'));
         bindCBDBAutocomplete('cbdbAdvStatus', 'cbdbAdvStatusList',
             async q => {
-                const res = await fetch(`/api/cbdb/status/search?q=${encodeURIComponent(q)}`);
+                const res = await apiFetch(`/api/cbdb/status/search?q=${encodeURIComponent(q)}`);
                 const data = await res.json();
                 return (Array.isArray(data) ? data : []).map(s => ({ id: s.code, label: s.name_chn, sub: s.name_eng }));
             },
             pick('status', 'cbdbAdvStatus'));
         bindCBDBAutocomplete('cbdbAdvText', 'cbdbAdvTextList',
             async q => {
-                const res = await fetch(`/api/cbdb/texts/search?q=${encodeURIComponent(q)}`);
+                const res = await apiFetch(`/api/cbdb/texts/search?q=${encodeURIComponent(q)}`);
                 const data = await res.json();
                 return (Array.isArray(data) ? data : []).map(tx => ({ id: tx.text_id, label: tx.title_chn, sub: tx.dynasty || '' }));
             },
             pick('text', 'cbdbAdvText'));
         bindCBDBAutocomplete('cbdbAdvAssoc', 'cbdbAdvAssocList',
             async q => {
-                const res = await fetch(`/api/cbdb/assoc/types?q=${encodeURIComponent(q)}`);
+                const res = await apiFetch(`/api/cbdb/assoc/types?q=${encodeURIComponent(q)}`);
                 const data = await res.json();
                 return (Array.isArray(data) ? data : []).map(x => ({ id: x.code, label: x.name_chn, sub: x.category }));
             },
@@ -1919,7 +1919,7 @@ function renderCBDBSearchArea(type) {
         bindCBDBAutocomplete('cbdbAssocInput', 'cbdbAssocList',
             async q => {
                 const cat = (document.getElementById('cbdbAssocCat') || {}).value || '';
-                const res = await fetch(`/api/cbdb/assoc/types?q=${encodeURIComponent(q)}${cat ? '&category=' + encodeURIComponent(cat) : ''}`);
+                const res = await apiFetch(`/api/cbdb/assoc/types?q=${encodeURIComponent(q)}${cat ? '&category=' + encodeURIComponent(cat) : ''}`);
                 const data = await res.json();
                 return (Array.isArray(data) ? data : []).map(x => ({
                     id: x.code, label: x.name_chn,
@@ -1952,7 +1952,7 @@ function renderCBDBSearchArea(type) {
         window._cbdbYearEntry = null;
         bindCBDBAutocomplete('cbdbYearEntry', 'cbdbYearEntryList',
             async q => {
-                const res = await fetch(`/api/cbdb/entries/search?q=${encodeURIComponent(q)}`);
+                const res = await apiFetch(`/api/cbdb/entries/search?q=${encodeURIComponent(q)}`);
                 const data = await res.json();
                 return (Array.isArray(data) ? data : []).map(e => ({ id: e.code, label: e.name_chn, sub: e.name_eng }));
             },
@@ -1970,7 +1970,7 @@ function renderCBDBSearchArea(type) {
             </div>`;
         window._cbdbPairState = { a: null, b: null };
         const pairFetcher = async q => {
-            const res = await fetch(`/api/cbdb/search?name=${encodeURIComponent(q)}`);
+            const res = await apiFetch(`/api/cbdb/search?name=${encodeURIComponent(q)}`);
             const data = await res.json();
             return (Array.isArray(data) ? data : []).map(p => ({
                 id: p.id, label: p.name_chn || p.name,
@@ -2008,7 +2008,7 @@ function renderCBDBSearchArea(type) {
         window._cbdbPlaceAssocState = { place: null, type: null };
         bindCBDBAutocomplete('cbdbPlaceAssocInput', 'cbdbPlaceAssocList',
             async q => {
-                const res = await fetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
+                const res = await apiFetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
                 const data = await res.json();
                 return (Array.isArray(data) ? data : []).map(p => ({ id: p.addr_id, label: p.name_chn, sub: p.firstyear ? `${p.firstyear}—${p.lastyear || ''}` : (p.admin_type || '') }));
             },
@@ -2018,7 +2018,7 @@ function renderCBDBSearchArea(type) {
             });
         bindCBDBAutocomplete('cbdbPlaceAssocType', 'cbdbPlaceAssocTypeList',
             async q => {
-                const res = await fetch(`/api/cbdb/assoc/types?q=${encodeURIComponent(q)}`);
+                const res = await apiFetch(`/api/cbdb/assoc/types?q=${encodeURIComponent(q)}`);
                 const data = await res.json();
                 return (Array.isArray(data) ? data : []).map(x => ({ id: x.code, label: x.name_chn, sub: x.category }));
             },
@@ -2062,7 +2062,7 @@ function renderCBDBSearchArea(type) {
             window._cbdbPersonState = window._cbdbPersonState || { place: null };
             bindCBDBAutocomplete('cbdbPersonPlace', 'cbdbPersonPlaceList',
                 async q => {
-                    const res = await fetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
+                    const res = await apiFetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
                     const data = await res.json();
                     return (Array.isArray(data) ? data : []).map(p => ({ id: p.addr_id, label: p.name_chn, sub: p.firstyear ? `${p.firstyear}—${p.lastyear || ''}` : (p.admin_type || '') }));
                 },
@@ -2121,7 +2121,7 @@ async function loadCBDBDynasties() {
     const sel = document.getElementById('cbdbDynasty');
     if (!sel || sel.dataset.loaded) return;
     try {
-        const res = await fetch('/api/cbdb/dynasties');
+        const res = await apiFetch('/api/cbdb/dynasties');
         const data = await res.json();
         if (!Array.isArray(data)) return;
         sel.innerHTML = '<option value="">全部朝代</option>' +
@@ -2245,7 +2245,7 @@ async function loadCBDBGroupNetwork() {
     if (!panel || !g) return;
     panel.innerHTML = '<div class="loading" style="margin:30px auto;display:block"></div>';
     try {
-        const res = await fetch('/api/cbdb/network/group', {
+        const res = await apiFetch('/api/cbdb/network/group', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2271,7 +2271,7 @@ async function cbdbGroupData() {
     resultsDiv.innerHTML = '<div class="loading"></div> 正在生成属性总表...';
     window._cbdbExport = null;
     try {
-        const res = await fetch('/api/cbdb/group/data', {
+        const res = await apiFetch('/api/cbdb/group/data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: ids.slice(0, 500) })
@@ -2322,7 +2322,7 @@ async function cbdbExportGeoJSON() {
     const srcLabel = { bio: '生活地址', posted: '任职地', all: '生活+任职' }[src] || '生活地址';
     showToast('正在生成 GeoJSON…', 'info', 1500);
     try {
-        const res = await fetch('/api/cbdb/persons/geojson', {
+        const res = await apiFetch('/api/cbdb/persons/geojson', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids: persons.map(p => p.id), addr_source: src })
@@ -2417,7 +2417,7 @@ async function cbdbPlotTrajectory() {
     if (ids.length !== 1) return;
     showToast('正在生成人生轨迹…（生活地址 + 任职履历）', 'info', 2000);
     try {
-        const res = await fetch('/api/cbdb/persons/geojson', {
+        const res = await apiFetch('/api/cbdb/persons/geojson', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids, addr_source: 'all', with_offices: true })
@@ -2686,7 +2686,7 @@ async function cbdbPlotGroupOnMap() {
     const wo = src === 'bio' && ids.length <= 50;
     showToast('正在获取地址坐标…', 'info', 1500);
     try {
-        const res = await fetch('/api/cbdb/persons/geojson', {
+        const res = await apiFetch('/api/cbdb/persons/geojson', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids, addr_types: fdef.types, addr_source: src, with_offices: wo })
@@ -2804,7 +2804,7 @@ async function cbdbMapGroupToList(cacheKey) {
     if (!resultsDiv) return;
     resultsDiv.innerHTML = '<div class="loading"></div> 查询中...';
     try {
-        const res = await fetch('/api/cbdb/query', {
+        const res = await apiFetch('/api/cbdb/query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filters: {}, person_ids: ids.slice(0, 5000) })
@@ -2995,7 +2995,7 @@ async function runAssocQuery() {
         if (fromYear) params.set('from_year', fromYear);
         if (toYear) params.set('to_year', toYear);
         if (dy) params.set('dy', dy);
-        const res = await fetch('/api/cbdb/assoc/persons?' + params);
+        const res = await apiFetch('/api/cbdb/assoc/persons?' + params);
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger)">${escapeHtml(data.error)}</p>`; return; }
         const rels = data.relations || [];
@@ -3067,7 +3067,7 @@ async function runPairQuery() {
     window._cbdbListView = { type: 'pair', query: a.label + ' · ' + b.label };
     window._cbdbExport = null;
     try {
-        const res = await fetch(`/api/cbdb/assoc/between?a=${a.id}&b=${b.id}`);
+        const res = await apiFetch(`/api/cbdb/assoc/between?a=${a.id}&b=${b.id}`);
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger)">${escapeHtml(data.error)}</p>`; return; }
         const rels = data.relations || [];
@@ -3124,7 +3124,7 @@ async function runKinPath(aId, bId) {
     if (!box) return;
     box.innerHTML = '<div class="loading"></div> 搜索中...';
     try {
-        const res = await fetch('/api/cbdb/kin/path?a=' + aId + '&b=' + bId);
+        const res = await apiFetch('/api/cbdb/kin/path?a=' + aId + '&b=' + bId);
         const d = await res.json();
         if (d.error) { box.innerHTML = '<p style="color:var(--danger)">' + escapeHtml(d.error) + '</p>'; return; }
         if (!d.found) {
@@ -3171,7 +3171,7 @@ async function runPlaceAssocQuery() {
         if (tp) { params.set('code', String(tp.code)); params.set('pair', '1'); }
         if (fromYear) params.set('from_year', fromYear);
         if (toYear) params.set('to_year', toYear);
-        const res = await fetch(`/api/cbdb/places/${place.id}/assoc?` + params);
+        const res = await apiFetch(`/api/cbdb/places/${place.id}/assoc?` + params);
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger)">${escapeHtml(data.error)}</p>`; return; }
         const rels = data.relations || [];
@@ -3226,7 +3226,7 @@ async function searchCBDB() {
             const dyT = (document.getElementById('cbdbDeathTo') || {}).value || '';
             const ixF = (document.getElementById('cbdbIndexFrom') || {}).value || '';
             const ixT = (document.getElementById('cbdbIndexTo') || {}).value || '';
-            const res = await fetch(`/api/cbdb/search?name=${encodeURIComponent(q)}${dy ? '&dy=' + encodeURIComponent(dy) : ''}${gender ? '&gender=' + gender : ''}${place ? '&addr_id=' + place.id : ''}${byF ? '&by_from=' + byF : ''}${byT ? '&by_to=' + byT : ''}${dyF ? '&dy_from=' + dyF : ''}${dyT ? '&dy_to=' + dyT : ''}${ixF ? '&index_from=' + ixF : ''}${ixT ? '&index_to=' + ixT : ''}`);
+            const res = await apiFetch(`/api/cbdb/search?name=${encodeURIComponent(q)}${dy ? '&dy=' + encodeURIComponent(dy) : ''}${gender ? '&gender=' + gender : ''}${place ? '&addr_id=' + place.id : ''}${byF ? '&by_from=' + byF : ''}${byT ? '&by_to=' + byT : ''}${dyF ? '&dy_from=' + dyF : ''}${dyT ? '&dy_to=' + dyT : ''}${ixF ? '&index_from=' + ixF : ''}${ixT ? '&index_to=' + ixT : ''}`);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
             if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到结果</p>'; return; }
@@ -3245,7 +3245,7 @@ async function searchCBDB() {
             return;
         } else if (window._cbdbType === 'office') {
             const cat = ((document.getElementById('cbdbOfficeCat') || {}).value || '').trim();
-            const res = await fetch(`/api/cbdb/offices/search?q=${encodeURIComponent(q)}${cat ? '&category=' + encodeURIComponent(cat) : ''}`);
+            const res = await apiFetch(`/api/cbdb/offices/search?q=${encodeURIComponent(q)}${cat ? '&category=' + encodeURIComponent(cat) : ''}`);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
             if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配官职</p>'; return; }
@@ -3261,7 +3261,7 @@ async function searchCBDB() {
                         </div>
                     </div>`).join('')}`;
         } else if (window._cbdbType === 'status') {
-            const res = await fetch(`/api/cbdb/status/search?q=${encodeURIComponent(q)}`);
+            const res = await apiFetch(`/api/cbdb/status/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
             if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配身份类型</p>'; return; }
@@ -3273,7 +3273,7 @@ async function searchCBDB() {
                         ${s.name_eng ? `<div class="result-card-body"><span style="font-size:12px;color:var(--text-muted)">${escapeHtml(s.name_eng)}</span></div>` : ''}
                     </div>`).join('')}`;
         } else if (window._cbdbType === 'text') {
-            const res = await fetch(`/api/cbdb/texts/search?q=${encodeURIComponent(q)}`);
+            const res = await apiFetch(`/api/cbdb/texts/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
             if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配著作</p>'; return; }
@@ -3296,7 +3296,7 @@ async function searchCBDB() {
             if (window._cbdbScope && window._cbdbScope.ids.length) {
                 url += `&ids=${window._cbdbScope.ids.join(',')}`;
             }
-            const res = await fetch(url);
+            const res = await apiFetch(url);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
             const persons = data.persons || [];
@@ -3318,7 +3318,7 @@ async function searchCBDB() {
             });
             return;
         } else if (window._cbdbType === 'entry') {
-            const res = await fetch(`/api/cbdb/entries/search?q=${encodeURIComponent(q)}`);
+            const res = await apiFetch(`/api/cbdb/entries/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
             if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配入仕方式</p>'; return; }
@@ -3337,7 +3337,7 @@ async function searchCBDB() {
             if (adminType) url += `&admin_type=${encodeURIComponent(adminType)}`;
             if (pFrom) url += `&from_year=${encodeURIComponent(pFrom)}`;
             if (pTo) url += `&to_year=${encodeURIComponent(pTo)}`;
-            const res = await fetch(url);
+            const res = await apiFetch(url);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
             if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配地名</p>'; return; }
@@ -3402,7 +3402,7 @@ async function runAdvancedQuery() {
         const useScope = scope && scope.ids.length;
         let res;
         if (useScope) {
-            res = await fetch('/api/cbdb/query', {
+            res = await apiFetch('/api/cbdb/query', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filters, person_ids: scope.ids })
@@ -3410,7 +3410,7 @@ async function runAdvancedQuery() {
         } else {
             const params = new URLSearchParams();
             Object.entries(filters).forEach(([k, v]) => params.set(k, v));
-            res = await fetch(`/api/cbdb/query?${params.toString()}`);
+            res = await apiFetch(`/api/cbdb/query?${params.toString()}`);
         }
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
@@ -3458,7 +3458,7 @@ function renderFilterBar(kind, id, title, filters) {
 function bindFilterAddrAutocomplete() {
     bindCBDBAutocomplete('fltAddr', 'fltAddrList',
         async q => {
-            const res = await fetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
+            const res = await apiFetch(`/api/cbdb/places/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             return (Array.isArray(data) ? data : []).map(p => ({ id: p.addr_id, label: p.name_chn, sub: p.firstyear ? `${p.firstyear}—${p.lastyear || ''}` : (p.admin_type || '') }));
         },
@@ -3480,7 +3480,7 @@ async function loadOfficePersons(officeId, title, filters) {
         if (filters && filters.from) params.set('from_year', filters.from);
         if (filters && filters.to) params.set('to_year', filters.to);
         if (filters && filters.addrId) params.set('addr_id', filters.addrId);
-        const res = await fetch(`/api/cbdb/offices/${officeId}/persons${params.toString() ? '?' + params.toString() : ''}`);
+        const res = await apiFetch(`/api/cbdb/offices/${officeId}/persons${params.toString() ? '?' + params.toString() : ''}`);
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
         if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + renderFilterBar('office', officeId, title, filters) + '<p style="color:var(--text-muted)">暂无任职记录（过滤条件可能过窄）</p>'; bindFilterAddrAutocomplete(); return; }
@@ -3542,7 +3542,7 @@ async function loadStatusPersons(code, title, filters) {
         const params = new URLSearchParams();
         if (filters && filters.from) params.set('from_year', filters.from);
         if (filters && filters.to) params.set('to_year', filters.to);
-        const res = await fetch(`/api/cbdb/status/${code}/persons${params.toString() ? '?' + params.toString() : ''}`);
+        const res = await apiFetch(`/api/cbdb/status/${code}/persons${params.toString() ? '?' + params.toString() : ''}`);
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
         if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + renderFilterBar('status', code, title, filters) + '<p style="color:var(--text-muted)">暂无人物记录（过滤条件可能过窄）</p>'; return; }
@@ -3572,7 +3572,7 @@ async function loadTextPersons(textId, title) {
     if (!resultsDiv) return;
     resultsDiv.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
     try {
-        const res = await fetch(`/api/cbdb/texts/${textId}/persons`);
+        const res = await apiFetch(`/api/cbdb/texts/${textId}/persons`);
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
         if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + '<p style="color:var(--text-muted)">暂无相关人物</p>'; return; }
@@ -3603,7 +3603,7 @@ async function loadPlacePersons(addrId, includeSame) {
     if (!resultsDiv) return;
     resultsDiv.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
     try {
-        const res = await fetch(`/api/cbdb/places/${addrId}/persons${includeSame ? '?include_same_coord=1' : ''}`);
+        const res = await apiFetch(`/api/cbdb/places/${addrId}/persons${includeSame ? '?include_same_coord=1' : ''}`);
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
         if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + '<p style="color:var(--text-muted)">暂无相关人物</p>'; return; }
@@ -3641,7 +3641,7 @@ async function loadEntryPersons(entryCode, title, filters) {
         if (filters && filters.to) params.set('to_year', filters.to);
         if (filters && filters.addrId) params.set('addr_id', filters.addrId);
         if (filters && filters.useIndex) params.set('use_index', '1');
-        const res = await fetch(`/api/cbdb/entries/${entryCode}/persons${params.toString() ? '?' + params.toString() : ''}`);
+        const res = await apiFetch(`/api/cbdb/entries/${entryCode}/persons${params.toString() ? '?' + params.toString() : ''}`);
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
         if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + renderFilterBar('entry', entryCode, title, filters) + '<p style="color:var(--text-muted)">暂无人物记录（过滤条件可能过窄）</p>'; bindFilterAddrAutocomplete(); return; }
@@ -3700,7 +3700,7 @@ async function loadCBDBPersonDetail(id) {
     detail.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
 
     try {
-        const res = await fetch(`/api/cbdb/person/${id}`);
+        const res = await apiFetch(`/api/cbdb/person/${id}`);
         const p = await res.json();
         if (p.error) {
             detail.innerHTML = renderCBDBBackBar('') + `<p style="color:var(--danger);">${p.error}</p>`;
@@ -3783,7 +3783,7 @@ async function runKinRecursive(id) {
     const mar = (document.getElementById('kinMar') || {}).value || '1';
     box.innerHTML = '<div class="loading"></div> 递归展开中（首次查询需加载亲属索引，约数秒）…';
     try {
-        const res = await fetch(`/api/cbdb/person/${id}/kin/recursive?up=${up}&down=${down}&col=${col}&mar=${mar}`);
+        const res = await apiFetch(`/api/cbdb/person/${id}/kin/recursive?up=${up}&down=${down}&col=${col}&mar=${mar}`);
         const data = await res.json();
         if (data.error) { box.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
         const persons = data.persons || [];
@@ -3821,7 +3821,7 @@ async function loadCBDBNetwork(id) {
     if (_cbdbNetState.includeKin) params.set('include_kin', '1');
     if (_cbdbNetState.dy) params.set('dy', _cbdbNetState.dy);
     try {
-        const res = await fetch(`/api/cbdb/network/${id}?${params.toString()}`);
+        const res = await apiFetch(`/api/cbdb/network/${id}?${params.toString()}`);
         const data = await res.json();
         if (data.error) { panel.innerHTML = `<p style="color:var(--danger);padding:20px">${data.error}</p>`; return; }
         renderNetworkPanel(panel, data, id);
@@ -4160,7 +4160,7 @@ async function loadAiModels() {
     const sel = document.getElementById('aiModelSelect');
     if (!sel) return;
     try {
-        const d = await (await fetch('/api/ai/models')).json();
+        const d = await (await apiFetch('/api/ai/models')).json();
         const models = d.models || [];
         sel.innerHTML = models.map(m =>
             '<option value="' + m.id + '"' + (m.id === (window._aiModel || d.default) ? ' selected' : '') + '>' + m.name + '</option>'
@@ -4202,7 +4202,7 @@ async function aiKbRefRender() {
     if (!panel) return;
     try {
         if (!_kbData) {
-            const res = await fetch('/api/writing-kb');
+            const res = await apiFetch('/api/writing-kb');
             _kbData = await res.json();
         }
         const themes = _kbData.themes || [];
@@ -4275,7 +4275,7 @@ async function sendAIChat() {
             ...(Array.isArray(window._aiHistory) ? window._aiHistory : []),
             { role: 'user', content: text }
         ];
-        const res = await fetch('/api/ai/chat', {
+        const res = await apiFetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ messages: msgs, model: window._aiModel || undefined })
@@ -4344,7 +4344,7 @@ async function checkStatus() {
     if (!dot || !text) return;
 
     try {
-        const res = await fetch('/api/status');
+        const res = await apiFetch('/api/status');
         const data = await res.json();
 
         const obsidianOk = data.obsidian;
@@ -4380,7 +4380,7 @@ async function globalSearch() {
     resultsDiv.innerHTML = '<div class="loading" style="margin:12px auto;display:block"></div><p style="text-align:center;color:var(--text-muted);font-size:13px">搜索 Vault 中...</p>';
 
     try {
-        const res = await fetch(`/api/obsidian/search?q=${encodeURIComponent(query)}`);
+        const res = await apiFetch(`/api/obsidian/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
             resultsDiv.innerHTML = data.slice(0, 10).map(f => `
@@ -4742,7 +4742,7 @@ async function cbdbMapClickReverse(e) {
     const alive = () => seq === window._cbdbRevSeq && _cbdbRevPin;
     const failPopup = msg => { if (alive()) _cbdbRevPin.setPopupContent(`<div class="cbdb-map-popup"><div class="cbdb-map-popup-line" style="color:#d98a8a">${escapeHtml(msg)}</div></div>`); };
     try {
-        const res = await fetch(`/api/cbdb/places/nearest?x=${lng.toFixed(4)}&y=${lat.toFixed(4)}`);
+        const res = await apiFetch(`/api/cbdb/places/nearest?x=${lng.toFixed(4)}&y=${lat.toFixed(4)}`);
         if (!alive()) return;
         if (!res.ok) {
             let msg = `HTTP ${res.status}`;
@@ -4863,7 +4863,7 @@ function searchEra() {
 
 async function searchEraBook(query, container) {
     try {
-        const d = await (await fetch('/api/tools/era/book?q=' + encodeURIComponent(query))).json();
+        const d = await (await apiFetch('/api/tools/era/book?q=' + encodeURIComponent(query))).json();
         if (!d.ok || !d.items || !d.items.length) return;
         const items = d.items.slice(0, 6);
         const bookHtml = '<div class="era-book-block">' +
@@ -4926,7 +4926,7 @@ function searchYear() {
 
 async function searchYearBook(year, container) {
     try {
-        const d = await (await fetch('/api/tools/era/book?q=' + year)).json();
+        const d = await (await apiFetch('/api/tools/era/book?q=' + year)).json();
         if (!d.ok || !d.items || !d.items.length) return;
         const items = d.items.slice(0, 6);
         container.insertAdjacentHTML('beforeend', '<div class="era-book-block">' +
@@ -5012,7 +5012,7 @@ function searchPlace() {
 async function searchPlaceBook(query, container) {
     // 史为乐《中国历史地名大辞典》原书检索块（数据就位自动生效；缺席静默跳过）
     try {
-        const d = await (await fetch('/api/tools/diming/book?q=' + encodeURIComponent(query))).json();
+        const d = await (await apiFetch('/api/tools/diming/book?q=' + encodeURIComponent(query))).json();
         if (!d.ok) {
             if (!container.innerHTML) container.innerHTML = '<p style="color:var(--text-muted)">未找到相关地名</p>';
             return;
@@ -5352,7 +5352,7 @@ async function cbdbAIAssist() {
     if (statusEl) statusEl.innerHTML = '<span class="cbdb-ai-thinking">&#x1F914; 正在理解你的问题…</span>';
 
     try {
-        const res = await fetch('/api/ai/chat', {
+        const res = await apiFetch('/api/ai/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -5476,7 +5476,7 @@ async function cbdbAIExecutePair(params) {
     if (!params.a || !params.b) { showToast('AI 解析缺少人名', 'warning'); return; }
 
     async function searchPerson(name) {
-        var res = await fetch('/api/cbdb/search?name=' + encodeURIComponent(name));
+        var res = await apiFetch('/api/cbdb/search?name=' + encodeURIComponent(name));
         var data = await res.json();
         return (Array.isArray(data) && data.length) ? data[0] : null;
     }
@@ -5505,7 +5505,7 @@ function cbdbAIOpenFirstResult() {
 
 // AI 意图：解析姓名 → 第一人（与 cbdbAIExecutePair 同一策略）
 async function cbdbAIResolveFirstPerson(name) {
-    var res = await fetch('/api/cbdb/search?name=' + encodeURIComponent(name));
+    var res = await apiFetch('/api/cbdb/search?name=' + encodeURIComponent(name));
     var data = await res.json();
     return (Array.isArray(data) && data.length) ? data[0] : null;
 }
@@ -5525,7 +5525,7 @@ async function cbdbAIShowSocial(params) {
     detail.innerHTML = renderCBDBBackBar(centerName + ' 的社会关系') +
         '<div class="loading" style="margin:20px auto;display:block"></div>';
     try {
-        var res = await fetch('/api/cbdb/person/' + p.id + '/assoc');
+        var res = await apiFetch('/api/cbdb/person/' + p.id + '/assoc');
         var rels = await res.json();
         var list = Array.isArray(rels) ? rels : [];
         var rows = list.map(function(r) {
@@ -5560,7 +5560,7 @@ async function cbdbAIShowKin(params) {
 async function cbdbAIShowEntryRange(params) {
     if (!params.entry) { showToast('AI 解析缺少入仕方式', 'warning'); return; }
     if (!params.from_year || !params.to_year) { showToast('AI 解析缺少起止年份', 'warning'); return; }
-    var res = await fetch('/api/cbdb/entries/resolve?q=' + encodeURIComponent(params.entry));
+    var res = await apiFetch('/api/cbdb/entries/resolve?q=' + encodeURIComponent(params.entry));
     var info = await res.json();
     if (info.error) { showToast(info.error, 'warning'); return; }
     switchCBDBType('entry');

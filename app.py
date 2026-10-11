@@ -30,10 +30,21 @@ APP_REPO = "Kormont-Chiang/junexi"
 OBSIDIAN_API_KEY = os.environ.get("OBSIDIAN_API_KEY", "")
 DEEPSEEK_MODEL = "deepseek-chat"  # 默认模型
 
-# 可选 AI 模型注册表: chat 端点按客户端传来的 model 分发
+# R53: 多供应商 AI 模型注册表——支持 DeepSeek/硅基流动/OpenClaw/通义/智谱/Kimi
 AI_MODELS = [
+    # DeepSeek 官方
     {"id": "deepseek-chat", "name": "DeepSeek 对话", "desc": "日常问答与写作,响应快", "via": "deepseek", "model": "deepseek-chat"},
     {"id": "deepseek-reasoner", "name": "DeepSeek 深思", "desc": "复杂推理/长链条论证,慢但深", "via": "deepseek", "model": "deepseek-reasoner"},
+    # 硅基流动(SiliconFlow)——聚合多家开源模型
+    {"id": "sf-deepseek-chat", "name": "DS对话·硅基", "desc": "DeepSeek-V3 via 硅基流动,便宜快", "via": "siliconflow", "model": "deepseek-ai/DeepSeek-V3"},
+    {"id": "sf-deepseek-r1", "name": "DS深思·硅基", "desc": "DeepSeek-R1 via 硅基流动,推理强", "via": "siliconflow", "model": "deepseek-ai/DeepSeek-R1"},
+    {"id": "sf-qwen-max", "name": "通义千问Max", "desc": "阿里旗舰模型 via 硅基流动", "via": "siliconflow", "model": "Qwen/Qwen2.5-72B-Instruct"},
+    {"id": "sf-qwen-coder", "name": "千问Coder", "desc": "代码/数据/正则,阿里Coder via 硅基", "via": "siliconflow", "model": "Qwen/Qwen2.5-Coder-32B-Instruct"},
+    {"id": "sf-glm4", "name": "GLM-4 Plus", "desc": "智谱旗舰,中文理解强 via 硅基", "via": "siliconflow", "model": "THUDM/glm-4-9b-chat"},
+    {"id": "sf-yi", "name": "Yi Large", "desc": "零一万物,长文本 via 硅基流动", "via": "siliconflow", "model": "01-ai/Yi-1.5-34B-Chat"},
+    {"id": "sf-internlm", "name": "InternLM", "desc": "书生·浦语,学术向 via 硅基流动", "via": "siliconflow", "model": "internlm/internlm2_5-20b-chat"},
+    {"id": "sf-llama", "name": "Llama 3.3", "desc": "Meta 70B,英文/代码 via 硅基", "via": "siliconflow", "model": "meta-llama/Meta-Llama-3.1-70B-Instruct"},
+    # OpenClaw 本机网关
     {"id": "openclaw", "name": "OpenClaw 网关", "desc": "走本机网关,模型取决于 OpenClaw 配置", "via": "openclaw", "model": "kimi-coding/k2p6"},
 ]
 
@@ -195,12 +206,35 @@ def _model_cfg(model_id):
 
 
 def deepseek_chat(messages, stream=False, model_id=None):
-    """按 model_id 分发: deepseek=直连官方API, openclaw=本机网关。fallback 逻辑保留。"""
+    """按 model_id 分发: deepseek=直连官方API, siliconflow=硅基流动, openclaw=本机网关"""
     cfg = _model_cfg(model_id)
     model_name = cfg.get("model", DEEPSEEK_MODEL)
     via = cfg.get("via", "deepseek")
 
-    # DeepSeek 官方: 有 API key 时优先直连，更快更稳
+    # R53: 硅基流动——聚合多家开源模型,OpenAI 兼容 API
+    if via == "siliconflow":
+        sf_key = os.environ.get("SILICONFLOW_API_KEY", "")
+        if not sf_key:
+            return {"error": "未配置 SiliconFlow API Key(环境变量 SILICONFLOW_API_KEY)"}
+        try:
+            r = requests.post("https://api.siliconflow.cn/v1/chat/completions",
+                headers={"Authorization": f"Bearer {sf_key}", "Content-Type": "application/json"},
+                json={"model": model_name, "messages": messages, "stream": stream},
+                timeout=120)
+            if r.status_code == 200:
+                return r.json()
+            elif r.status_code == 401:
+                return {"error": "硅基流动 API Key 无效或已过期"}
+            elif r.status_code == 429:
+                return {"error": "硅基流动额度不足——请前往 https://cloud.siliconflow.cn 充值"}
+            else:
+                return {"error": f"硅基流动错误 {r.status_code}: {r.text[:100]}"}
+        except requests.exceptions.Timeout:
+            return {"error": "硅基流动请求超时"}
+        except Exception as e:
+            return {"error": f"硅基流动连接失败: {str(e)[:80]}"}
+
+    # DeepSeek 官方: 有 API key 时优先直连
     api_key = os.environ.get("DEEPSEEK_API_KEY", "")
     if via == "deepseek" and api_key:
         try:
@@ -210,10 +244,13 @@ def deepseek_chat(messages, stream=False, model_id=None):
                 timeout=120)
             if r.status_code == 200:
                 return r.json()
+            elif r.status_code == 429:
+                # R53: DeepSeek 额度不够→提示跳转硅基流动
+                return {"error": "DeepSeek 额度不足——试试硅基流动的同款模型(更便宜),或前往 https://platform.deepseek.com 充值"}
         except:
             pass
 
-    # OpenClaw 本地 gateway(对 deepseek-reasoner 等也可兜底)
+    # OpenClaw 本地 gateway(兜底)
     try:
         r = requests.post("http://127.0.0.1:8642/v1/chat/completions",
             json={"model": model_name, "messages": messages, "stream": stream},
@@ -225,7 +262,7 @@ def deepseek_chat(messages, stream=False, model_id=None):
 
     if via == "deepseek" and not api_key:
         return {"error": "未配置 DeepSeek API Key"}
-    return {"error": "模型服务暂不可用（直连与 gateway 均失败）"}
+    return {"error": "模型服务暂不可用"}
 
 # ── Routes: 页面 ────────────────────────────────────────
 # ── R47c: 自动 cache busting——模板渲染时注入文件 mtime 作为版本号 ──

@@ -60,21 +60,21 @@
 
 /* ── 红: 绛色 (深红宫墙) ── */
 [data-theme="hong"] {
-    --bg-primary: #1a0e0e;
-    --bg-secondary: #261414;
-    --bg-tertiary: #341c1c;
-    --bg-card: #201212;
-    --bg-hover: #3a2222;
-    --border-color: #4a2e2e;
-    --text-primary: #e0d0c8;
-    --text-secondary: #b8a090;
-    --text-muted: #806858;
+    --bg-primary: #1e1214;
+    --bg-secondary: #2a1a1e;
+    --bg-tertiary: #382228;
+    --bg-card: #241a1c;
+    --bg-hover: #3e2a30;
+    --border-color: #4e363c;
+    --text-primary: #d8c8c4;
+    --text-secondary: #b0a090;
+    --text-muted: #787060;
     --accent: #d4a86e;
     --accent-dim: #a07848;
     --accent-glow: rgba(212,168,110,0.15);
-    --danger: #c04040;
-    --success: #7a9a68;
-    --info: #6a8ab0;
+    --danger: #e06060;
+    --success: #7ab088;
+    --info: #6a9ac0;
     --shadow: 0 4px 20px rgba(0,0,0,0.5);
     --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
 }

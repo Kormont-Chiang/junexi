@@ -2,13 +2,14 @@
    六月息 · 历史学学术面板 — 全局样式
    ═══════════════════════════════════════════════════════ */
 
+/* ── 皂: 玄黑 (默认暗色) ── */
 :root {
-    --bg-primary: #0f0f12;
-    --bg-secondary: #16161a;
-    --bg-tertiary: #1e1e24;
-    --bg-card: #1a1a20;
-    --bg-hover: #25252e;
-    --border-color: #2a2a35;
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #111111;
+    --bg-tertiary: #181818;
+    --bg-card: #141414;
+    --bg-hover: #1e1e1e;
+    --border-color: #2a2a2a;
     --text-primary: #e8e8ec;
     --text-secondary: #a0a0b0;
     --text-muted: #6b6b7b;
@@ -36,8 +37,8 @@
 
 /* ═══ R40b: 四预设主题 ═══ */
 
-/* ── 主题2: 宣纸 (亮色) ── */
-[data-theme="light"] {
+/* ── 白: 宣纸 (亮色) ── */
+[data-theme="bai"] {
     --bg-primary: #f5f0e8;
     --bg-secondary: #ebe5d8;
     --bg-tertiary: #e0d8c8;
@@ -57,8 +58,8 @@
     --shadow-lg: 0 8px 40px rgba(0,0,0,0.12);
 }
 
-/* ── 主题3: 赭石 (红褐暖调) ── */
-[data-theme="sepia"] {
+/* ── 红: 朱砂 (红褐暖调) ── */
+[data-theme="hong"] {
     --bg-primary: #1c1210;
     --bg-secondary: #2a1a16;
     --bg-tertiary: #38241e;
@@ -78,8 +79,8 @@
     --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
 }
 
-/* ── 主题4: 黛蓝 (青灰冷调) ── */
-[data-theme="morandi"] {
+/* ── 青: 黛蓝 (青灰冷调) ── */
+[data-theme="qing"] {
     --bg-primary: #1a2028;
     --bg-secondary: #222a34;
     --bg-tertiary: #2a3442;
@@ -117,36 +118,35 @@ body::before {
     top: 0; left: 0; right: 0; bottom: 0;
     pointer-events: none;
     z-index: 0;
-    opacity: var(--pattern-opacity, 0.12);
+    opacity: var(--pattern-opacity, 0.15);
 }
 
-/* 玄青(默认): 云雷纹——回字形螺旋，青铜器暗纹 */
-:root[data-theme="dark"] body::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cpath d='M4 4h16v4h-8v8h-4V8H4V4zm24 0h16v16h-4v-8h-8V4h-4zM4 24h4v8h8v4H4V24zm32 8h4v8H28v-4h8v-4zM16 16h16v16H16V16zm4 4v8h8v-8h-8z' fill='none' stroke='%23c9a96e' stroke-width='1.8'/%3E%3C/svg%3E");
-    background-size: 48px 48px;
-    --pattern-opacity: 0.12;
-}
-}
-
-/* 宣纸: 纤维纹理 */
-[data-theme="light"] body::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
-    background-size: 120px 120px;
-    --pattern-opacity: 0.08;
+/* 皂: 云雷纹——双层回字，青铜器暗纹 */
+:root[data-theme="zao"] body::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23c9a96e'%3E%3Cpath d='M4 4h32v8h-16v16h-8V12H4V4zm48 0h32v32h-8V16H52V4h-4zM4 48h8v16h16v8H4V48zm72 16h8v32H64v-8h16V64h4zM24 24h24v24H24V24zm6 6v12h12V30H30z' stroke-width='2'/%3E%3Cpath d='M52 52h40v40H52V52zm8 8v24h24V60H60z' stroke-width='1.2' opacity='0.5'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 96px 96px;
+    --pattern-opacity: 0.15;
 }
 
-/* 赭石: 卷草纹——唐草缠枝 */
-[data-theme="sepia"] body::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M36 36c0-6 4-10 10-10s10 4 10 10-4 10-10 10-10-4-10-10zm0 0c0 6-4 10-10 10s-10-4-10-10 4-10 10-10 10 4 10 10zm0-18c2 4 2 8 0 18m0 0c-2 10-2 14 0 18M18 36c4-2 8-2 18 0m0 0c10 2 14 2 18 0' fill='none' stroke='%23c04851' stroke-width='1.5'/%3E%3Ccircle cx='36' cy='18' r='2.5' fill='none' stroke='%23c04851' stroke-width='1.2'/%3E%3Ccircle cx='36' cy='54' r='2.5' fill='none' stroke='%23c04851' stroke-width='1.2'/%3E%3Ccircle cx='18' cy='36' r='2.5' fill='none' stroke='%23c04851' stroke-width='1.2'/%3E%3Ccircle cx='54' cy='36' r='2.5' fill='none' stroke='%23c04851' stroke-width='1.2'/%3E%3C/svg%3E");
-    background-size: 72px 72px;
-    --pattern-opacity: 0.11;
+/* 白: 洒金笺——金箔碎片+纤维纹理 */
+[data-theme="bai"] body::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23p)' opacity='0.35'/%3E%3Cg fill='%239a7030'%3E%3Crect x='20' y='30' width='6' height='3' rx='1' opacity='0.6'/%3E%3Crect x='80' y='15' width='4' height='6' rx='1' opacity='0.5'/%3E%3Crect x='130' y='50' width='8' height='3' rx='1' opacity='0.4'/%3E%3Crect x='50' y='80' width='3' height='5' rx='1' opacity='0.55'/%3E%3Crect x='110' y='100' width='5' height='4' rx='1' opacity='0.45'/%3E%3Crect x='30' y='120' width='7' height='3' rx='1' opacity='0.5'/%3E%3Crect x='140' y='130' width='4' height='5' rx='1' opacity='0.35'/%3E%3Crect x='65' y='55' width='5' height='3' rx='1' opacity='0.4'/%3E%3Crect x='95' y='140' width='6' height='3' rx='1' opacity='0.45'/%3E%3C/g%3E%3Cg fill='none' stroke='%239a7030' stroke-width='0.4' opacity='0.3'%3E%3Cpath d='M10 40q20-5 40 0t40 0 40 0'/%3E%3Cpath d='M0 90q25-8 50 0t50 0 50 0'/%3E%3Cpath d='M15 140q20-5 40 0t40 0 40 0'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 160px 160px;
+    --pattern-opacity: 0.25;
 }
 
-/* 黛蓝: 落花流水——宋代水波纹 */
-[data-theme="morandi"] body::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='28' viewBox='0 0 56 28'%3E%3Cpath d='M0 14q7-7 14 0t14 0 14 0 14 0' fill='none' stroke='%235a8ac0' stroke-width='1.3'/%3E%3Cpath d='M0 14q7 7 14 0t14 0 14 0 14 0' fill='none' stroke='%235a8ac0' stroke-width='1.5' opacity='0.5'/%3E%3Ccircle cx='14' cy='7' r='1.5' fill='%235a8ac0' opacity='0.4'/%3E%3Ccircle cx='42' cy='21' r='1.5' fill='%235a8ac0' opacity='0.4'/%3E%3Ccircle cx='28' cy='14' r='1' fill='%235a8ac0' opacity='0.3'/%3E%3C/svg%3E");
-    background-size: 56px 28px;
-    --pattern-opacity: 0.13;
+/* 红: 卷草纹——双层缠枝 */
+[data-theme="hong"] body::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23c04851'%3E%3Cpath d='M48 48c0-8 5-13 13-13s13 5 13 13-5 13-13 13-13-5-13-13zm0 0c0 8-5 13-13 13S22 56 22 48s5-13 13-13 13 5 13 13zM48 24c3 6 3 12 0 24m0 0c-3 12-3 18 0 24M24 48c6-3 12-3 24 0m0 0c12 3 18 3 24 0' stroke-width='2'/%3E%3Ccircle cx='48' cy='12' r='4' stroke-width='1.5'/%3E%3Ccircle cx='48' cy='84' r='4' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='48' r='4' stroke-width='1.5'/%3E%3Ccircle cx='84' cy='48' r='4' stroke-width='1.5'/%3E%3Cpath d='M0 0l16 16M96 96L80 80M0 96l16-16M96 0L80 16' stroke-width='0.8' opacity='0.4'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 96px 96px;
+    --pattern-opacity: 0.14;
+}
+
+/* 青: 落花流水——双层水波 */
+[data-theme="qing"] body::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='42' viewBox='0 0 84 42'%3E%3Cg fill='none' stroke='%235a8ac0'%3E%3Cpath d='M0 10q10-10 21 0t21 0 21 0 21 0' stroke-width='1.8'/%3E%3Cpath d='M0 10q10 10 21 0t21 0 21 0 21 0' stroke-width='1' opacity='0.5'/%3E%3Cpath d='M-10 30q10-10 21 0t21 0 21 0 21 0 21 0' stroke-width='1.4'/%3E%3Cpath d='M-10 30q10 10 21 0t21 0 21 0 21 0 21 0' stroke-width='0.8' opacity='0.4'/%3E%3Ccircle cx='21' cy='5' r='2' stroke-width='1' opacity='0.6'/%3E%3Ccircle cx='63' cy='25' r='2' stroke-width='1' opacity='0.6'/%3E%3Ccircle cx='42' cy='18' r='1.2' stroke-width='0.8' opacity='0.4'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 84px 42px;
+    --pattern-opacity: 0.16;
 }
 
 /* 内容层在底纹之上 */

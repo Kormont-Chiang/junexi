@@ -36,7 +36,7 @@
                 <div id="statusDot" class="status-dot error"></div>
                 <span id="statusText">API 未连接</span>
             </div>
-            <button id="themeToggleBtn" onclick="jxCycleTheme()" style="padding:6px 12px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">🎨 玄青</button>
+            <button id="themeToggleBtn" onclick="jxCycleTheme()" style="padding:6px 12px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">🎨 青</button>
         </div>
     </nav>
 
@@ -1377,8 +1377,8 @@
 <script>
 /* R40b: 主题切换——localStorage 持久化 + data-theme attribute */
 (function(){
-  var THEMES=['dark','light','sepia','morandi'];
-  var LABELS={dark:'玄青',light:'宣纸',sepia:'赭石',morandi:'黛蓝'};
+  var THEMES=['qing','hong','zao','bai'];
+  var LABELS={qing:'青',hong:'红',zao:'皂',bai:'白'};
   var _pluginThemeLinks=[];
   function _injectPluginThemes(){
     fetch('/api/plugins').then(function(r){return r.json()}).then(function(d){
@@ -1398,22 +1398,22 @@
     _pluginThemeLinks=[];
   }
   function applyTheme(t){
-    if(THEMES.indexOf(t)<0)t='dark';
-    document.documentElement.setAttribute('data-theme',t==='dark'?'dark':t);
+    if(THEMES.indexOf(t)<0)t='qing';
+    document.documentElement.setAttribute('data-theme',t);
     localStorage.setItem('jx-theme',t);
     var btn=document.getElementById('themeToggleBtn');
     if(btn)btn.textContent='🎨 '+LABELS[t];
     _removePluginThemes();
-    if(t!=='dark')_injectPluginThemes();
+    if(t!=='qing')_injectPluginThemes();
   }
   window.jxSetTheme=applyTheme;
   window.jxCycleTheme=function(){
-    var cur=localStorage.getItem('jx-theme')||'dark';
+    var cur=localStorage.getItem('jx-theme')||'qing';
     var i=THEMES.indexOf(cur);if(i<0)i=0;
     applyTheme(THEMES[(i+1)%THEMES.length]);
   };
   document.addEventListener('DOMContentLoaded',function(){
-    applyTheme(localStorage.getItem('jx-theme')||'dark');
+    applyTheme(localStorage.getItem('jx-theme')||'qing');
     _initNavDrag();
     // R41a: 插件 tab 异步注入后再 apply 排序（MutationObserver 监听 navTabs 子节点变化）
     var _navObs = new MutationObserver(function(){

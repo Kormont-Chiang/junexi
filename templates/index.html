@@ -37,6 +37,21 @@
                 <span id="statusText">API 未连接</span>
             </div>
             <button id="themeToggleBtn" onclick="jxCycleTheme()" style="padding:6px 12px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">🎨 青</button>
+            <select id="fontFamilySelect" onchange="jxSetFont(this.value)" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:inherit">
+                <option value="system">系统默认</option>
+                <option value="serif">宋体</option>
+                <option value="kai">楷体</option>
+                <option value="fang">仿宋</option>
+                <option value="hei">黑体</option>
+                <option value="li">隶书</option>
+                <option value="you">幼圆</option>
+            </select>
+            <select id="fontSizeSelect" onchange="jxSetFontSize(this.value)" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:inherit">
+                <option value="small">小</option>
+                <option value="standard" selected>标准</option>
+                <option value="large">大</option>
+                <option value="xlarge">特大</option>
+            </select>
         </div>
     </nav>
 
@@ -1412,14 +1427,46 @@
     var i=THEMES.indexOf(cur);if(i<0)i=0;
     applyTheme(THEMES[(i+1)%THEMES.length]);
   };
+  /* R44: 字体 + 字号 */
+  var FONT_STACKS={
+    system:"'Noto Sans SC','Microsoft YaHei',sans-serif",
+    serif:"'Noto Serif SC','SimSun','宋体',serif",
+    kai:"'KaiTi','楷体','STKaiti',serif",
+    fang:"'FangSong','仿宋','STFangsong',serif",
+    hei:"'Microsoft YaHei','黑体','SimHei',sans-serif",
+    li:"'LiSu','隶书','STLiti',serif",
+    you:"'YouYuan','幼圆',sans-serif"
+  };
+  var FONT_SIZES={small:'13px',standard:'14px',large:'16px',xlarge:'18px'};
+  function jxSetFont(f){
+    var stack=FONT_STACKS[f]||FONT_STACKS.system;
+    document.body.style.setProperty('--jx-font',stack);
+    document.body.style.fontFamily=stack;
+    localStorage.setItem('jx-font',f);
+    var sel=document.getElementById('fontFamilySelect');
+    if(sel)sel.value=f;
+  }
+  function jxSetFontSize(s){
+    var size=FONT_SIZES[s]||FONT_SIZES.standard;
+    document.documentElement.style.setProperty('--jx-font-size',size);
+    document.documentElement.style.fontSize=size;
+    localStorage.setItem('jx-font-size',s);
+    var sel=document.getElementById('fontSizeSelect');
+    if(sel)sel.value=s;
+  }
+  window.jxSetFont=jxSetFont;
+  window.jxSetFontSize=jxSetFontSize;
+
   document.addEventListener('DOMContentLoaded',function(){
     applyTheme(localStorage.getItem('jx-theme')||'qing');
+    jxSetFont(localStorage.getItem('jx-font')||'system');
+    jxSetFontSize(localStorage.getItem('jx-font-size')||'standard');
     _initNavDrag();
     // R41a: 插件 tab 异步注入后再 apply 排序（MutationObserver 监听 navTabs 子节点变化）
     var _navObs = new MutationObserver(function(){
       setTimeout(_applyNavOrder, 100);
     });
-    _navObs.observe(container, { childList: true, subtree: false });
+    _navObs.observe(document.getElementById('navTabs'), { childList: true, subtree: false });
   });
 
   /* R41a: nav 页签拖拽排序 + localStorage 持久化 */

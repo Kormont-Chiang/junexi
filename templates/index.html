@@ -1437,19 +1437,18 @@
     li:"'LiSu','隶书','STLiti',serif",
     you:"'YouYuan','幼圆',sans-serif"
   };
-  var FONT_SIZES={small:'13px',standard:'14px',large:'16px',xlarge:'18px'};
+  var FONT_SIZES={small:'0.85',standard:'1',large:'1.15',xlarge:'1.3'};
   function jxSetFont(f){
     var stack=FONT_STACKS[f]||FONT_STACKS.system;
-    document.body.style.setProperty('--jx-font',stack);
     document.body.style.fontFamily=stack;
     localStorage.setItem('jx-font',f);
     var sel=document.getElementById('fontFamilySelect');
     if(sel)sel.value=f;
   }
   function jxSetFontSize(s){
-    var size=FONT_SIZES[s]||FONT_SIZES.standard;
-    document.documentElement.style.setProperty('--jx-font-size',size);
-    document.documentElement.style.fontSize=size;
+    var scale=parseFloat(FONT_SIZES[s]||FONT_SIZES.standard);
+    // zoom 缩放整个页面——按钮/输入框/间距全跟着变
+    document.body.style.zoom=scale;
     localStorage.setItem('jx-font-size',s);
     var sel=document.getElementById('fontSizeSelect');
     if(sel)sel.value=s;

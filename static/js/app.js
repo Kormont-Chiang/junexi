@@ -650,12 +650,8 @@ async function fedSearch() {
         html += '<div class="fed-cell"><div class="fed-cell-title">📖 中国哲学书电子化计划</div><div class="fed-cell-body">';
         if (ct) html += '<a class="tool-src-btn" href="' + ct.link + '" target="_blank" rel="noopener">ctext 检索「' + escapeHtml(q.slice(0, 12)) + '」</a><div class="fed-note">机构库,网页版全文检索</div>';
         html += '</div></div>';
-        // 订阅库 deeplinks
-        html += '<div class="fed-cell"><div class="fed-cell-title">🔐 订阅库(站内打开)</div><div class="fed-cell-body fed-sub">' +
-            '<a class="tool-src-btn" href="https://www.ancientbooks.cn/" target="_blank" rel="noopener">爱如生</a>' +
-            '<a class="tool-src-btn" href="https://www.ancientbooks.cn/" target="_blank" rel="noopener" title="机构订阅,需登录">中华经典古籍库</a>' +
-            '<a class="tool-src-btn" href="https://www.guji.cn/" target="_blank" rel="noopener">籍合网</a>' +
-            '<div class="fed-note">订阅库无公开接口,带词前往检索页</div></div></div>';
+        // R52: 智能推荐——根据关键词从 db-card 匹配相关站点
+        html += fedSmartSuggest(q);
         html += '</div>';
         box.innerHTML = html;
     } catch (e) {
@@ -663,6 +659,81 @@ async function fedSearch() {
     }
 }
 window.fedSearch = fedSearch;
+
+// R52: 智能站点推荐——根据查询关键词匹配 db-card 中的相关站点
+function fedSmartSuggest(q) {
+    // 关键词→分类映射
+    var KW = {
+        '敦煌': ['敦煌', '数字敦煌', 'e-dunhuang'],
+        '碑': ['碑刻', '碑', '墓志', '石刻'],
+        '墓志': ['墓志', '碑刻', '石刻'],
+        '简': ['简牍', '简帛', '简牍网', '简帛网'],
+        '帛': ['简帛', '简帛网'],
+        '甲骨': ['甲骨', '殷契'],
+        '金文': ['金文', '殷周'],
+        '地图': ['地图', 'GIS', '历史地理'],
+        '地理': ['地图', 'GIS', '历史地理', '沿革'],
+        '职官': ['职官', '官制', 'CBDB'],
+        '年号': ['年号', '纪年'],
+        '避讳': ['避讳', '讳'],
+        '音韵': ['音韵', '声韵'],
+        '方言': ['方言', '语言'],
+        '期刊': ['期刊', '论文', 'CNKI', '知网'],
+        '论文': ['期刊', '论文', 'CNKI', '知网', 'JSTOR'],
+        '文献': ['文献', '古籍', 'Kanripo', 'ctext'],
+        '古籍': ['古籍', 'Kanripo', 'ctext', '爱如生'],
+        '方志': ['方志', '地方志'],
+        '档案': ['档案', '文书'],
+        '图像': ['图像', '影像', '书画', '故宫'],
+        '书画': ['书画', '故宫', '博物馆'],
+        '器物': ['器物', '博物馆', '考古'],
+        '考古': ['考古', '文物', '博物馆'],
+        '铭文': ['铭文', '金文', '石刻'],
+        '谱': ['谱牒', '家谱', '族谱'],
+        '宗教': ['宗教', '佛教', '道教'],
+        '佛': ['佛教', '佛', '大藏经'],
+        '道': ['道教', '道藏'],
+        '诗': ['诗歌', '文学', '搜韵'],
+        '词': ['词', '文学', '搜韵'],
+        '小说': ['小说', '文学'],
+        '戏曲': ['戏曲', '文学'],
+        '文': ['文学', '文集'],
+    };
+    // 收集 db-card 的站点信息
+    var cards = document.querySelectorAll('.db-card');
+    var sites = [];
+    cards.forEach(function(c) {
+        var name = c.querySelector('.db-name');
+        var desc = c.querySelector('.db-desc');
+        var href = c.href || '';
+        if (name) sites.push({ name: name.textContent.trim(), desc: desc ? desc.textContent.trim() : '', href: href });
+    });
+    // 匹配关键词
+    var matched = [];
+    var seen = {};
+    for (var kw in KW) {
+        if (q.indexOf(kw) >= 0) {
+            KW[kw].forEach(function(tag) {
+                sites.forEach(function(s) {
+                    var key = s.name;
+                    if (seen[key]) return;
+                    if (s.name.indexOf(tag) >= 0 || s.desc.indexOf(tag) >= 0) {
+                        seen[key] = true;
+                        matched.push(s);
+                    }
+                });
+            });
+        }
+    }
+    if (!matched.length) return '';
+    // 生成 HTML——最多 4 个推荐
+    var html = '<div class="fed-cell"><div class="fed-cell-title">🎯 相关站点推荐</div><div class="fed-cell-body fed-sub">';
+    matched.slice(0, 4).forEach(function(s) {
+        html += '<a class="tool-src-btn" href="' + s.href + '" target="_blank" rel="noopener">' + escapeHtml(s.name) + '</a>';
+    });
+    html += '<div class="fed-note">根据「' + escapeHtml(q.slice(0, 12)) + '」智能匹配</div></div></div>';
+    return html;
+}
 
 function fedGoCbdb(q) {
     switchTab('cbdb');

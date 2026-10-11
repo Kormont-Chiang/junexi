@@ -5966,22 +5966,49 @@ window._logActivity = function (type, label) {
     } catch (e) {}
 };
 
-// 顶部全局搜索: Enter 跳到 CBDB 人名检索
+// R63: 顶部全局搜索——智能判断 CBDB 是否可用
+async function _cbdbAvailable() {
+    try {
+        var r = await apiFetch('/api/plugins');
+        var d = await r.json();
+        var plugins = d.plugins || d || [];
+        if (Array.isArray(plugins)) {
+            for (var i = 0; i < plugins.length; i++) {
+                if (plugins[i].id === 'cbdb' || plugins[i].name === 'cbdb') return plugins[i].enabled !== false;
+            }
+        }
+        return true; // 插件列表没有 cbdb 条目 → 可能是旧版内置
+    } catch(e) { return true; }
+}
+
 (function () {
     const bindTopSearch = () => {
         const gs = document.getElementById('globalSearch');
         if (!gs || gs.dataset.bound) return;
         gs.dataset.bound = '1';
-        gs.addEventListener('keydown', (e) => {
+        gs.addEventListener('keydown', async (e) => {
             if (e.key !== 'Enter') return;
             const q = gs.value.trim();
             if (!q) return;
             window._logActivity('search', '顶部搜索：' + q);
-            switchTab('cbdb');
-            if (window._cbdbType !== 'person') switchCBDBType('person');
-            const inp = document.getElementById('cbdbSearchInput');
-            if (inp) { inp.value = q; }
-            if (typeof searchCBDB === 'function') searchCBDB();
+            
+            // R63: CBDB 可用 → 跳 CBDB 人名检索；不可用 → 跳联合检索
+            var hasCbdb = await _cbdbAvailable();
+            if (hasCbdb && typeof switchCBDBType === 'function') {
+                switchTab('cbdb');
+                if (window._cbdbType !== 'person') switchCBDBType('person');
+                const inp = document.getElementById('cbdbSearchInput');
+                if (inp) { inp.value = q; }
+                if (typeof searchCBDB === 'function') searchCBDB();
+            } else {
+                // 联合检索
+                switchTab('library');
+                const fedInput = document.getElementById('fedQuery');
+                if (fedInput) {
+                    fedInput.value = q;
+                    if (typeof fedSearch === 'function') fedSearch();
+                }
+            }
         });
     };
     if (document.readyState === 'loading') {

@@ -195,6 +195,7 @@ body {
 .nav-tabs { display: flex; gap: 4px; }
 .nav-tab {
     padding: 8px 18px; border-radius: var(--radius-sm);
+    white-space: nowrap; flex-shrink: 0;
     cursor: pointer; font-size: 14px;
     color: var(--text-secondary);
     transition: all 0.2s;

@@ -1399,7 +1399,7 @@
   }
   function applyTheme(t){
     if(THEMES.indexOf(t)<0)t='dark';
-    document.documentElement.setAttribute('data-theme',t==='dark'?'':t);
+    document.documentElement.setAttribute('data-theme',t==='dark'?'dark':t);
     localStorage.setItem('jx-theme',t);
     var btn=document.getElementById('themeToggleBtn');
     if(btn)btn.textContent='🎨 '+LABELS[t];

@@ -40,7 +40,15 @@ function showToast(message, type = 'info', duration = 3000) {
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
-    toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span class="toast-msg">${message}</span>`;
+    // R74: message 用 textContent 防 XSS
+    var iconSpan = document.createElement('span');
+    iconSpan.className = 'toast-icon';
+    iconSpan.textContent = icons[type] || 'ℹ️';
+    var msgSpan = document.createElement('span');
+    msgSpan.className = 'toast-msg';
+    msgSpan.textContent = String(message);
+    toast.appendChild(iconSpan);
+    toast.appendChild(msgSpan);
     toastContainer.appendChild(toast);
     setTimeout(() => {
         toast.classList.add('toast-out');
@@ -281,7 +289,7 @@ function switchTab(tabId) {
     if (tabId === '_plugins') loadPluginManager();
     if (_pluginTabs && _pluginTabs[tabId]) loadPluginPage(tabId);
     // 页面特定初始化
-    if (tabId === 'dashboard') loadDashboard();
+    if (tabId === 'dashboard') loadDashboardDebounced();
     if (tabId === 'map') {
         initMap();
         // display:none → 显示后 Leaflet 内部 size 仍是 0，flyTo/fitBounds 动画会算 NaN；
@@ -390,6 +398,13 @@ async function saveQuickNote() {
 }
 
 // ── 仪表盘数据 ─────────────────────────────────────────
+// R74: 防抖——500ms 内不重复加载仪表盘
+var _dashLoadTimer = null;
+function loadDashboardDebounced() {
+    if (_dashLoadTimer) clearTimeout(_dashLoadTimer);
+    _dashLoadTimer = setTimeout(function() { loadDashboard(); }, 300);
+}
+
 async function loadDashboard() {
     await Promise.all([loadStats(), loadNews(), loadRecentActivity(), loadPapersList()]);
 }

@@ -90,7 +90,7 @@ def add_security_headers(response):
             "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com data:; "
-            "img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgis.com https://*.is.autonavi.com https://webst0*.is.autonavi.com https://webrd0*.is.autonavi.com; "
+            "img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgis.com https://*.is.autonavi.com; "
             "connect-src 'self' https://api.deepseek.com https://api.siliconflow.cn; "
             "frame-src 'self'; "
             "frame-ancestors 'none'"

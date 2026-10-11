@@ -62,11 +62,14 @@ def wait_for_server(url: str, timeout: float = 15.0) -> bool:
 
 
 def main():
+    # R73: --no-gui 纯浏览器模式——WebView2 不可用或想用系统浏览器时
+    no_gui = "--no-gui" in sys.argv or os.environ.get("JUNEXI_NO_GUI") == "1"
+    
     mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "JuneXi.SingleInstance")
     if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
         log("已有实例在运行，本次启动退出")
         return
-    log("===== 启动 =====")
+    log("===== 启动 =====" + (" [no-gui]" if no_gui else ""))
     from app import app  # Flask 实例（加载 .env、路由、CBDB 配置）
 
     port = find_free_port()
@@ -82,6 +85,18 @@ def main():
     if not wait_for_server(url, timeout=15):
         log("错误：服务 15 秒内未就绪")
         raise RuntimeError("服务启动超时")
+
+    if no_gui:
+        log("纯浏览器模式，打开系统浏览器…")
+        import webbrowser
+        webbrowser.open(url)
+        # 保持进程存活
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            log("键盘中断，退出")
+        return
 
     import webview
     log("打开窗口…")

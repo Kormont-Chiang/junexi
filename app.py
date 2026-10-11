@@ -1738,6 +1738,9 @@ def open_external_url():
 @app.route("/api/window/shrink-left", methods=["POST"])
 def window_shrink_left():
     """R70: 把 JuneXi 窗口缩小并靠左半屏——配合外部浏览器分屏使用"""
+    # R73: 纯浏览器模式下不做窗口操作
+    if os.environ.get("JUNEXI_NO_GUI") == "1":
+        return jsonify({"ok": False, "error": "no-gui mode"})
     try:
         import ctypes
         import ctypes.wintypes as wt
@@ -1772,6 +1775,9 @@ def window_shrink_left():
 @app.route("/api/window/restore", methods=["POST"])
 def window_restore():
     """R70: 恢复 JuneXi 窗口到原始大小"""
+    # R73: 纯浏览器模式下不做窗口操作
+    if os.environ.get("JUNEXI_NO_GUI") == "1":
+        return jsonify({"ok": False, "error": "no-gui mode"})
     try:
         import ctypes
         import ctypes.wintypes as wt

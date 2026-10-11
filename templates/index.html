@@ -1375,6 +1375,7 @@
         <div class="lib-viewer-body">
           <div class="lib-viewer-frame">
             <div id="lvLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:var(--bg,#faf9f6);z-index:5;color:var(--muted,#8a8577);font-size:13px"><div style="font-size:30px;animation:lvSpin 1.2s linear infinite">🍃</div><div>正在代为加载…（需要登录的站会停在登录页）</div></div>
+            <div id="lvBlocked" style="display:none;position:absolute;inset:0;z-index:6;background:var(--bg,#faf9f6);color:var(--text-secondary,#5a5648);font-size:13px;padding:40px;text-align:center;flex-direction:column;align-items:center;justify-content:center;gap:12px"><div style="font-size:36px">🔒</div><div>此网站禁止内嵌（X-Frame-Options / CSP / Cloudflare）</div><div style="font-size:12px;color:var(--muted,#8a8577)">部分网站即使代理也无法内嵌——它们拒绝了任何 iframe 加载</div><a id="lvBlockedLink" target="_blank" style="color:var(--accent,#4a7a68);font-size:14px">→ 在系统浏览器中打开</a></div>
             <iframe id="lvFrame" referrerpolicy="no-referrer"></iframe>
             <div class="lib-viewer-fallback">左侧由本地代理代为加载（自动绕开内嵌限制）；若显示抓取失败 → <a id="lvFallbackLink" target="_blank">点此新窗口打开</a></div>
           </div>

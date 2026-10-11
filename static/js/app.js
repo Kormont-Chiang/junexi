@@ -5670,6 +5670,33 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
+// ── R49: 键盘快捷键——Ctrl+1~9 切换页签;Ctrl+0 回仪表盘;Ctrl+/ 聚焦搜索 ──
+document.addEventListener('keydown', function (e) {
+  if (!e.ctrlKey && !e.metaKey) return;
+  if (e.altKey || e.shiftKey) return;
+  // 不拦截输入框内的快捷键（除 Ctrl+/ 聚焦搜索）
+  var inInput = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
+  var key = e.key;
+  if (key === '/' ) {
+    e.preventDefault();
+    var gs = document.getElementById('globalSearch');
+    if (gs) gs.focus();
+    return;
+  }
+  if (inInput) return;
+  var tabs = document.querySelectorAll('.nav-tab[data-tab]');
+  var idx = -1;
+  if (key === '0') idx = 0; // 仪表盘
+  else {
+    var n = parseInt(key, 10);
+    if (n >= 1 && n <= 9) idx = n; // Ctrl+1=第一个 tab
+  }
+  if (idx >= 0 && idx < tabs.length) {
+    e.preventDefault();
+    tabs[idx].click();
+  }
+});
+
 // ── 史料库内嵌查看器：平台内打开 + 笔记空间（R37）──
 function initLibViewer() {
   var lv = document.getElementById('libViewer');

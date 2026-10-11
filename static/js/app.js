@@ -792,7 +792,37 @@ function _libSiteList() {
 }
 
 window._libAIHistory = [];
-function libAISend() {
+
+// R54: 史料库 AI 自然语言检索——像 CBDB AI 一样解析+执行
+const LIB_AI_PROMPT = `你是「六月息」史料库的智能检索助手。用户用自然语言描述想查的内容。你的任务是解析成结构化 JSON。
+
+可执行的操作：
+1. cbdb_search — 查人物/职官/地名/著作等结构化数据 → params: {tab: "person"|"office"|"place"|"text"|"year"|"adv", name, dynasty, office, place, year}
+2. fed_search — 多库联合检索（古籍全文/一般查询） → params: {query: "提取的关键词"}
+3. site_suggest — 推荐相关站点（不执行检索） → params: {category: "敦煌|碑刻|简牍|期刊|地图|方志|图像|考古|宗教|文学"}
+
+回复格式（必须是合法 JSON，不要 markdown 代码块）：
+{"action": "cbdb_search"|"fed_search"|"site_suggest", "params": {...}, "explanation": "一句话说明你要做什么"}
+
+示例：
+用户："帮我查苏轼的生平"
+→ {"action": "cbdb_search", "params": {"tab": "person", "name": "苏轼"}, "explanation": "在 CBDB 中检索苏轼"}
+
+用户："敦煌莫高窟的碑刻资料去哪找"
+→ {"action": "site_suggest", "params": {"category": "敦煌"}, "explanation": "推荐敦煌相关的碑刻与数字资源站点"}
+
+用户："查一下唐代进士的名单"
+→ {"action": "cbdb_search", "params": {"tab": "entry", "dynasty": "唐"}, "explanation": "在 CBDB 入仕模块中筛选唐代进士"}
+
+用户："宋代墓志材料"
+→ {"action": "fed_search", "params": {"query": "宋代 墓志"}, "explanation": "联合检索古籍库中的宋代墓志资料"}
+
+用户："找关于王安石变法的论文"
+→ {"action": "fed_search", "params": {"query": "王安石变法"}, "explanation": "多库联合检索王安石变法相关资料"}
+
+只输出 JSON，不要输出其他内容。`;
+
+async function libAISend() {
     const input = document.getElementById('libAIInput');
     const chat = document.getElementById('libAIChat');
     const q = (input?.value || '').trim();
@@ -804,41 +834,142 @@ function libAISend() {
     chat.insertAdjacentHTML('beforeend', '<div class="lib-ai-msg lib-ai-q">' + escapeHtml(q) + '</div><div class="lib-ai-msg lib-ai-a" id="libAIThinking">正在想……</div>');
     chat.scrollTop = chat.scrollHeight;
     input.value = '';
+
+    try {
+        const res = await apiFetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: [
+                    { role: 'system', content: LIB_AI_PROMPT },
+                    { role: 'user', content: q }
+                ]
+            })
+        }, 30000);
+        const data = await res.json();
+        const text = (data.response || data.message || data.text || '').trim();
+        
+        // Try to parse JSON from AI response
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+            // Fallback to导购模式
+            libAIReplyAsGuide(q, chat, '没能理解你的意图，让我以导购模式回答。');
+            return;
+        }
+
+        let parsed;
+        try { parsed = JSON.parse(jsonMatch[0]); } catch(e) {
+            libAIReplyAsGuide(q, chat, '解析失败，让我以导购模式回答。');
+            return;
+        }
+
+        // Show explanation
+        const exp = parsed.explanation ? '：' + escapeHtml(parsed.explanation) : '';
+        const thinking = document.getElementById('libAIThinking');
+        if (thinking) thinking.outerHTML = '<div class="lib-ai-msg lib-ai-a"><b>✓' + exp + '</b><div id="libAIResult" style="margin-top:6px">正在执行…</div></div>';
+        chat.scrollTop = chat.scrollHeight;
+
+        // Execute the action
+        await libAIExecute(parsed, chat);
+
+    } catch (err) {
+        const thinking = document.getElementById('libAIThinking');
+        if (thinking) thinking.outerHTML = '<div class="lib-ai-msg lib-ai-a">请求失败：' + escapeHtml(String(err).slice(0, 80)) + '</div>';
+    }
+    if (btn) btn.disabled = false;
+}
+window.libAISend = libAISend;
+
+// R54: 执行 AI 解析的结构化检索
+async function libAIExecute(parsed, chat) {
+    const action = parsed.action;
+    const params = parsed.params || {};
+    const resultBox = document.getElementById('libAIResult');
+
+    if (action === 'cbdb_search') {
+        // 切到 CBDB 页并执行检索
+        if (typeof switchTab === 'function') switchTab('cbdb');
+        await new Promise(r => setTimeout(r, 500));
+        
+        const tab = params.tab || 'person';
+        if (typeof switchCBDBType === 'function') switchCBDBType(tab);
+        await new Promise(r => setTimeout(r, 400));
+        
+        // Fill params using CBDB AI's field mapping
+        if (typeof cbdbAIFillParams === 'function') {
+            await cbdbAIFillParams(tab, params);
+        } else {
+            // Fallback: try common field IDs
+            const si = document.getElementById('cbdbSearchInput');
+            if (si && params.name) si.value = params.name;
+            if (si && params.q) si.value = params.q;
+        }
+        
+        if (typeof searchCBDB === 'function') searchCBDB();
+        if (resultBox) resultBox.innerHTML = '✓ 已切换到 CBDB 检索，正在查询…';
+        return;
+    }
+
+    if (action === 'fed_search') {
+        // 执行联合检索
+        const query = params.query || '';
+        if (!query) { if (resultBox) resultBox.innerHTML = '缺少查询词'; return; }
+        
+        // Fill and trigger fedSearch
+        const fedInput = document.getElementById('fedQuery');
+        if (fedInput) {
+            fedInput.value = query;
+            if (typeof fedSearch === 'function') {
+                await fedSearch();
+                if (resultBox) resultBox.innerHTML = '✓ 已执行联合检索「' + escapeHtml(query) + '」，见上方结果';
+            }
+        }
+        return;
+    }
+
+    if (action === 'site_suggest') {
+        // 推荐站点
+        libAIReplyAsGuide(params.category || '', chat, '根据你的需求推荐相关站点：');
+        return;
+    }
+
+    // Default: 导购模式
+    libAIReplyAsGuide(JSON.stringify(params), chat, '让我推荐相关资源：');
+}
+
+// R54: 导购模式回复（兼容旧行为）
+function libAIReplyAsGuide(query, chat, prefix) {
     const sites = _libSiteList();
     const siteLines = sites.map(s => '- ' + s.name + '：' + (s.desc || '')).join('\n');
     const system = '你是「六月息」史料库的文献资源导购员。用户想找某类历史资料但不知道去哪个网站/数据库。' +
         '下面是本库已收录的全部站点（名称：简介）。回答要求：1) 从已收录站点里挑最合适的，说出站点名和它为什么合适；' +
         '2) 如果库里没有合适的，如实说明，并可补充推荐库外知名的公开资源；3) 回答控制在 200 字内，直接给结论，不要寒暄；' +
         '4) 涉及访问限制（需校园网/VPN/翻墙）要提醒。已收录站点：\n' + siteLines;
-    const history = window._libAIHistory.slice(-6);
-    history.push({ role: 'user', content: q });
+    
     apiFetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [{ role: 'system', content: system }].concat(history) })
-    }, 60000).then(r => r.json()).then(d => {
-        const thinking = document.getElementById('libAIThinking');
+        body: JSON.stringify({ messages: [{ role: 'system', content: system }, { role: 'user', content: query }] })
+    }, 30000).then(r => r.json()).then(d => {
         let answer = (d.response || d.message || d.text || '').trim() || '（没有收到回答）';
         answer = escapeHtml(answer);
         answer = answer.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-        // 站名自动变链接(先转义后替换,站名是中文不受影响)
         sites.forEach(s => {
             if (answer.indexOf(s.name) >= 0) {
                 answer = answer.split(s.name).join('<a href="' + s.href + '" target="_blank" class="lib-ai-link">' + s.name + '</a>');
             }
         });
-        if (thinking) thinking.outerHTML = '<div class="lib-ai-msg lib-ai-a">' + answer.replace(/\n/g, '<br>') + '</div>';
-        window._libAIHistory.push({ role: 'user', content: q });
-        window._libAIHistory.push({ role: 'assistant', content: (d.response || d.message || d.text || '').trim() });
-        chat.scrollTop = chat.scrollHeight;
-        if (btn) btn.disabled = false;
-    }).catch(err => {
+        
         const thinking = document.getElementById('libAIThinking');
-        if (thinking) thinking.outerHTML = '<div class="lib-ai-msg lib-ai-a">请求失败：' + escapeHtml(String(err).slice(0, 80)) + '</div>';
-        if (btn) btn.disabled = false;
+        const fullAnswer = (prefix ? '<b>' + escapeHtml(prefix) + '</b><br>' : '') + answer.replace(/\n/g, '<br>');
+        if (thinking) {
+            thinking.outerHTML = '<div class="lib-ai-msg lib-ai-a">' + fullAnswer + '</div>';
+        } else {
+            chat.insertAdjacentHTML('beforeend', '<div class="lib-ai-msg lib-ai-a">' + fullAnswer + '</div>');
+        }
+        chat.scrollTop = chat.scrollHeight;
     });
 }
-window.libAISend = libAISend;
 
 // ── 读文献页 ─────────────────────────────────────────
 let _rdLoadedOnce = false;

@@ -1538,7 +1538,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     cursor: pointer; transition: transform .15s ease; font-family: inherit; }
 .cbdb-orb-marker:hover .cbdb-cluster { transform: scale(1.12); }
 .cbdb-map-grpctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 14px;
-    padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 10px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 6px; }
 .cbdb-map-grpctl-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .cbdb-map-chip { padding: 2px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 999px;
@@ -1557,7 +1557,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-map-popup-person:hover { background: rgba(201,169,110,0.12); color: #ecd9a8; }
 /* 地图反查：开关容器 + 图钉 */
 .cbdb-map-revctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 999px;
-    padding: 4px 6px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    padding: 4px 6px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .cbdb-rev-dot { width: 12px; height: 12px; border-radius: 50%; background: #7ec8e3; border: 2px solid #eaf7ff;
     box-shadow: 0 0 10px rgba(126,200,227,0.8); }
 .cbdb-rev-pin { animation: cbdb-rev-pulse 1.6s ease-out infinite; }
@@ -1589,7 +1589,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-traj-arrow { background: none; border: none; font-size: 10px; line-height: 12px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
 .cbdb-map-trajlegend { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 12px;
-    padding: 8px 12px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 12px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 4px; max-width: 170px; }
 .cbdb-map-trajlegend-title { font-size: 13px; color: #ecd9a8; font-family: "KaiTi","STKaiti","STSong","SimSun",serif;
     margin-bottom: 2px; }
@@ -3024,7 +3024,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     cursor: pointer; transition: transform .15s ease; font-family: inherit; }
 .cbdb-orb-marker:hover .cbdb-cluster { transform: scale(1.12); }
 .cbdb-map-grpctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 14px;
-    padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 10px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 6px; }
 .cbdb-map-grpctl-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .cbdb-map-chip { padding: 2px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 999px;
@@ -3043,7 +3043,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-map-popup-person:hover { background: rgba(201,169,110,0.12); color: #ecd9a8; }
 /* 地图反查：开关容器 + 图钉 */
 .cbdb-map-revctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 999px;
-    padding: 4px 6px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    padding: 4px 6px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .cbdb-rev-dot { width: 12px; height: 12px; border-radius: 50%; background: #7ec8e3; border: 2px solid #eaf7ff;
     box-shadow: 0 0 10px rgba(126,200,227,0.8); }
 .cbdb-rev-pin { animation: cbdb-rev-pulse 1.6s ease-out infinite; }
@@ -3075,7 +3075,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-traj-arrow { background: none; border: none; font-size: 10px; line-height: 12px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
 .cbdb-map-trajlegend { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 12px;
-    padding: 8px 12px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 12px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 4px; max-width: 170px; }
 .cbdb-map-trajlegend-title { font-size: 13px; color: #ecd9a8; font-family: "KaiTi","STKaiti","STSong","SimSun",serif;
     margin-bottom: 2px; }
@@ -4525,7 +4525,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     cursor: pointer; transition: transform .15s ease; font-family: inherit; }
 .cbdb-orb-marker:hover .cbdb-cluster { transform: scale(1.12); }
 .cbdb-map-grpctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 14px;
-    padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 10px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 6px; }
 .cbdb-map-grpctl-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .cbdb-map-chip { padding: 2px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 999px;
@@ -4544,7 +4544,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-map-popup-person:hover { background: rgba(201,169,110,0.12); color: #ecd9a8; }
 /* 地图反查：开关容器 + 图钉 */
 .cbdb-map-revctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 999px;
-    padding: 4px 6px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    padding: 4px 6px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .cbdb-rev-dot { width: 12px; height: 12px; border-radius: 50%; background: #7ec8e3; border: 2px solid #eaf7ff;
     box-shadow: 0 0 10px rgba(126,200,227,0.8); }
 .cbdb-rev-pin { animation: cbdb-rev-pulse 1.6s ease-out infinite; }
@@ -4576,7 +4576,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-traj-arrow { background: none; border: none; font-size: 10px; line-height: 12px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
 .cbdb-map-trajlegend { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 12px;
-    padding: 8px 12px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 12px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 4px; max-width: 170px; }
 .cbdb-map-trajlegend-title { font-size: 13px; color: #ecd9a8; font-family: "KaiTi","STKaiti","STSong","SimSun",serif;
     margin-bottom: 2px; }
@@ -6011,7 +6011,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     cursor: pointer; transition: transform .15s ease; font-family: inherit; }
 .cbdb-orb-marker:hover .cbdb-cluster { transform: scale(1.12); }
 .cbdb-map-grpctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 14px;
-    padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 10px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 6px; }
 .cbdb-map-grpctl-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .cbdb-map-chip { padding: 2px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 999px;
@@ -6030,7 +6030,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-map-popup-person:hover { background: rgba(201,169,110,0.12); color: #ecd9a8; }
 /* 地图反查：开关容器 + 图钉 */
 .cbdb-map-revctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 999px;
-    padding: 4px 6px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    padding: 4px 6px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .cbdb-rev-dot { width: 12px; height: 12px; border-radius: 50%; background: #7ec8e3; border: 2px solid #eaf7ff;
     box-shadow: 0 0 10px rgba(126,200,227,0.8); }
 .cbdb-rev-pin { animation: cbdb-rev-pulse 1.6s ease-out infinite; }
@@ -6062,7 +6062,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-traj-arrow { background: none; border: none; font-size: 10px; line-height: 12px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
 .cbdb-map-trajlegend { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 12px;
-    padding: 8px 12px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 12px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 4px; max-width: 170px; }
 .cbdb-map-trajlegend-title { font-size: 13px; color: #ecd9a8; font-family: "KaiTi","STKaiti","STSong","SimSun",serif;
     margin-bottom: 2px; }
@@ -7515,7 +7515,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     cursor: pointer; transition: transform .15s ease; font-family: inherit; }
 .cbdb-orb-marker:hover .cbdb-cluster { transform: scale(1.12); }
 .cbdb-map-grpctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 14px;
-    padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 10px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 6px; }
 .cbdb-map-grpctl-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .cbdb-map-chip { padding: 2px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 999px;
@@ -7534,7 +7534,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-map-popup-person:hover { background: rgba(201,169,110,0.12); color: #ecd9a8; }
 /* 地图反查：开关容器 + 图钉 */
 .cbdb-map-revctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 999px;
-    padding: 4px 6px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    padding: 4px 6px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .cbdb-rev-dot { width: 12px; height: 12px; border-radius: 50%; background: #7ec8e3; border: 2px solid #eaf7ff;
     box-shadow: 0 0 10px rgba(126,200,227,0.8); }
 .cbdb-rev-pin { animation: cbdb-rev-pulse 1.6s ease-out infinite; }
@@ -7566,7 +7566,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-traj-arrow { background: none; border: none; font-size: 10px; line-height: 12px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
 .cbdb-map-trajlegend { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 12px;
-    padding: 8px 12px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 12px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 4px; max-width: 170px; }
 .cbdb-map-trajlegend-title { font-size: 13px; color: #ecd9a8; font-family: "KaiTi","STKaiti","STSong","SimSun",serif;
     margin-bottom: 2px; }
@@ -9001,7 +9001,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     cursor: pointer; transition: transform .15s ease; font-family: inherit; }
 .cbdb-orb-marker:hover .cbdb-cluster { transform: scale(1.12); }
 .cbdb-map-grpctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 14px;
-    padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 10px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 6px; }
 .cbdb-map-grpctl-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .cbdb-map-chip { padding: 2px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 999px;
@@ -9020,7 +9020,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-map-popup-person:hover { background: rgba(201,169,110,0.12); color: #ecd9a8; }
 /* 地图反查：开关容器 + 图钉 */
 .cbdb-map-revctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 999px;
-    padding: 4px 6px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    padding: 4px 6px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .cbdb-rev-dot { width: 12px; height: 12px; border-radius: 50%; background: #7ec8e3; border: 2px solid #eaf7ff;
     box-shadow: 0 0 10px rgba(126,200,227,0.8); }
 .cbdb-rev-pin { animation: cbdb-rev-pulse 1.6s ease-out infinite; }
@@ -9052,7 +9052,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-traj-arrow { background: none; border: none; font-size: 10px; line-height: 12px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
 .cbdb-map-trajlegend { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 12px;
-    padding: 8px 12px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 12px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 4px; max-width: 170px; }
 .cbdb-map-trajlegend-title { font-size: 13px; color: #ecd9a8; font-family: "KaiTi","STKaiti","STSong","SimSun",serif;
     margin-bottom: 2px; }
@@ -10502,7 +10502,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     cursor: pointer; transition: transform .15s ease; font-family: inherit; }
 .cbdb-orb-marker:hover .cbdb-cluster { transform: scale(1.12); }
 .cbdb-map-grpctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 14px;
-    padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 10px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 6px; }
 .cbdb-map-grpctl-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .cbdb-map-chip { padding: 2px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 999px;
@@ -10521,7 +10521,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-map-popup-person:hover { background: rgba(201,169,110,0.12); color: #ecd9a8; }
 /* 地图反查：开关容器 + 图钉 */
 .cbdb-map-revctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 999px;
-    padding: 4px 6px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    padding: 4px 6px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .cbdb-rev-dot { width: 12px; height: 12px; border-radius: 50%; background: #7ec8e3; border: 2px solid #eaf7ff;
     box-shadow: 0 0 10px rgba(126,200,227,0.8); }
 .cbdb-rev-pin { animation: cbdb-rev-pulse 1.6s ease-out infinite; }
@@ -10553,7 +10553,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-traj-arrow { background: none; border: none; font-size: 10px; line-height: 12px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
 .cbdb-map-trajlegend { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 12px;
-    padding: 8px 12px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 12px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 4px; max-width: 170px; }
 .cbdb-map-trajlegend-title { font-size: 13px; color: #ecd9a8; font-family: "KaiTi","STKaiti","STSong","SimSun",serif;
     margin-bottom: 2px; }
@@ -11988,7 +11988,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
     cursor: pointer; transition: transform .15s ease; font-family: inherit; }
 .cbdb-orb-marker:hover .cbdb-cluster { transform: scale(1.12); }
 .cbdb-map-grpctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 14px;
-    padding: 8px 10px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 10px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 6px; }
 .cbdb-map-grpctl-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .cbdb-map-chip { padding: 2px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 999px;
@@ -12007,7 +12007,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-map-popup-person:hover { background: rgba(201,169,110,0.12); color: #ecd9a8; }
 /* 地图反查：开关容器 + 图钉 */
 .cbdb-map-revctl { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 999px;
-    padding: 4px 6px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    padding: 4px 6px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 .cbdb-rev-dot { width: 12px; height: 12px; border-radius: 50%; background: #7ec8e3; border: 2px solid #eaf7ff;
     box-shadow: 0 0 10px rgba(126,200,227,0.8); }
 .cbdb-rev-pin { animation: cbdb-rev-pulse 1.6s ease-out infinite; }
@@ -12039,7 +12039,7 @@ a.leaflet-popup-close-button:hover { color: #e8e8ec !important; }
 .cbdb-traj-arrow { background: none; border: none; font-size: 10px; line-height: 12px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.7); }
 .cbdb-map-trajlegend { background: rgba(15,15,18,0.9); border: 1px solid rgba(201,169,110,0.4); border-radius: 12px;
-    padding: 8px 12px; backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    padding: 8px 12px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
     display: flex; flex-direction: column; gap: 4px; max-width: 170px; }
 .cbdb-map-trajlegend-title { font-size: 13px; color: #ecd9a8; font-family: "KaiTi","STKaiti","STSong","SimSun",serif;
     margin-bottom: 2px; }

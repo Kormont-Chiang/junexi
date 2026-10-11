@@ -10,6 +10,10 @@ const VAULT_NAME = '论文写作';
 async function apiFetch(url, options, timeoutMs) {
     const opts = options || {};
     const timeout = timeoutMs || 30000;
+    // R47c: AbortController 降级——不支持时用普通 fetch
+    if (typeof AbortController === 'undefined') {
+        return fetch(url, opts);
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
     try {

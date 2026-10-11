@@ -829,7 +829,9 @@ async function libAISend() {
     if (!q) return;
     const btn = document.querySelector('.lib-ai-send');
     if (btn) btn.disabled = true;
-    const hint = chat.querySelector('.lib-ai-hint');
+    // R60: 无标题无hint——chat 默认隐藏，第一条消息时显示
+    chat.style.display = '';
+    var hint = chat.querySelector('.lib-ai-hint');
     if (hint) hint.remove();
     chat.insertAdjacentHTML('beforeend', '<div class="lib-ai-msg lib-ai-q">' + escapeHtml(q) + '</div><div class="lib-ai-msg lib-ai-a" id="libAIThinking">正在想……</div>');
     chat.scrollTop = chat.scrollHeight;

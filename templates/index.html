@@ -1276,7 +1276,7 @@
                         <span id="aiModelDesc" class="ai-model-desc"></span>
                     </div>
                     <div class="ai-input-area">
-                        <input type="text" id="aiChatInput" placeholder="输入你的问题...">
+                        <input type="text" id="aiChatInput" placeholder="输入你的问题..." onkeydown="if(event.key==='Enter')sendAIChat()">
                         <button id="aiSendBtn" onclick="sendAIChat()">发送</button>
                         <button class="ai-quick-btn" onclick="clearAIChat()" title="清空对话">🗑</button>
                     </div>

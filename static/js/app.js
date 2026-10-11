@@ -847,7 +847,7 @@ function _libSiteList() {
     return sites;
 }
 
-window._libAIHistory = [];
+// R72: 清理死变量 _libAIHistory
 
 // R54: 史料库 AI 自然语言检索——像 CBDB AI 一样解析+执行
 const LIB_AI_PROMPT = `你是「六月息」史料库的智能检索助手。用户用自然语言描述想查的内容。你的任务是解析成结构化 JSON。
@@ -4722,7 +4722,7 @@ function clearAIChat() {
     if (messages) {
         messages.innerHTML = '<div class="ai-message system">你好！我是你的历史学研究助手。我可以帮你摘要史料、梳理论证逻辑、解释历史概念、比较不同史料对同一事件的记载等。有什么可以帮你的？</div>';
     }
-    window._aiChatHistory = [];
+    window._aiHistory = [];
 }
 window.clearAIChat = clearAIChat;
 

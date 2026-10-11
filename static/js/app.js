@@ -4379,29 +4379,30 @@ const AI_PROMPTS = [
   ]},
 ];
 
+// R64: 左侧提示词库列表加载
+function aiPromptLibLoad() {
+    var list = document.getElementById('aiPromptLibList');
+    if (!list) return;
+    var flat = [];
+    AI_PROMPTS.forEach(function(g) { g.items.forEach(function(it) { flat.push(it); }); });
+    list.innerHTML = flat.map(function(it, i) {
+        return '<button class="ai-quick-btn" onclick="aiPromptPick(flat[' + i + '])" style="text-align:left;font-size:11px;padding:4px 6px">' + it.label + '</button>';
+    }).join('');
+    // Store flat array globally for onclick access
+    window._aiPromptFlat = flat;
+}
+window.aiPromptLibLoad = aiPromptLibLoad;
+
+// 旧的 toggle 函数保留兼容,但现在左侧常显
 function aiPromptLibToggle() {
-    const panel = document.getElementById('aiPromptLibPanel');
-    if (!panel) return;
-    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
-    panel.style.display = '';
-    panel.innerHTML = AI_PROMPTS.map((g, gi) =>
-        '<div class="pl-cat"><div class="pl-cat-title">' + g.cat + '</div>' +
-        g.items.map(it => '<div class="pl-item" onclick="aiPromptUse(' + gi + ',\'' + it.label.slice(0,2) + '\', this)">' + it.label + '</div>').join('') + '</div>'
-    ).join('');
-    // 给每项存 index 更稳: 重渲染带 data 属性
-    panel.querySelectorAll('.pl-item').forEach((el, k) => {
-        let flat = [];
-        AI_PROMPTS.forEach(g => g.items.forEach(it => flat.push(it)));
-        el.onclick = () => aiPromptPick(flat[k]);
-    });
+    // R64: 左侧面板已常显提示词库,此函数仅作兼容
+    aiPromptLibLoad();
 }
 window.aiPromptLibToggle = aiPromptLibToggle;
 
 function aiPromptPick(item) {
     const input = document.getElementById('aiChatInput');
     if (input) { input.value = item.text; input.focus(); }
-    const panel = document.getElementById('aiPromptLibPanel');
-    if (panel) panel.style.display = 'none';
     showToast('提示词已填入,可修改后再发送', 'success');
 }
 window.aiPromptPick = aiPromptPick;
@@ -6019,6 +6020,7 @@ async function _cbdbAvailable() {
     // 插件 nav 注入: 启动即拉取
     if (typeof loadPluginNav === 'function') loadPluginNav();
 if (typeof loadAiModels === 'function') loadAiModels();
+if (typeof aiPromptLibLoad === 'function') aiPromptLibLoad();
 })();
 
 

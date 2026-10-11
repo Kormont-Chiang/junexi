@@ -1042,8 +1042,27 @@ body {
 .taboo-alt { color: var(--success); }
 
 /* ── AI 助手 ─────────────────────────────────────────── */
-.ai-layout { display: flex; gap: 16px; align-items: stretch; }
-.ai-notes-panel { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); overflow: hidden; height: calc(100vh - 160px); }
+/* R64: AI 助手三栏布局——左:提示词+模型 中:对话 右:笔记 */
+.ai-layout { display: flex; gap: 12px; align-items: stretch; }
+.ai-left-panel {
+    width: 220px; min-width: 160px; max-width: 400px;
+    display: flex; flex-direction: column; gap: 0;
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: var(--radius); overflow: hidden; height: calc(100vh - 160px);
+    overflow-y: auto; resize: horizontal;
+}
+.ai-left-section { padding: 10px 12px; border-bottom: 1px solid var(--border-color); }
+.ai-left-section:last-child { border-bottom: none; }
+.ai-left-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.ai-left-list { display: flex; flex-direction: column; gap: 2px; }
+.ai-left-list .ai-quick-btn { text-align: left; font-size: 11px; padding: 5px 8px; width: 100%; }
+.ai-notes-panel {
+    width: 280px; min-width: 200px; max-width: 500px;
+    display: flex; flex-direction: column;
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: var(--radius); overflow: hidden; height: calc(100vh - 160px);
+    resize: horizontal;
+}
 .ai-chat-container {
     display: flex; flex-direction: column;
     height: calc(100vh - 160px);

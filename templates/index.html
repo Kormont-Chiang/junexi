@@ -1273,21 +1273,35 @@
         <!-- ═══ AI 助手 ═══ -->
         <div id="ai" class="page">
             <div class="ai-layout">
+                <!-- R64: 左侧面板——提示词库 + 模型选择 -->
+                <div class="ai-left-panel" id="aiLeftPanel">
+                    <div class="ai-left-section">
+                        <div class="ai-left-title">✨ 提示词库</div>
+                        <div id="aiPromptLibList" class="ai-left-list"></div>
+                    </div>
+                    <div class="ai-left-section">
+                        <div class="ai-left-title">🤖 模型选择</div>
+                        <select id="aiModelSelect" onchange="aiModelChange()" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--input-bg);color:var(--text)"><option>加载模型...</option></select>
+                        <div id="aiModelDesc" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+                        <button class="ai-quick-btn" onclick="aiKeySetup()" style="margin-top:6px" title="配置 API Key">🔑 配置 Key</button>
+                    </div>
+                    <div class="ai-left-section" id="aiKeyPanel" style="display:none">
+                        <div class="ai-left-title">🔧 API Key</div>
+                        <div id="aiKeyGuide" style="font-size:11px;line-height:1.6;margin-bottom:6px"></div>
+                        <input type="password" id="aiKeyInput" placeholder="粘贴 API Key" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--input-bg);color:var(--text)">
+                        <button class="btn-primary" onclick="aiKeySave()" style="margin-top:4px;font-size:11px;padding:4px 10px">保存</button>
+                    </div>
+                    <div class="ai-left-section">
+                        <button class="ai-quick-btn" onclick="aiKbRefToggle()" style="width:100%">📚 引用知识库</button>
+                        <div class="ai-kbref-panel" id="aiKbRefPanel" style="display:none"></div>
+                        <span class="ai-kbref-badge" id="aiKbRefBadge" style="display:none" onclick="aiKbRefClear()" title="点击清除引用"></span>
+                    </div>
+                </div>
+
+                <!-- 中间对话区 -->
                 <div class="ai-chat-container">
                     <div id="aiChatMessages" class="ai-messages">
                         <div class="ai-message system">你好！我是你的历史学研究助手。我可以帮你摘要史料、梳理论证逻辑、解释历史概念、比较不同史料对同一事件的记载等。有什么可以帮你的？</div>
-                    </div>
-                    <div class="ai-model-bar">
-                        <select id="aiModelSelect" onchange="aiModelChange()"><option>加载模型...</option></select>
-                        <span id="aiModelDesc" class="ai-model-desc"></span>
-                        <button class="ai-quick-btn" onclick="aiKeySetup()" title="配置 API Key">🔑</button>
-                    </div>
-                    <div id="aiKeyPanel" style="display:none;padding:8px 12px;background:rgba(199,169,110,0.08);border-radius:8px;margin:8px 0;font-size:12px">
-                        <div id="aiKeyGuide" style="margin-bottom:8px;line-height:1.6"></div>
-                        <div style="display:flex;gap:6px;align-items:center">
-                            <input type="password" id="aiKeyInput" placeholder="粘贴 API Key 到这里" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--input-bg);color:var(--text)">
-                            <button class="btn-primary" onclick="aiKeySave()" style="font-size:11px;padding:4px 10px">保存</button>
-                        </div>
                     </div>
                     <div class="ai-input-area">
                         <input type="text" id="aiChatInput" placeholder="输入你的问题..." onkeydown="if(event.key==='Enter')sendAIChat()">
@@ -1300,25 +1314,17 @@
                         <button class="ai-quick-btn" onclick="aiQuickAction('concept')">📖 概念解释</button>
                         <button class="ai-quick-btn" onclick="aiQuickAction('compare')">⚖️ 史料对比</button>
                     </div>
-                    <div class="ai-promptlib" id="aiPromptLibPanel" style="display:none"></div>
-                        <div class="ai-kbref">
-                        <div class="ai-kbref-bar">
-                            <button class="ai-quick-btn" onclick="aiPromptLibToggle()">✨ 提示词库</button>
-                            <button class="ai-quick-btn" onclick="aiKbRefToggle()">📚 引用知识库</button>
-                            <span class="ai-kbref-badge" id="aiKbRefBadge" style="display:none" onclick="aiKbRefClear()" title="点击清除引用"></span>
-                        </div>
-                        <div class="ai-kbref-panel" id="aiKbRefPanel" style="display:none"></div>
-                    </div>
                 </div>
-                <!-- R62: AI 笔记面板——边聊边记，直存 Obsidian -->
-                <div class="ai-notes-panel">
+
+                <!-- R62: 右侧笔记面板 -->
+                <div class="ai-notes-panel" id="aiNotesPanel">
                     <div class="panel-header" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)">
                         <span>📝 AI 笔记</span>
                         <span style="flex:1"></span>
                         <button class="ai-quick-btn" onclick="aiNoteToObsidian()" title="存入 Obsidian">📥</button>
                         <button class="ai-quick-btn" onclick="aiNoteClear()" title="清空">🗑</button>
                     </div>
-                    <textarea id="aiNoteEditor" placeholder="边聊边记……选中 AI 回答可一键摘录，或直接在这里写想法。&#10;&#10;Ctrl+Enter 保存到 Obsidian" style="flex:1;width:100%;padding:12px;border:none;background:transparent;color:var(--text);font-size:13px;line-height:1.7;resize:none;outline:none;min-height:200px"></textarea>
+                    <textarea id="aiNoteEditor" placeholder="边聊边记……&#10;&#10;Ctrl+Enter 保存到 Obsidian" style="flex:1;width:100%;padding:12px;border:none;background:transparent;color:var(--text);font-size:13px;line-height:1.7;resize:none;outline:none;min-height:200px"></textarea>
                     <div style="padding:8px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)">
                         <span id="aiNoteStatus">本地草稿 · 点 📥 存入 Obsidian</span>
                     </div>

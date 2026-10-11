@@ -1447,8 +1447,10 @@
   }
   function jxSetFontSize(s){
     var scale=parseFloat(FONT_SIZES[s]||FONT_SIZES.standard);
-    // zoom 缩放整个页面——按钮/输入框/间距全跟着变
     document.body.style.zoom=scale;
+    // R44c: 顶栏高度跟随 zoom 自适应，防止特大字号溢出
+    var topBar=document.querySelector('.top-bar');
+    if(topBar)topBar.style.height=Math.round(60*scale)+'px';
     localStorage.setItem('jx-font-size',s);
     var sel=document.getElementById('fontSizeSelect');
     if(sel)sel.value=s;

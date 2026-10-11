@@ -139,7 +139,7 @@ body::before {
 [data-theme="hong"] body::before {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23c9a96e'%3E%3Cpath d='M48 48c0-8 5-13 13-13s13 5 13 13-5 13-13 13-13-5-13-13zm0 0c0 8-5 13-13 13S22 56 22 48s5-13 13-13 13 5 13 13zM48 24c3 6 3 12 0 24m0 0c-3 12-3 18 0 24M24 48c6-3 12-3 24 0m0 0c12 3 18 3 24 0' stroke-width='2'/%3E%3Ccircle cx='48' cy='12' r='4' stroke-width='1.5'/%3E%3Ccircle cx='48' cy='84' r='4' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='48' r='4' stroke-width='1.5'/%3E%3Ccircle cx='84' cy='48' r='4' stroke-width='1.5'/%3E%3Cpath d='M0 0l16 16M96 96L80 80M0 96l16-16M96 0L80 16' stroke-width='0.8' opacity='0.4'/%3E%3C/g%3E%3C/svg%3E");
     background-size: 96px 96px;
-    --pattern-opacity: 0.14;
+    --pattern-opacity: 0.22;
 }
 
 /* 青: 落花流水——双层水波 */

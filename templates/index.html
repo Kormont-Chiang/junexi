@@ -36,6 +36,7 @@
                 <div id="statusDot" class="status-dot error"></div>
                 <span id="statusText">API 未连接</span>
             </div>
+            <button id="themeToggleBtn" onclick="jxCycleTheme()" style="padding:6px 12px;border-radius:7px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-secondary);font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap">🎨 玄青</button>
         </div>
     </nav>
 
@@ -1373,5 +1374,28 @@
         </div>
       </div>
     </div>
+<script>
+/* R40b: 主题切换——localStorage 持久化 + data-theme attribute */
+(function(){
+  var THEMES=['dark','light','sepia','morandi'];
+  var LABELS={dark:'玄青',light:'白纸',sepia:'美拉德',morandi:'莫兰迪'};
+  function applyTheme(t){
+    if(THEMES.indexOf(t)<0)t='dark';
+    document.documentElement.setAttribute('data-theme',t==='dark'?'':t);
+    localStorage.setItem('jx-theme',t);
+    var btn=document.getElementById('themeToggleBtn');
+    if(btn)btn.textContent='🎨 '+LABELS[t];
+  }
+  window.jxSetTheme=applyTheme;
+  window.jxCycleTheme=function(){
+    var cur=localStorage.getItem('jx-theme')||'dark';
+    var i=THEMES.indexOf(cur);if(i<0)i=0;
+    applyTheme(THEMES[(i+1)%THEMES.length]);
+  };
+  document.addEventListener('DOMContentLoaded',function(){
+    applyTheme(localStorage.getItem('jx-theme')||'dark');
+  });
+})();
+</script>
 </body>
 </html>

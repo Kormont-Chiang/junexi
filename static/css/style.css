@@ -24,6 +24,81 @@
     --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
 }
 
+/* ── R40b: 旧短名映射（兼容 index.html / app.js 中的 var(--bg) 等） ── */
+:root {
+    --bg: var(--bg-primary);
+    --fg: var(--text-primary);
+    --text: var(--text-primary);
+    --muted: var(--text-muted);
+    --panel: var(--bg-card);
+    --border: var(--border-color);
+}
+
+/* ═══ R40b: 四预设主题 ═══ */
+
+/* ── 主题2: 白纸 (亮色) ── */
+[data-theme="light"] {
+    --bg-primary: #faf9f6;
+    --bg-secondary: #f0efe9;
+    --bg-tertiary: #e8e6de;
+    --bg-card: #ffffff;
+    --bg-hover: #e8e6de;
+    --border-color: #d8d4c8;
+    --text-primary: #2b2924;
+    --text-secondary: #5a5648;
+    --text-muted: #8a8577;
+    --accent: #b8863e;
+    --accent-dim: #9a7030;
+    --accent-glow: rgba(184,134,62,0.15);
+    --danger: #b03a2e;
+    --success: #4a8a5c;
+    --info: #4a7ab0;
+    --shadow: 0 4px 20px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 40px rgba(0,0,0,0.12);
+}
+
+/* ── 主题3: 美拉德 (暖棕) ── */
+[data-theme="sepia"] {
+    --bg-primary: #1a150c;
+    --bg-secondary: #241a08;
+    --bg-tertiary: #2e2415;
+    --bg-card: #1d1b17;
+    --bg-hover: #3a2e1c;
+    --border-color: #4a3e28;
+    --text-primary: #e8dcc0;
+    --text-secondary: #c9b896;
+    --text-muted: #8a7a5c;
+    --accent: #d4a050;
+    --accent-dim: #a07840;
+    --accent-glow: rgba(212,160,80,0.15);
+    --danger: #c05a4a;
+    --success: #8aa868;
+    --info: #7a9ec0;
+    --shadow: 0 4px 20px rgba(0,0,0,0.5);
+    --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
+}
+
+/* ── 主题4: 莫兰迪 (灰调柔和) ── */
+[data-theme="morandi"] {
+    --bg-primary: #2b2d33;
+    --bg-secondary: #35373e;
+    --bg-tertiary: #3e4048;
+    --bg-card: #33353c;
+    --bg-hover: #44464e;
+    --border-color: #555762;
+    --text-primary: #d4d5d9;
+    --text-secondary: #a8a9b0;
+    --text-muted: #787a82;
+    --accent: #a8a29e;
+    --accent-dim: #8a8478;
+    --accent-glow: rgba(168,162,158,0.15);
+    --danger: #b07872;
+    --success: #8fa888;
+    --info: #7a95b0;
+    --shadow: 0 4px 20px rgba(0,0,0,0.3);
+    --shadow-lg: 0 8px 40px rgba(0,0,0,0.4);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -1509,27 +1584,6 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
    六月息 · 历史学学术面板 — 全局样式
    ═══════════════════════════════════════════════════════ */
 
-:root {
-    --bg-primary: #0f0f12;
-    --bg-secondary: #16161a;
-    --bg-tertiary: #1e1e24;
-    --bg-card: #1a1a20;
-    --bg-hover: #25252e;
-    --border-color: #2a2a35;
-    --text-primary: #e8e8ec;
-    --text-secondary: #a0a0b0;
-    --text-muted: #6b6b7b;
-    --accent: #c9a96e;
-    --accent-dim: #8b7355;
-    --accent-glow: rgba(201,169,110,0.15);
-    --danger: #c75450;
-    --success: #5a9e6e;
-    --info: #5a8ec7;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -3031,27 +3085,6 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
    六月息 · 历史学学术面板 — 全局样式
    ═══════════════════════════════════════════════════════ */
 
-:root {
-    --bg-primary: #0f0f12;
-    --bg-secondary: #16161a;
-    --bg-tertiary: #1e1e24;
-    --bg-card: #1a1a20;
-    --bg-hover: #25252e;
-    --border-color: #2a2a35;
-    --text-primary: #e8e8ec;
-    --text-secondary: #a0a0b0;
-    --text-muted: #6b6b7b;
-    --accent: #c9a96e;
-    --accent-dim: #8b7355;
-    --accent-glow: rgba(201,169,110,0.15);
-    --danger: #c75450;
-    --success: #5a9e6e;
-    --info: #5a8ec7;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -4538,27 +4571,6 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
    六月息 · 历史学学术面板 — 全局样式
    ═══════════════════════════════════════════════════════ */
 
-:root {
-    --bg-primary: #0f0f12;
-    --bg-secondary: #16161a;
-    --bg-tertiary: #1e1e24;
-    --bg-card: #1a1a20;
-    --bg-hover: #25252e;
-    --border-color: #2a2a35;
-    --text-primary: #e8e8ec;
-    --text-secondary: #a0a0b0;
-    --text-muted: #6b6b7b;
-    --accent: #c9a96e;
-    --accent-dim: #8b7355;
-    --accent-glow: rgba(201,169,110,0.15);
-    --danger: #c75450;
-    --success: #5a9e6e;
-    --info: #5a8ec7;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -6063,27 +6075,6 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
    六月息 · 历史学学术面板 — 全局样式
    ═══════════════════════════════════════════════════════ */
 
-:root {
-    --bg-primary: #0f0f12;
-    --bg-secondary: #16161a;
-    --bg-tertiary: #1e1e24;
-    --bg-card: #1a1a20;
-    --bg-hover: #25252e;
-    --border-color: #2a2a35;
-    --text-primary: #e8e8ec;
-    --text-secondary: #a0a0b0;
-    --text-muted: #6b6b7b;
-    --accent: #c9a96e;
-    --accent-dim: #8b7355;
-    --accent-glow: rgba(201,169,110,0.15);
-    --danger: #c75450;
-    --success: #5a9e6e;
-    --info: #5a8ec7;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -7570,27 +7561,6 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
    六月息 · 历史学学术面板 — 全局样式
    ═══════════════════════════════════════════════════════ */
 
-:root {
-    --bg-primary: #0f0f12;
-    --bg-secondary: #16161a;
-    --bg-tertiary: #1e1e24;
-    --bg-card: #1a1a20;
-    --bg-hover: #25252e;
-    --border-color: #2a2a35;
-    --text-primary: #e8e8ec;
-    --text-secondary: #a0a0b0;
-    --text-muted: #6b6b7b;
-    --accent: #c9a96e;
-    --accent-dim: #8b7355;
-    --accent-glow: rgba(201,169,110,0.15);
-    --danger: #c75450;
-    --success: #5a9e6e;
-    --info: #5a8ec7;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -9092,27 +9062,6 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
    六月息 · 历史学学术面板 — 全局样式
    ═══════════════════════════════════════════════════════ */
 
-:root {
-    --bg-primary: #0f0f12;
-    --bg-secondary: #16161a;
-    --bg-tertiary: #1e1e24;
-    --bg-card: #1a1a20;
-    --bg-hover: #25252e;
-    --border-color: #2a2a35;
-    --text-primary: #e8e8ec;
-    --text-secondary: #a0a0b0;
-    --text-muted: #6b6b7b;
-    --accent: #c9a96e;
-    --accent-dim: #8b7355;
-    --accent-glow: rgba(201,169,110,0.15);
-    --danger: #c75450;
-    --success: #5a9e6e;
-    --info: #5a8ec7;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -10599,27 +10548,6 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
    六月息 · 历史学学术面板 — 全局样式
    ═══════════════════════════════════════════════════════ */
 
-:root {
-    --bg-primary: #0f0f12;
-    --bg-secondary: #16161a;
-    --bg-tertiary: #1e1e24;
-    --bg-card: #1a1a20;
-    --bg-hover: #25252e;
-    --border-color: #2a2a35;
-    --text-primary: #e8e8ec;
-    --text-secondary: #a0a0b0;
-    --text-muted: #6b6b7b;
-    --accent: #c9a96e;
-    --accent-dim: #8b7355;
-    --accent-glow: rgba(201,169,110,0.15);
-    --danger: #c75450;
-    --success: #5a9e6e;
-    --info: #5a8ec7;
-    --radius: 12px;
-    --radius-sm: 8px;
-    --shadow: 0 4px 20px rgba(0,0,0,0.4);
-    --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
-}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 

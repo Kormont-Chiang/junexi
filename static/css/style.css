@@ -36,20 +36,20 @@
 
 /* ═══ R40b: 四预设主题 ═══ */
 
-/* ── 主题2: 白纸 (亮色) ── */
+/* ── 主题2: 宣纸 (亮色) ── */
 [data-theme="light"] {
-    --bg-primary: #faf9f6;
-    --bg-secondary: #f0efe9;
-    --bg-tertiary: #e8e6de;
-    --bg-card: #ffffff;
-    --bg-hover: #e8e6de;
-    --border-color: #d8d4c8;
+    --bg-primary: #f5f0e8;
+    --bg-secondary: #ebe5d8;
+    --bg-tertiary: #e0d8c8;
+    --bg-card: #faf7f0;
+    --bg-hover: #e5ddd0;
+    --border-color: #c8bfa8;
     --text-primary: #2b2924;
     --text-secondary: #5a5648;
     --text-muted: #8a8577;
-    --accent: #b8863e;
-    --accent-dim: #9a7030;
-    --accent-glow: rgba(184,134,62,0.15);
+    --accent: #9a7030;
+    --accent-dim: #7a5820;
+    --accent-glow: rgba(154,112,48,0.15);
     --danger: #b03a2e;
     --success: #4a8a5c;
     --info: #4a7ab0;
@@ -57,20 +57,20 @@
     --shadow-lg: 0 8px 40px rgba(0,0,0,0.12);
 }
 
-/* ── 主题3: 美拉德 (暖棕) ── */
+/* ── 主题3: 赭石 (红褐暖调) ── */
 [data-theme="sepia"] {
-    --bg-primary: #1a150c;
-    --bg-secondary: #241a08;
-    --bg-tertiary: #2e2415;
-    --bg-card: #1d1b17;
-    --bg-hover: #3a2e1c;
-    --border-color: #4a3e28;
-    --text-primary: #e8dcc0;
-    --text-secondary: #c9b896;
-    --text-muted: #8a7a5c;
-    --accent: #d4a050;
-    --accent-dim: #a07840;
-    --accent-glow: rgba(212,160,80,0.15);
+    --bg-primary: #1c1210;
+    --bg-secondary: #2a1a16;
+    --bg-tertiary: #38241e;
+    --bg-card: #221816;
+    --bg-hover: #3e2a22;
+    --border-color: #503830;
+    --text-primary: #e8d8d0;
+    --text-secondary: #c8a89a;
+    --text-muted: #907868;
+    --accent: #c04851;
+    --accent-dim: #983840;
+    --accent-glow: rgba(192,72,81,0.15);
     --danger: #c05a4a;
     --success: #8aa868;
     --info: #7a9ec0;
@@ -78,25 +78,25 @@
     --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
 }
 
-/* ── 主题4: 莫兰迪 (灰调柔和) ── */
+/* ── 主题4: 黛蓝 (青灰冷调) ── */
 [data-theme="morandi"] {
-    --bg-primary: #2b2d33;
-    --bg-secondary: #35373e;
-    --bg-tertiary: #3e4048;
-    --bg-card: #33353c;
-    --bg-hover: #44464e;
-    --border-color: #555762;
-    --text-primary: #d4d5d9;
-    --text-secondary: #a8a9b0;
-    --text-muted: #787a82;
-    --accent: #a8a29e;
-    --accent-dim: #8a8478;
-    --accent-glow: rgba(168,162,158,0.15);
-    --danger: #b07872;
-    --success: #8fa888;
-    --info: #7a95b0;
-    --shadow: 0 4px 20px rgba(0,0,0,0.3);
-    --shadow-lg: 0 8px 40px rgba(0,0,0,0.4);
+    --bg-primary: #1a2028;
+    --bg-secondary: #222a34;
+    --bg-tertiary: #2a3442;
+    --bg-card: #1e2630;
+    --bg-hover: #303a48;
+    --border-color: #3a4656;
+    --text-primary: #c8d4e0;
+    --text-secondary: #90a0b4;
+    --text-muted: #68788c;
+    --accent: #5a8ac0;
+    --accent-dim: #4068a0;
+    --accent-glow: rgba(90,138,192,0.15);
+    --danger: #b05858;
+    --success: #6a9a78;
+    --info: #5a8ec7;
+    --shadow: 0 4px 20px rgba(0,0,0,0.4);
+    --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -124,6 +124,8 @@ body::before {
 :root[data-theme="dark"] body::before {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cpath d='M4 4h16v4h-8v8h-4V8H4V4zm24 0h16v16h-4v-8h-8V4h-4zM4 24h4v8h8v4H4V24zm32 8h4v8H28v-4h8v-4zM16 16h16v16H16V16zm4 4v8h8v-8h-8z' fill='none' stroke='%23c9a96e' stroke-width='1.8'/%3E%3C/svg%3E");
     background-size: 48px 48px;
+    --pattern-opacity: 0.12;
+}
 }
 
 /* 宣纸: 纤维纹理 */
@@ -135,14 +137,14 @@ body::before {
 
 /* 赭石: 卷草纹——唐草缠枝 */
 [data-theme="sepia"] body::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M36 36c0-6 4-10 10-10s10 4 10 10-4 10-10 10-10-4-10-10zm0 0c0 6-4 10-10 10s-10-4-10-10 4-10 10-10 10 4 10 10zm0-18c2 4 2 8 0 18m0 0c-2 10-2 14 0 18M18 36c4-2 8-2 18 0m0 0c10 2 14 2 18 0' fill='none' stroke='%23d4a050' stroke-width='1.5'/%3E%3Ccircle cx='36' cy='18' r='2.5' fill='none' stroke='%23d4a050' stroke-width='1.2'/%3E%3Ccircle cx='36' cy='54' r='2.5' fill='none' stroke='%23d4a050' stroke-width='1.2'/%3E%3Ccircle cx='18' cy='36' r='2.5' fill='none' stroke='%23d4a050' stroke-width='1.2'/%3E%3Ccircle cx='54' cy='36' r='2.5' fill='none' stroke='%23d4a050' stroke-width='1.2'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M36 36c0-6 4-10 10-10s10 4 10 10-4 10-10 10-10-4-10-10zm0 0c0 6-4 10-10 10s-10-4-10-10 4-10 10-10 10 4 10 10zm0-18c2 4 2 8 0 18m0 0c-2 10-2 14 0 18M18 36c4-2 8-2 18 0m0 0c10 2 14 2 18 0' fill='none' stroke='%23c04851' stroke-width='1.5'/%3E%3Ccircle cx='36' cy='18' r='2.5' fill='none' stroke='%23c04851' stroke-width='1.2'/%3E%3Ccircle cx='36' cy='54' r='2.5' fill='none' stroke='%23c04851' stroke-width='1.2'/%3E%3Ccircle cx='18' cy='36' r='2.5' fill='none' stroke='%23c04851' stroke-width='1.2'/%3E%3Ccircle cx='54' cy='36' r='2.5' fill='none' stroke='%23c04851' stroke-width='1.2'/%3E%3C/svg%3E");
     background-size: 72px 72px;
     --pattern-opacity: 0.11;
 }
 
 /* 黛蓝: 落花流水——宋代水波纹 */
 [data-theme="morandi"] body::before {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='28' viewBox='0 0 56 28'%3E%3Cpath d='M0 14q7-7 14 0t14 0 14 0 14 0' fill='none' stroke='%23a8a29e' stroke-width='1.3'/%3E%3Cpath d='M0 14q7 7 14 0t14 0 14 0 14 0' fill='none' stroke='%23a8a29e' stroke-width='1.5' opacity='0.5'/%3E%3Ccircle cx='14' cy='7' r='1.5' fill='%23a8a29e' opacity='0.4'/%3E%3Ccircle cx='42' cy='21' r='1.5' fill='%23a8a29e' opacity='0.4'/%3E%3Ccircle cx='28' cy='14' r='1' fill='%23a8a29e' opacity='0.3'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='28' viewBox='0 0 56 28'%3E%3Cpath d='M0 14q7-7 14 0t14 0 14 0 14 0' fill='none' stroke='%235a8ac0' stroke-width='1.3'/%3E%3Cpath d='M0 14q7 7 14 0t14 0 14 0 14 0' fill='none' stroke='%235a8ac0' stroke-width='1.5' opacity='0.5'/%3E%3Ccircle cx='14' cy='7' r='1.5' fill='%235a8ac0' opacity='0.4'/%3E%3Ccircle cx='42' cy='21' r='1.5' fill='%235a8ac0' opacity='0.4'/%3E%3Ccircle cx='28' cy='14' r='1' fill='%235a8ac0' opacity='0.3'/%3E%3C/svg%3E");
     background-size: 56px 28px;
     --pattern-opacity: 0.13;
 }

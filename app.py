@@ -797,6 +797,43 @@ def ai_key_status():
     })
 
 
+@app.route("/api/ai/balance", methods=["GET"])
+def ai_balance():
+    """R69: 查询各供应商余额——SiliconFlow 有余额接口,DeepSeek 暂无"""
+    result = {}
+    # SiliconFlow: GET /v1/user/info
+    sf_key = _AI_KEYS.get("siliconflow") or os.environ.get("SILICONFLOW_API_KEY", "")
+    if sf_key:
+        try:
+            r = requests.get("https://api.siliconflow.cn/v1/user/info",
+                headers={"Authorization": f"Bearer {sf_key}"}, timeout=10)
+            if r.status_code == 200:
+                d = r.json().get("data", {})
+                balance = d.get("balance", "N/A")
+                result["siliconflow"] = {
+                    "ok": True,
+                    "balance": balance,
+                    "currency": "CNY",
+                    "name": d.get("name", ""),
+                    "email": d.get("email", "")
+                }
+            else:
+                result["siliconflow"] = {"ok": False, "error": f"HTTP {r.status_code}"}
+        except Exception as e:
+            result["siliconflow"] = {"ok": False, "error": str(e)[:80]}
+    else:
+        result["siliconflow"] = {"ok": False, "error": "未配置 Key"}
+    
+    # DeepSeek: 目前没有公开余额查询接口
+    ds_key = _AI_KEYS.get("deepseek") or os.environ.get("DEEPSEEK_API_KEY", "")
+    if ds_key:
+        result["deepseek"] = {"ok": False, "error": "暂无余额接口,请到 platform.deepseek.com 查看"}
+    else:
+        result["deepseek"] = {"ok": False, "error": "未配置 Key"}
+    
+    return jsonify({"ok": True, "providers": result})
+
+
 @app.route("/api/ai/chat", methods=["POST"])
 def ai_chat():
     """AI 对话（兼容 {messages} 与 {message, history} 两种请求格式）"""

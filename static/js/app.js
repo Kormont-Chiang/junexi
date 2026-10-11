@@ -297,6 +297,8 @@ function switchTab(tabId) {
         if (_area && !_area.innerHTML.trim()) switchCBDBType(window._cbdbType || 'person');
         loadCBDBDynasties();
     }
+    // R69: 进入 AI 页签时自动查询余额
+    if (tabId === 'ai') aiLoadBalance();
 }
 
 // ── Obsidian 集成 ──────────────────────────────────────
@@ -4561,6 +4563,44 @@ function aiKeySave() {
     }).catch(() => {});
 }
 window.aiKeySave = aiKeySave;
+
+// R69: 查询 AI 余额
+async function aiLoadBalance() {
+    var panel = document.getElementById('aiBalancePanel');
+    if (!panel) return;
+    panel.innerHTML = '<span style="color:var(--muted)">⏳ 查询余额…</span>';
+    try {
+        var res = await apiFetch('/api/ai/balance');
+        var data = await res.json();
+        var html = '';
+        var sf = data.providers && data.providers.siliconflow;
+        if (sf && sf.ok) {
+            var bal = typeof sf.balance === 'number' ? '¥' + sf.balance.toFixed(2) : sf.balance;
+            var color = (typeof sf.balance === 'number' && sf.balance < 1) ? '#e74c3c' : (typeof sf.balance === 'number' && sf.balance < 10 ? '#e67e22' : '#27ae60');
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px;background:var(--bg-tertiary,rgba(0,0,0,0.15));border-radius:4px;margin-bottom:3px">'
+                + '<span>🧪 硅基流动</span>'
+                + '<span style="color:' + color + ';font-weight:600">' + escapeHtml(bal) + '</span>'
+                + '</div>';
+        } else if (sf) {
+            html += '<div style="display:flex;justify-content:space-between;padding:4px 6px;font-size:10px;color:var(--muted)">'
+                + '<span>🧪 硅基流动</span><span>' + escapeHtml(sf.error || '未知') + '</span></div>';
+        }
+        var ds = data.providers && data.providers.deepseek;
+        if (ds && ds.ok) {
+            html += '<div style="display:flex;justify-content:space-between;padding:4px 6px;background:var(--bg-tertiary,rgba(0,0,0,0.15));border-radius:4px">'
+                + '<span>🐋 DeepSeek</span>'
+                + '<span style="color:var(--muted)">' + escapeHtml(ds.balance || '') + '</span></div>';
+        } else if (ds) {
+            html += '<div style="display:flex;justify-content:space-between;padding:4px 6px;font-size:10px;color:var(--muted)">'
+                + '<span>🐋 DeepSeek</span><span>' + escapeHtml(ds.error || '') + '</span></div>';
+        }
+        if (!html) html = '<span style="color:var(--muted);font-size:10px">未配置 API Key</span>';
+        panel.innerHTML = html + '<button class="ai-quick-btn" onclick="aiLoadBalance()" style="font-size:10px;padding:2px 6px;margin-top:2px">↻ 刷新余额</button>';
+    } catch (e) {
+        panel.innerHTML = '<span style="color:var(--muted);font-size:10px">余额查询失败</span>';
+    }
+}
+window.aiLoadBalance = aiLoadBalance;
 
 // R62: AI 笔记面板——边聊边记，直存 Obsidian
 function aiNoteToObsidian() {

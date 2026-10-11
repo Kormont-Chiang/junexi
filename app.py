@@ -116,7 +116,10 @@ def unhandled(e):
     tb = traceback.format_exc()
     app.logger.error(f"UNHANDLED {request.method} {request.path}: {type(e).__name__}: {e}\n{tb}")
     if request.path.startswith("/api/"):
-        return jsonify({"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}", "path": request.path}), 500
+        # R65: 生产模式不暴露内部错误细节（路径/堆栈），只给类型
+        if app.debug:
+            return jsonify({"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}", "path": request.path}), 500
+        return jsonify({"ok": False, "error": "服务器内部错误"}), 500
     # 非 API 路径让 Flask 默认处理（返回 500 HTML）
     from flask import abort
     return abort(500)

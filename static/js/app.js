@@ -4436,9 +4436,10 @@ function aiModelChange() {
     // R61: 检查所选模型是否需要 API Key
     var opt = sel.options[sel.selectedIndex];
     var via = opt ? opt.dataset.via : '';
-    if (via === 'siliconflow' && !localStorage.getItem('jx_sf_key')) {
+    // R65: 不存 key 到 localStorage（防 XSS），只存"已配置"标记；key 只存后端内存
+    if (via === 'siliconflow' && !localStorage.getItem('jx_sf_ok')) {
         showAIKeyGuide('siliconflow');
-    } else if (via === 'deepseek' && !localStorage.getItem('jx_ds_key')) {
+    } else if (via === 'deepseek' && !localStorage.getItem('jx_ds_ok')) {
         showAIKeyGuide('deepseek');
     } else {
         hideAIKeyGuide();
@@ -4489,10 +4490,11 @@ function aiKeySave() {
     var key = input.value.trim();
     if (!key) return;
     var provider = panel.dataset.provider || 'siliconflow';
+    // R65: key 只发后端，不存 localStorage
     if (provider === 'siliconflow') {
-        localStorage.setItem('jx_sf_key', key);
+        localStorage.setItem('jx_sf_ok', '1');
     } else if (provider === 'deepseek') {
-        localStorage.setItem('jx_ds_key', key);
+        localStorage.setItem('jx_ds_ok', '1');
     }
     input.value = '';
     hideAIKeyGuide();

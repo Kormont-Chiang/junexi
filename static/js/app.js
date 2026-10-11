@@ -58,7 +58,7 @@ function initTabs() {
 let _pluginTabs = {}; // tabId -> plugin id
 
 function loadPluginNav() {
-    fetch('/api/plugins').then(r => r.json()).then(d => {
+    apiFetch('/api/plugins').then(r => r.json()).then(d => {
         const zone = document.getElementById('navPluginZone');
         if (!zone) return;
         _pluginTabs = {};
@@ -302,7 +302,7 @@ function switchTab(tabId) {
 // ── Obsidian 集成 ──────────────────────────────────────
 // 所有外部跳转统一走后端 /api/open-url (WebView2 不响应 obsidian:// 自定义协议, window.open/_blank 也不可靠)
 window.openExternal = function (url) {
-    fetch('/api/open-url?u=' + encodeURIComponent(url)).catch(() => {});
+    apiFetch('/api/open-url?u=' + encodeURIComponent(url)).catch(() => {});
 };
 
 function openObsidianURI(path) {
@@ -4112,7 +4112,7 @@ function renderNetworkPanel(panel, data, centerId, group) {
         </div>`;
 
     // 朝代下拉（异步填充，保留选中）
-    fetch('/api/cbdb/dynasties').then(r => r.json()).then(list => {
+    apiFetch('/api/cbdb/dynasties').then(r => r.json()).then(list => {
         const sel = document.getElementById('cbdbNetDy');
         if (sel && Array.isArray(list)) {
             sel.innerHTML = '<option value="">全部朝代</option>' +
@@ -5833,7 +5833,7 @@ async function cbdbAIShowEntryRange(params) {
 // ── 活动足迹统一上报(后端 jsonl 追加) ────────────────
 window._logActivity = function (type, label) {
     try {
-        fetch('/api/activity', {
+        apiFetch('/api/activity', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: type, label: String(label || '').slice(0, 100) })
@@ -6011,7 +6011,7 @@ function initLibViewer() {
     var fname = '史料库笔记/' + slug(curName) + '-' + fmtTs(n.ts).replace(/[-: ]/g, '') + '.md';
     var md = '# ' + curName + ' · 笔记\n\n' + n.text +
       '\n\n---\n*来源：' + curUrl + '*\n*记入：六月息史料库查看器*\n';
-    return fetch('/api/obsidian/note/' + encodeURIComponent(fname), {
+    return apiFetch('/api/obsidian/note/' + encodeURIComponent(fname), {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: md })
     }).then(function (r) { return r.json(); }).then(function (d) {
@@ -6030,7 +6030,7 @@ function initLibViewer() {
     arr.slice().reverse().forEach(function (n) { md += '## ' + fmtTs(n.ts) + '\n\n' + n.text + '\n\n'; });
     var fname = '史料库笔记/' + slug(curName) + '-合集' + new Date().getFullYear() +
       String(new Date().getMonth() + 101).slice(1) + String(new Date().getDate() + 100).slice(1) + '.md';
-    fetch('/api/obsidian/note/' + encodeURIComponent(fname), {
+    apiFetch('/api/obsidian/note/' + encodeURIComponent(fname), {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: md })
     }).then(function (r) { return r.json(); }).then(function (d) {

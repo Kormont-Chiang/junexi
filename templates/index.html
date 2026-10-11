@@ -1280,6 +1280,14 @@
                     <div class="ai-model-bar">
                         <select id="aiModelSelect" onchange="aiModelChange()"><option>加载模型...</option></select>
                         <span id="aiModelDesc" class="ai-model-desc"></span>
+                        <button class="ai-quick-btn" onclick="aiKeySetup()" title="配置 API Key">🔑</button>
+                    </div>
+                    <div id="aiKeyPanel" style="display:none;padding:8px 12px;background:rgba(199,169,110,0.08);border-radius:8px;margin:8px 0;font-size:12px">
+                        <div id="aiKeyGuide" style="margin-bottom:8px;line-height:1.6"></div>
+                        <div style="display:flex;gap:6px;align-items:center">
+                            <input type="password" id="aiKeyInput" placeholder="粘贴 API Key 到这里" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--input-bg);color:var(--text)">
+                            <button class="btn-primary" onclick="aiKeySave()" style="font-size:11px;padding:4px 10px">保存</button>
+                        </div>
                     </div>
                     <div class="ai-input-area">
                         <input type="text" id="aiChatInput" placeholder="输入你的问题..." onkeydown="if(event.key==='Enter')sendAIChat()">

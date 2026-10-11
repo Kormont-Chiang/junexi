@@ -4414,7 +4414,7 @@ async function loadAiModels() {
         const d = await (await apiFetch('/api/ai/models')).json();
         const models = d.models || [];
         sel.innerHTML = models.map(m =>
-            '<option value="' + m.id + '"' + (m.id === (window._aiModel || d.default) ? ' selected' : '') + '>' + m.name + '</option>'
+            '<option value="' + m.id + '" data-via="' + (m.via || '') + '"' + (m.id === (window._aiModel || d.default) ? ' selected' : '') + '>' + m.name + '</option>'
         ).join('');
         const cur = models.find(m => m.id === (window._aiModel || d.default));
         const desc = document.getElementById('aiModelDesc');
@@ -4431,9 +4431,80 @@ function aiModelChange() {
     if (!sel) return;
     window._aiModel = sel.value;
     localStorage.setItem('jx_ai_model', sel.value);
-    showToast('已切换模型', 'success');
+    
+    // R61: 检查所选模型是否需要 API Key
+    var opt = sel.options[sel.selectedIndex];
+    var via = opt ? opt.dataset.via : '';
+    if (via === 'siliconflow' && !localStorage.getItem('jx_sf_key')) {
+        showAIKeyGuide('siliconflow');
+    } else if (via === 'deepseek' && !localStorage.getItem('jx_ds_key')) {
+        showAIKeyGuide('deepseek');
+    } else {
+        hideAIKeyGuide();
+        showToast('已切换模型', 'success');
+    }
 }
 window.aiModelChange = aiModelChange;
+
+// R61: API Key 配置引导
+function showAIKeyGuide(provider) {
+    var panel = document.getElementById('aiKeyPanel');
+    var guide = document.getElementById('aiKeyGuide');
+    if (!panel || !guide) return;
+    
+    if (provider === 'siliconflow') {
+        guide.innerHTML = '<b>🔧 配置硅基流动 API</b><br>' +
+            '1. 打开 <a href="https://cloud.siliconflow.cn" target="_blank" style="color:var(--gold)">cloud.siliconflow.cn</a> 注册（送 2000 万 Token）<br>' +
+            '2. 左侧菜单 → API 密钥 → 新建 API 密钥<br>' +
+            '3. 复制密钥，粘贴到下方输入框';
+    } else if (provider === 'deepseek') {
+        guide.innerHTML = '<b>🔧 配置 DeepSeek API</b><br>' +
+            '1. 打开 <a href="https://platform.deepseek.com" target="_blank" style="color:var(--gold)">platform.deepseek.com</a> 注册<br>' +
+            '2. 左侧 → API Keys → 创建 API Key<br>' +
+            '3. 复制密钥，粘贴到下方输入框';
+    }
+    panel.style.display = '';
+    panel.dataset.provider = provider;
+}
+
+function hideAIKeyGuide() {
+    var panel = document.getElementById('aiKeyPanel');
+    if (panel) panel.style.display = 'none';
+}
+
+function aiKeySetup() {
+    // 手动打开 key 配置面板
+    var sel = document.getElementById('aiModelSelect');
+    var opt = sel ? sel.options[sel.selectedIndex] : null;
+    var via = opt ? opt.dataset.via : 'siliconflow';
+    showAIKeyGuide(via);
+}
+window.aiKeySetup = aiKeySetup;
+
+function aiKeySave() {
+    var input = document.getElementById('aiKeyInput');
+    var panel = document.getElementById('aiKeyPanel');
+    if (!input || !panel) return;
+    var key = input.value.trim();
+    if (!key) return;
+    var provider = panel.dataset.provider || 'siliconflow';
+    if (provider === 'siliconflow') {
+        localStorage.setItem('jx_sf_key', key);
+    } else if (provider === 'deepseek') {
+        localStorage.setItem('jx_ds_key', key);
+    }
+    input.value = '';
+    hideAIKeyGuide();
+    showToast('✓ API Key 已保存', 'success');
+    
+    // 把 key 发给后端
+    apiFetch('/api/ai/set-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: provider, key: key })
+    }).catch(() => {});
+}
+window.aiKeySave = aiKeySave;
 
 
 function aiKbRefToggle() {

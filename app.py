@@ -748,6 +748,36 @@ def ai_models():
     return jsonify({"ok": True, "default": AI_MODELS[0]["id"], "models": AI_MODELS})
 
 
+# R61: API Key 内存存储（不写入文件，重启需重新配置）
+_AI_KEYS = {}
+
+@app.route("/api/ai/set-key", methods=["POST"])
+def ai_set_key():
+    """接收前端传来的 API Key，存内存供当前会话使用"""
+    data = request.json or {}
+    provider = data.get("provider", "")
+    key = data.get("key", "").strip()
+    if not provider or not key:
+        return jsonify({"ok": False, "error": "缺少 provider 或 key"}), 400
+    _AI_KEYS[provider] = key
+    # 同步到环境变量供 deepseek_chat 使用
+    if provider == "siliconflow":
+        os.environ["SILICONFLOW_API_KEY"] = key
+    elif provider == "deepseek":
+        os.environ["DEEPSEEK_API_KEY"] = key
+    return jsonify({"ok": True})
+
+
+@app.route("/api/ai/key-status", methods=["GET"])
+def ai_key_status():
+    """检查各供应商 API Key 是否已配置"""
+    return jsonify({
+        "ok": True,
+        "siliconflow": bool(_AI_KEYS.get("siliconflow") or os.environ.get("SILICONFLOW_API_KEY")),
+        "deepseek": bool(_AI_KEYS.get("deepseek") or os.environ.get("DEEPSEEK_API_KEY"))
+    })
+
+
 @app.route("/api/ai/chat", methods=["POST"])
 def ai_chat():
     """AI 对话（兼容 {messages} 与 {message, history} 两种请求格式）"""

@@ -1049,7 +1049,7 @@ def chgis_regime():
 
 
 # ── 插件加载(骨架: 只注册不改现有路由) ──
-from plugin_loader import load_plugins, plugin_assets
+from plugin_loader import load_plugins, plugin_assets, plugin_themes
 _plugin_nav, _plugin_loaded, _plugin_skipped = load_plugins(app)
 
 # ── OCR provider 注册（capabilities: ["ocr"] 插件，见 docs/OCR插件化方案.md）──
@@ -1195,7 +1195,7 @@ def _scan_plugin_manifests():
 @app.route("/api/plugins", methods=["GET"])
 def api_plugins_list():
     return jsonify({"ok": True, "plugins": _scan_plugin_manifests(), "nav": _plugin_nav,
-                    "assets": plugin_assets()})
+                    "assets": plugin_assets(), "themes": plugin_themes()})
 
 
 @app.route("/api/plugins/<pid>/toggle", methods=["POST"])

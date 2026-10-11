@@ -33,10 +33,16 @@ def all_plugin_dirs():
 
 # 插件静态资源 {pid: {css:[url], js:[url]}}
 _plugin_assets = {}
+# R40c: 插件皮肤包 {pid: [css_url]}——manifest.theme.css 声明的额外 CSS
+_plugin_themes = {}
 
 
 def plugin_assets():
     return dict(_plugin_assets)
+
+
+def plugin_themes():
+    return dict(_plugin_themes)
 
 
 def _user_data_dir():
@@ -130,7 +136,10 @@ def load_plugins(app):
                 assets = manifest.get("assets") or {}
                 css = [c for c in (assets.get("css") or []) if isinstance(c, str)]
                 js = [j for j in (assets.get("js") or []) if isinstance(j, str)]
-                if os.path.isdir(sdir) and (css or js):
+                # R40c: 插件皮肤包——manifest.theme 声明 {css:[文件名]}，写入 _plugin_themes 供前端注入
+                theme = manifest.get("theme") or {}
+                theme_css = [t for t in (theme.get("css") or []) if isinstance(t, str)]
+                if os.path.isdir(sdir) and (css or js or theme_css):
                     import flask as _fl
                     bp_s = _fl.Blueprint("jx_pstatic_%s" % pid, __name__,
                                          static_folder=sdir, static_url_path="/plugin/%s/static" % pid)
@@ -139,6 +148,8 @@ def load_plugins(app):
                         "css": ["/plugin/%s/static/%s" % (pid, c) for c in css],
                         "js": ["/plugin/%s/static/%s" % (pid, j) for j in js],
                     }
+                    if theme_css:
+                        _plugin_themes[pid] = ["/plugin/%s/static/%s" % (pid, t) for t in theme_css]
                 loaded.append(pid)
             except Exception as e:
                 skipped.append((pid, "%s: %s" % (type(e).__name__, str(e)[:120])))

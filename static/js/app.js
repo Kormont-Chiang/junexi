@@ -4385,11 +4385,10 @@ function aiPromptLibLoad() {
     if (!list) return;
     var flat = [];
     AI_PROMPTS.forEach(function(g) { g.items.forEach(function(it) { flat.push(it); }); });
-    list.innerHTML = flat.map(function(it, i) {
-        return '<button class="ai-quick-btn" onclick="aiPromptPick(flat[' + i + '])" style="text-align:left;font-size:11px;padding:4px 6px">' + it.label + '</button>';
-    }).join('');
-    // Store flat array globally for onclick access
     window._aiPromptFlat = flat;
+    list.innerHTML = flat.map(function(it, i) {
+        return '<button class="ai-quick-btn" onclick="aiPromptPick(window._aiPromptFlat[' + i + '])" style="text-align:left;font-size:11px;padding:4px 6px">' + it.label + '</button>';
+    }).join('');
 }
 window.aiPromptLibLoad = aiPromptLibLoad;
 

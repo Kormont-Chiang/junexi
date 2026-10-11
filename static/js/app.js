@@ -4500,6 +4500,16 @@ function aiKbRefClear() {
 }
 window.aiKbRefClear = aiKbRefClear;
 
+// R57: 清空 AI 对话
+function clearAIChat() {
+    const messages = document.getElementById('aiChatMessages');
+    if (messages) {
+        messages.innerHTML = '<div class="ai-message system">你好！我是你的历史学研究助手。我可以帮你摘要史料、梳理论证逻辑、解释历史概念、比较不同史料对同一事件的记载等。有什么可以帮你的？</div>';
+    }
+    window._aiChatHistory = [];
+}
+window.clearAIChat = clearAIChat;
+
 async function sendAIChat() {
     const input = document.getElementById('aiChatInput');
     const messages = document.getElementById('aiChatMessages');

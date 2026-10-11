@@ -104,7 +104,13 @@ def load_plugins(app):
                     skipped.append((pid, "no routes"))
                     continue
                 fname, var = routes_ref.split(":")
-                fpath = os.path.join(pdir, fname)
+                # R66: 防路径穿越——fname 必须在插件目录内
+                fpath = os.path.realpath(os.path.join(pdir, fname))
+                pdir_real = os.path.realpath(pdir)
+                if not fpath.startswith(pdir_real + os.sep):
+                    print(f"[plugins] {pid}: routes 文件路径越界,跳过")
+                    skipped.append((pid, "path traversal"))
+                    continue
                 spec = importlib.util.spec_from_file_location("jx_plugin_%s" % pid, fpath)
                 mod = importlib.util.module_from_spec(spec)
                 # 插件内模块互引(如 warmup.py 的 from routes import X): 先注册到 sys.modules
@@ -118,7 +124,11 @@ def load_plugins(app):
                 if warm_ref:
                     try:
                         wf, wv = warm_ref.split(":")
-                        wpath = os.path.join(pdir, wf)
+                        # R66: warmup 同样防路径穿越
+                        wpath = os.path.realpath(os.path.join(pdir, wf))
+                        if not wpath.startswith(pdir_real + os.sep):
+                            print(f"[plugins] {pid}: warmup 文件路径越界,跳过")
+                            continue
                         wspec = importlib.util.spec_from_file_location("jx_plugin_%s_warmup" % pid, wpath)
                         wmod = importlib.util.module_from_spec(wspec)
                         _sys.modules["jx_plugin_%s_warmup" % pid] = wmod

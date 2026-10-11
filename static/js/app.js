@@ -543,7 +543,7 @@ async function checkAppUpdate(manual) {
         if (tag) tag.textContent = 'v' + d.current;
         if (d.update_available) {
             if (link) { link.textContent = '发现新版本 v' + d.latest; link.className = 'up-new'; }
-            if (info) info.innerHTML = '（' + (d.published_at || '') + ' · <a href="javascript:void(0)" onclick="downloadAppUpdate(this)">下载更新包</a> · <a href="javascript:void(0)" onclick="openExternal(\'' + (d.url || 'https://github.com/Kormont-Chiang/junexi/releases') + '\')">前往页面</a>）';
+            if (info) info.innerHTML = '（' + escapeHtml(d.published_at || '') + ' · <a href="javascript:void(0)" onclick="downloadAppUpdate(this)">下载更新包</a> · <a href="javascript:void(0)" onclick="openExternal(\'' + escapeHtml(d.url || 'https://github.com/Kormont-Chiang/junexi/releases') + '\')">前往页面</a>）';
             if (manual) showToast('发现新版本 v' + d.latest, 'success');
         } else if (manual && info) {
             info.textContent = ' · 已是最新';

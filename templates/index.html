@@ -1376,23 +1376,23 @@ window.addEventListener('error', function(e){
   var msg = e.message + ' @ ' + (e.filename||'').split('/').pop() + ':' + e.lineno;
   console.error('[JX-Error]', msg);
   // 可选：显示用户可见的 toast（开发模式）
-  if (localStorage.getItem('jx-debug') === '1') {
+  try { if (localStorage.getItem('jx-debug') === '1') {
     var toast = document.createElement('div');
     toast.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;background:#c04040;color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;max-width:400px;font-family:monospace';
     toast.textContent = 'JS Error: ' + e.message;
     document.body.appendChild(toast);
     setTimeout(function(){ toast.remove(); }, 5000);
-  }
+  } } catch(_) {}
 });
 window.addEventListener('unhandledrejection', function(e){
   console.error('[JX-Rejection]', e.reason);
-  if (localStorage.getItem('jx-debug') === '1') {
+  try { if (localStorage.getItem('jx-debug') === '1') {
     var toast = document.createElement('div');
     toast.style.cssText = 'position:fixed;bottom:70px;right:20px;z-index:99999;background:#c08040;color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;max-width:400px;font-family:monospace';
     toast.textContent = 'Promise Rejection: ' + (e.reason && e.reason.message || e.reason);
     document.body.appendChild(toast);
     setTimeout(function(){ toast.remove(); }, 5000);
-  }
+  } } catch(_) {}
 });
 /* R40b: 主题切换——localStorage 持久化 + data-theme attribute */
 (function(){

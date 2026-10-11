@@ -4404,7 +4404,12 @@ function _kbKbForPrompt(text) {
 }
 
 let _aiKbExtra = ''; // 手动引用的知识库条目(拼接进 system prompt)
-let _aiModel = localStorage.getItem('jx_ai_model') || '';
+// R71: 安全 localStorage 封装——磁盘满/隐私模式下不崩
+function _lsGet(k) { try { return localStorage.getItem(k); } catch(e) { return null; } }
+function _lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch(e) { return false; } }
+function _lsDel(k) { try { localStorage.removeItem(k); return true; } catch(e) { return false; } }
+
+let _aiModel = _lsGet('jx_ai_model') || '';
 
 // ── 历史研究提示词库: 点击填入输入框可编辑(框架主导权: AI 给料,人来改) ──
 const AI_PROMPTS = [
@@ -4486,15 +4491,15 @@ function aiModelChange() {
     const sel = document.getElementById('aiModelSelect');
     if (!sel) return;
     window._aiModel = sel.value;
-    localStorage.setItem('jx_ai_model', sel.value);
+    _lsSet('jx_ai_model', sel.value);
     
     // R61: 检查所选模型是否需要 API Key
     var opt = sel.options[sel.selectedIndex];
     var via = opt ? opt.dataset.via : '';
     // R65: 不存 key 到 localStorage（防 XSS），只存"已配置"标记；key 只存后端内存
-    if (via === 'siliconflow' && !localStorage.getItem('jx_sf_ok')) {
+    if (via === 'siliconflow' && !_lsGet('jx_sf_ok')) {
         showAIKeyGuide('siliconflow');
-    } else if (via === 'deepseek' && !localStorage.getItem('jx_ds_ok')) {
+    } else if (via === 'deepseek' && !_lsGet('jx_ds_ok')) {
         showAIKeyGuide('deepseek');
     } else {
         hideAIKeyGuide();
@@ -4547,9 +4552,9 @@ function aiKeySave() {
     var provider = panel.dataset.provider || 'siliconflow';
     // R65: key 只发后端，不存 localStorage
     if (provider === 'siliconflow') {
-        localStorage.setItem('jx_sf_ok', '1');
+        _lsSet('jx_sf_ok', '1');
     } else if (provider === 'deepseek') {
-        localStorage.setItem('jx_ds_ok', '1');
+        _lsSet('jx_ds_ok', '1');
     }
     input.value = '';
     hideAIKeyGuide();

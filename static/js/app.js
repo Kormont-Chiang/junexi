@@ -928,8 +928,38 @@ async function libAIExecute(parsed, chat) {
     }
 
     if (action === 'site_suggest') {
-        // 推荐站点
-        libAIReplyAsGuide(params.category || '', chat, '根据你的需求推荐相关站点：');
+        // R55: 智能站点推荐——根据 category 从 db-card 匹配
+        var category = params.category || '';
+        var sites = _libSiteList();
+        var matched = [];
+        if (category) {
+            var tags = category.split(/[、,，\s]+/);
+            sites.forEach(function(s) {
+                for (var i = 0; i < tags.length; i++) {
+                    if (tags[i] && (s.name.indexOf(tags[i]) >= 0 || s.desc.indexOf(tags[i]) >= 0)) {
+                        matched.push(s);
+                        break;
+                    }
+                }
+            });
+        }
+        // If no db-card match, use keyword map
+        if (!matched.length && typeof fedSmartSuggest === 'function') {
+            var html = fedSmartSuggest(category);
+            if (html && resultBox) {
+                resultBox.innerHTML = html.replace(/<div class="fed-cell">|<\/div><\/div>$/g, '').trim();
+                return;
+            }
+        }
+        if (matched.length && resultBox) {
+            var html = '<b>推荐站点：</b><br>' + matched.slice(0, 5).map(function(s) {
+                return '<a href="' + s.href + '" target="_blank" class="lib-ai-link">' + escapeHtml(s.name) + '</a> — ' + escapeHtml(s.desc || '');
+            }).join('<br>');
+            resultBox.innerHTML = html;
+            return;
+        }
+        // Fallback to导购
+        libAIReplyAsGuide(category || JSON.stringify(params), chat, '让我推荐相关资源：');
         return;
     }
 

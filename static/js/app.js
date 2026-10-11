@@ -392,6 +392,19 @@ async function loadDashboard() {
     await Promise.all([loadStats(), loadNews(), loadRecentActivity(), loadPapersList()]);
 }
 
+// R48: 仪表盘手动刷新——带旋转动画
+async function refreshDashboard() {
+    const btn = document.querySelector('.dash-refresh');
+    if (btn) { btn.style.display = 'inline-block'; btn.style.animation = 'spin 0.6s linear'; }
+    try {
+        await loadDashboard();
+        showToast('仪表盘已刷新', 'success');
+    } catch (e) {
+        showToast('刷新失败: ' + (e.message || ''), 'error');
+    }
+    if (btn) { setTimeout(() => { btn.style.animation = ''; }, 700); }
+}
+
 async function loadStats() {
     try {
         const res = await apiFetch('/api/obsidian/stats');

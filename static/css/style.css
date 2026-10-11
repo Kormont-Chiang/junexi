@@ -1042,7 +1042,8 @@ body {
 .taboo-alt { color: var(--success); }
 
 /* ── AI 助手 ─────────────────────────────────────────── */
-.ai-layout { max-width: 800px; margin: 0 auto; }
+.ai-layout { display: flex; gap: 16px; align-items: stretch; }
+.ai-notes-panel { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); overflow: hidden; height: calc(100vh - 160px); }
 .ai-chat-container {
     display: flex; flex-direction: column;
     height: calc(100vh - 160px);

@@ -1310,6 +1310,19 @@
                         <div class="ai-kbref-panel" id="aiKbRefPanel" style="display:none"></div>
                     </div>
                 </div>
+                <!-- R62: AI 笔记面板——边聊边记，直存 Obsidian -->
+                <div class="ai-notes-panel">
+                    <div class="panel-header" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)">
+                        <span>📝 AI 笔记</span>
+                        <span style="flex:1"></span>
+                        <button class="ai-quick-btn" onclick="aiNoteToObsidian()" title="存入 Obsidian">📥</button>
+                        <button class="ai-quick-btn" onclick="aiNoteClear()" title="清空">🗑</button>
+                    </div>
+                    <textarea id="aiNoteEditor" placeholder="边聊边记……选中 AI 回答可一键摘录，或直接在这里写想法。&#10;&#10;Ctrl+Enter 保存到 Obsidian" style="flex:1;width:100%;padding:12px;border:none;background:transparent;color:var(--text);font-size:13px;line-height:1.7;resize:none;outline:none;min-height:200px"></textarea>
+                    <div style="padding:8px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)">
+                        <span id="aiNoteStatus">本地草稿 · 点 📥 存入 Obsidian</span>
+                    </div>
+                </div>
             </div>
         </div>
         <div id="_plugins" class="page">

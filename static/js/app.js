@@ -4506,6 +4506,48 @@ function aiKeySave() {
 }
 window.aiKeySave = aiKeySave;
 
+// R62: AI 笔记面板——边聊边记，直存 Obsidian
+function aiNoteToObsidian() {
+    var editor = document.getElementById('aiNoteEditor');
+    var status = document.getElementById('aiNoteStatus');
+    if (!editor) return;
+    var text = editor.value.trim();
+    if (!text) { if (status) status.textContent = '先写点什么再存'; return; }
+    var now = new Date();
+    function z(n) { return (n < 10 ? '0' : '') + n; }
+    var ts = now.getFullYear() + '-' + z(now.getMonth() + 1) + '-' + z(now.getDate()) + ' ' + z(now.getHours()) + ':' + z(now.getMinutes());
+    var fname = 'AI对话笔记/' + ts.replace(/[-: ]/g, '') + '.md';
+    var md = '# AI 对话笔记 · ' + ts + '\n\n' + text + '\n\n---\n*记入：六月息 AI 助手*\n';
+    apiFetch('/api/obsidian/note/' + encodeURIComponent(fname), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: md })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (status) status.textContent = d.ok ? '✓ 已存入 Obsidian' : '存入失败：' + (d.error || '未知错误');
+    }).catch(function(e) {
+        if (status) status.textContent = '存入失败：' + String(e).slice(0, 60);
+    });
+}
+window.aiNoteToObsidian = aiNoteToObsidian;
+
+function aiNoteClear() {
+    var editor = document.getElementById('aiNoteEditor');
+    var status = document.getElementById('aiNoteStatus');
+    if (editor) editor.value = '';
+    if (status) status.textContent = '本地草稿 · 点 📥 存入 Obsidian';
+}
+window.aiNoteClear = aiNoteClear;
+
+// Ctrl+Enter 保存笔记
+document.addEventListener('DOMContentLoaded', function() {
+    var editor = document.getElementById('aiNoteEditor');
+    if (editor) {
+        editor.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); aiNoteToObsidian(); }
+        });
+    }
+});
+
 
 function aiKbRefToggle() {
     const panel = document.getElementById('aiKbRefPanel');

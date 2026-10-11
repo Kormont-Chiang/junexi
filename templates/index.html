@@ -19,16 +19,16 @@
                 <div class="logo-sub">LIUYUEXI · 历史学学术面板</div>
             </div>
         </div>
-        <div class="nav-tabs">
-            <button class="nav-tab active" data-tab="dashboard">📊 仪表盘</button>
-            <button class="nav-tab" data-tab="workspace">📝 论文工作台</button>
-            <button class="nav-tab" data-tab="library">📚 史料库</button>
-            <button class="nav-tab" data-tab="map">🗺️ 史料地图</button>
-            <button class="nav-tab" data-tab="tools">🛠️ 史学工具</button>
-            <button class="nav-tab" data-tab="cbdb">🏛️ CBDB</button>
-            <button class="nav-tab" data-tab="ai">🤖 AI 助手</button>
+        <div class="nav-tabs" id="navTabs">
             <span id="navPluginZone" style="display:contents"></span>
-            <button class="nav-tab" data-tab="_plugins">🧩 插件</button>
+            <button class="nav-tab active" data-tab="dashboard" draggable="true">📊 仪表盘</button>
+            <button class="nav-tab" data-tab="workspace" draggable="true">📝 论文工作台</button>
+            <button class="nav-tab" data-tab="library" draggable="true">📚 史料库</button>
+            <button class="nav-tab" data-tab="map" draggable="true">🗺️ 史料地图</button>
+            <button class="nav-tab" data-tab="tools" draggable="true">🛠️ 史学工具</button>
+            <button class="nav-tab" data-tab="cbdb" draggable="true">🏛️ CBDB</button>
+            <button class="nav-tab" data-tab="ai" draggable="true">🤖 AI 助手</button>
+            <button class="nav-tab" data-tab="_plugins" draggable="true">🧩 插件</button>
         </div>
         <div class="nav-right">
             <input type="text" id="globalSearch" placeholder="搜索史料、人物、地名...">
@@ -1414,7 +1414,90 @@
   };
   document.addEventListener('DOMContentLoaded',function(){
     applyTheme(localStorage.getItem('jx-theme')||'dark');
+    _initNavDrag();
+    // R41a: 插件 tab 异步注入后再 apply 排序（MutationObserver 监听 navTabs 子节点变化）
+    var _navObs = new MutationObserver(function(){
+      setTimeout(_applyNavOrder, 100);
+    });
+    _navObs.observe(container, { childList: true, subtree: false });
   });
+
+  /* R41a: nav 页签拖拽排序 + localStorage 持久化 */
+  var _navContainer=null;
+  var _applyingOrder=false;
+  function _applyNavOrder(){
+    var container=_navContainer;
+    if(!container||_applyingOrder)return;
+    var saved=null;
+    try{saved=JSON.parse(localStorage.getItem('jx-nav-order')||'null')}catch(e){}
+    if(!saved||!Array.isArray(saved))return;
+    var tabs=container.querySelectorAll('.nav-tab[data-tab]');
+    var map={};
+    Array.prototype.forEach.call(tabs,function(t){map[t.dataset.tab]=t});
+    var needApply=false;
+    var currentOrder=Array.prototype.map.call(tabs,function(t){return t.dataset.tab});
+    for(var i=0;i<saved.length;i++){
+      if(currentOrder[i]!==saved[i]){needApply=true;break}
+    }
+    if(!needApply)return;
+    _applyingOrder=true;
+    // 记录当前不在 saved 中的 tab 的相对顺序（如插件 tab）
+    var extras=[];
+    Array.prototype.forEach.call(tabs,function(t){
+      var id=t.dataset.tab;
+      if(saved.indexOf(id)<0)extras.push(t);
+    });
+    // 按 saved 顺序重排
+    saved.forEach(function(id){
+      if(map[id]){container.appendChild(map[id]);delete map[id]}
+    });
+    // 追加不在 saved 中的 tab
+    extras.forEach(function(t){container.appendChild(t)});
+    setTimeout(function(){_applyingOrder=false},50);
+  }
+  function _initNavDrag(){
+    var container=document.getElementById('navTabs');
+    if(!container)return;
+    _navContainer=container;
+    var dragged=null;
+    function saveOrder(){
+      var tabs=container.querySelectorAll('.nav-tab[data-tab]');
+      var seen={};
+      var order=[];
+      Array.prototype.forEach.call(tabs,function(t){
+        var id=t.dataset.tab;
+        if(!seen[id]){seen[id]=true;order.push(id)}
+      });
+      localStorage.setItem('jx-nav-order',JSON.stringify(order));
+    }
+    _applyNavOrder();
+    container.addEventListener('dragstart',function(e){
+      var t=e.target.closest('.nav-tab[data-tab]');
+      if(!t)return;
+      dragged=t;
+      e.dataTransfer.effectAllowed='move';
+      t.style.opacity='0.4';
+    });
+    container.addEventListener('dragend',function(e){
+      if(dragged){dragged.style.opacity='';dragged=null;saveOrder()}
+    });
+    container.addEventListener('dragover',function(e){
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      if(!dragged)return;
+      var after=getAfter(container,e.clientX);
+      if(after==null){container.appendChild(dragged)}
+      else if(after!==dragged){container.insertBefore(dragged,after)}
+    });
+    function getAfter(c,x){
+      var tabs=c.querySelectorAll('.nav-tab[data-tab]:not([style*="opacity"])');
+      for(var i=0;i<tabs.length;i++){
+        var r=tabs[i].getBoundingClientRect();
+        if(x<r.left+r.width/2)return tabs[i];
+      }
+      return null;
+    }
+  }
 })();
 </script>
 </body>

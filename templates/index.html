@@ -81,8 +81,8 @@
             <div class="dashboard-grid">
                 <!-- 左栏 -->
                 <div class="dash-col">
-                    <div class="panel">
-                        <div class="panel-header"><span class="panel-icon">⚡</span> 快捷入口</div>
+                    <div class="panel" data-block="dash-quick">
+                        <div class="panel-header"><span class="panel-icon">⚡</span> 快捷入口 <span class="block-toggle" data-block="dash-quick" title="显示/隐藏">👁</span></div>
                         <div class="quick-links">
                             <a href="#" onclick="switchTab('workspace'); return false;" class="quick-link">
                                 <div class="quick-link-icon">📄</div>
@@ -126,8 +126,8 @@
                         </div>
                     </div>
 
-                    <div class="panel">
-                        <div class="panel-header"><span class="panel-icon">🛠️</span> 工具速览</div>
+                    <div class="panel" data-block="dash-tools">
+                        <div class="panel-header"><span class="panel-icon">🛠️</span> 工具速览 <span class="block-toggle" data-block="dash-tools" title="显示/隐藏">👁</span></div>
                         <div class="tools-grid">
                             <a href="#" onclick="switchTab('tools'); return false;" class="tool-card">
                                 <div class="tool-card-icon">📅</div>
@@ -159,8 +159,8 @@
 
                 <!-- 中栏 -->
                 <div class="dash-col">
-                    <div class="panel panel-grow">
-                        <div class="panel-header"><span class="panel-icon">📖</span> 学术写作知识库</div>
+                    <div class="panel panel-grow" data-block="dash-papers">
+                        <div class="panel-header"><span class="panel-icon">📖</span> 学术写作知识库 <span class="block-toggle" data-block="dash-papers" title="显示/隐藏">👁</span></div>
                         <div id="papersList" class="doc-list">
                             <div class="empty-state">
                                 <div class="empty-state-icon">📄</div>
@@ -169,8 +169,8 @@
                         </div>
                     </div>
 
-                    <div class="panel">
-                        <div class="panel-header"><span class="panel-icon">🕐</span> 最近动态</div>
+                    <div class="panel" data-block="dash-activity">
+                        <div class="panel-header"><span class="panel-icon">🕐</span> 最近动态 <span class="block-toggle" data-block="dash-activity" title="显示/隐藏">👁</span></div>
                         <div id="activityTimeline" class="timeline">
                             <div class="empty-state">
                                 <div class="empty-state-icon">🕐</div>
@@ -179,8 +179,8 @@
                         </div>
                     </div>
 
-                    <div class="panel">
-                        <div class="panel-header"><span class="panel-icon">📂</span> Vault 概览</div>
+                    <div class="panel" data-block="dash-vault">
+                        <div class="panel-header"><span class="panel-icon">📂</span> Vault 概览 <span class="block-toggle" data-block="dash-vault" title="显示/隐藏">👁</span></div>
                         <div id="vaultOverview" class="vault-overview">
                             <div class="vault-stat">
                                 <span class="vault-stat-num" id="vaultTotalFiles">-</span>
@@ -200,8 +200,8 @@
 
                 <!-- 右栏 -->
                 <div class="dash-col">
-                    <div class="panel">
-                        <div class="panel-header"><span class="panel-icon">📰</span> 学术动态</div>
+                    <div class="panel" data-block="dash-news">
+                        <div class="panel-header"><span class="panel-icon">📰</span> 学术动态 <span class="block-toggle" data-block="dash-news" title="显示/隐藏">👁</span></div>
                         <div class="news-list" id="newsList">
                             <div class="empty-state">
                                 <div class="empty-state-icon">📰</div>
@@ -210,8 +210,8 @@
                         </div>
                     </div>
 
-                    <div class="panel panel-grow">
-                        <div class="panel-header"><span class="panel-icon">✏️</span> 快速笔记</div>
+                    <div class="panel panel-grow" data-block="dash-note">
+                        <div class="panel-header"><span class="panel-icon">✏️</span> 快速笔记 <span class="block-toggle" data-block="dash-note" title="显示/隐藏">👁</span></div>
                         <textarea id="quickNote" class="quick-note-textarea" placeholder="灵感一闪，先记下来..."></textarea>
                         <button class="btn-primary" onclick="saveQuickNote()" style="width:100%">保存到今日札记</button>
                     </div>
@@ -1498,7 +1498,47 @@
       return null;
     }
   }
+
+  /* R41b: 功能块显隐开关——搭积木 */
+  function _initBlockToggle(){
+    var saved={};
+    try{saved=JSON.parse(localStorage.getItem('jx-hidden-blocks')||'{}')}catch(e){}
+    // Apply saved visibility
+    document.querySelectorAll('[data-block]').forEach(function(el){
+      var id=el.getAttribute('data-block');
+      if(saved[id]){
+        el.classList.add('block-hidden');
+      }
+    });
+    // Click handlers on toggle icons
+    document.querySelectorAll('.block-toggle').forEach(function(btn){
+      btn.addEventListener('click',function(e){
+        e.stopPropagation();
+        var id=btn.getAttribute('data-block');
+        var panel=document.querySelector('[data-block="'+id+'"]');
+        if(!panel)return;
+        panel.classList.toggle('block-hidden');
+        if(panel.classList.contains('block-hidden')){
+          saved[id]=true;
+        }else{
+          delete saved[id];
+        }
+        localStorage.setItem('jx-hidden-blocks',JSON.stringify(saved));
+      });
+    });
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    _initBlockToggle();
+  });
 })();
 </script>
+<style>
+/* R41b: 功能块显隐 */
+.block-hidden>*:not(.panel-header){display:none!important}
+.block-toggle{cursor:pointer;opacity:0.4;font-size:13px;margin-left:auto;user-select:none;transition:opacity .2s}
+.block-toggle:hover{opacity:1}
+.panel-header{display:flex;align-items:center;gap:6px}
+.panel-header .panel-icon+span:not(.block-toggle){flex:1}
+</style>
 </body>
 </html>

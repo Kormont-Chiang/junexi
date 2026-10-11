@@ -9,7 +9,7 @@
     <!-- R47: 异步加载+超时降级——网络不通时页面不等字体 -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet"></noscript>
-    <link rel="stylesheet" href="/static/css/style.css?v=45">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ auto_version('css/style.css') }}">
     <link rel="stylesheet" href="/static/css/lib/leaflet.css">
 </head>
 <body>
@@ -1318,19 +1318,19 @@
         </div>
     </main>
 
-    <script src="/static/js/data/era-names.js?v=17"></script>
-    <script src="/static/js/data/officials.js?v=17"></script>
-    <script src="/static/js/data/places.js?v=16"></script>
-    <script src="/static/js/data/taboo.js?v=16"></script>
-    <script src="/static/js/data/phonology.js?v=16"></script>
-    <script src="/static/js/data/versions.js?v=16"></script>
-    <script src="/static/js/data/chgis/chgis-data.js?v=16"></script>
+    <script src="/static/js/data/era-names.js?v={{ auto_version('js/data/era-names.js') }}"></script>
+    <script src="/static/js/data/officials.js?v={{ auto_version('js/data/officials.js') }}"></script>
+    <script src="/static/js/data/places.js?v={{ auto_version('js/data/places.js') }}"></script>
+    <script src="/static/js/data/taboo.js?v={{ auto_version('js/data/taboo.js') }}"></script>
+    <script src="/static/js/data/phonology.js?v={{ auto_version('js/data/phonology.js') }}"></script>
+    <script src="/static/js/data/versions.js?v={{ auto_version('js/data/versions.js') }}"></script>
+    <script src="/static/js/data/chgis/chgis-data.js?v={{ auto_version('js/data/chgis/chgis-data.js') }}"></script>
     <script src="/static/js/lib/leaflet.js"></script>
-    <script src="/static/js/lib/echarts.min.js?v=16"></script>
-    <script src="/static/js/app.js?v=71"></script>
-    <script src="/static/js/zotero.js?v=5"></script>
-    <script src="/static/js/ccts.js?v=2"></script>
-    <script src="/static/js/reading.js?v=9"></script>
+    <script src="/static/js/lib/echarts.min.js?v={{ auto_version('js/lib/echarts.min.js') }}"></script>
+    <script src="/static/js/app.js?v={{ auto_version('js/app.js') }}"></script>
+    <script src="/static/js/zotero.js?v={{ auto_version('js/zotero.js') }}"></script>
+    <script src="/static/js/ccts.js?v={{ auto_version('js/ccts.js') }}"></script>
+    <script src="/static/js/reading.js?v={{ auto_version('js/reading.js') }}"></script>
     <div id="appFooterBar" class="app-footer">六月息 <span id="appVerTag">…</span> · <a href="javascript:void(0)" onclick="checkAppUpdate(true)" id="appUpdateLink">检查更新</a><span id="appUpdateInfo"></span></div>
 
     <!-- 📖 史料库内嵌查看器：平台内打开 + 笔记空间 -->

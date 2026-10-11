@@ -228,6 +228,18 @@ def deepseek_chat(messages, stream=False, model_id=None):
     return {"error": "模型服务暂不可用（直连与 gateway 均失败）"}
 
 # ── Routes: 页面 ────────────────────────────────────────
+# ── R47c: 自动 cache busting——模板渲染时注入文件 mtime 作为版本号 ──
+def _auto_version(path):
+    """返回静态文件的最后修改时间戳，用于 cache busting。"""
+    try:
+        full = os.path.join(app.static_folder, path)
+        return str(int(os.path.getmtime(full)))
+    except Exception:
+        return "0"
+
+@app.context_processor
+def inject_versions():
+    return dict(auto_version=_auto_version)
 
 @app.route("/")
 def index():

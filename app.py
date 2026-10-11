@@ -62,6 +62,14 @@ def add_no_cache_headers(response):
     response.headers["Cache-Control"] = "no-store"
     return response
 
+@app.after_request
+def add_security_headers(response):
+    # R46c: 安全响应头——本地应用，收紧不必要的浏览器行为
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
 # ── R46: 全局错误处理 ──
 @app.errorhandler(404)
 def not_found(e):

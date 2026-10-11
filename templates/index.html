@@ -357,6 +357,17 @@
                             </div>
                             <div id="fedResults" class="fed-results" style="display:none"></div>
                         </div>
+
+            <!-- 🤖 史料库 AI 导购 -->
+            <div class="lib-ai-panel">
+                <div class="db-section-title">🤖 不知道去哪查？问 AI</div>
+                <div class="lib-ai-chat" id="libAIChat"><div class="lib-ai-hint">例：想查宋代墓志材料去哪找 / 哪个库能查职官沿革 / 敦煌文书影像在哪看</div></div>
+                <div class="lib-ai-input-row">
+                    <input type="text" id="libAIInput" class="lib-ai-input" placeholder="想找某类资料，但不知道去哪个站……" onkeydown="if(event.key==='Enter')libAISend()">
+                    <button class="lib-ai-send" onclick="libAISend()">发送</button>
+                </div>
+            </div>
+
                         <div class="lib-toolbar">
                 <input type="text" id="libSearch" class="lib-search" placeholder="🔍 锁定目标：站名 / 描述 / 板块（如「敦煌」「期刊」「碑刻」）" oninput="filterLibrary(this.value)">
                 <span class="lib-count" id="libCount"></span>
@@ -898,16 +909,6 @@
                     </div>
 
             <div id="obsidianSearchResults"></div>
-                </div>
-            </div>
-
-            <!-- 🤖 史料库 AI 导购 -->
-            <div class="lib-ai-panel">
-                <div class="db-section-title">🤖 不知道去哪查？问 AI</div>
-                <div class="lib-ai-chat" id="libAIChat"><div class="lib-ai-hint">例：想查宋代墓志材料去哪找 / 哪个库能查职官沿革 / 敦煌文书影像在哪看</div></div>
-                <div class="lib-ai-input-row">
-                    <input type="text" id="libAIInput" class="lib-ai-input" placeholder="想找某类资料，但不知道去哪个站……" onkeydown="if(event.key==='Enter')libAISend()">
-                    <button class="lib-ai-send" onclick="libAISend()">发送</button>
                 </div>
             </div>
         </div>

@@ -12446,3 +12446,9 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .app-footer a:hover{color:var(--accent,#4a9)}
 .app-footer .up-new{color:#c9a86a;font-weight:600}
 .app-footer #appVerTag,#appUpdateInfo{pointer-events:none}
+
+/* R67: AI 回答复制按钮 */
+.ai-message.ai { position: relative; }
+.ai-copy-btn { position: absolute; right: 4px; top: 4px; background: none; border: none; cursor: pointer; font-size: 12px; opacity: 0; transition: opacity 0.2s; padding: 2px 4px; }
+.ai-message.ai:hover .ai-copy-btn { opacity: 0.6; }
+.ai-copy-btn:hover { opacity: 1 !important; }

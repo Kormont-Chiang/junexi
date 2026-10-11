@@ -4627,6 +4627,30 @@ function clearAIChat() {
 }
 window.clearAIChat = clearAIChat;
 
+// R67: 复制 AI 回答
+function aiCopyResponse(btn) {
+    var bubble = btn.previousElementSibling;
+    if (!bubble) return;
+    var text = bubble.textContent;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function() {
+            btn.textContent = '✓';
+            setTimeout(function() { btn.textContent = '📋'; }, 1500);
+        });
+    } else {
+        // Fallback
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = '✓';
+        setTimeout(function() { btn.textContent = '📋'; }, 1500);
+    }
+}
+window.aiCopyResponse = aiCopyResponse;
+
 async function sendAIChat() {
     const input = document.getElementById('aiChatInput');
     const messages = document.getElementById('aiChatMessages');
@@ -4667,7 +4691,7 @@ async function sendAIChat() {
             messages.innerHTML += `<div class="ai-message system"><div class="ai-bubble">错误：${escapeHtml(data.error)}</div></div>`;
         } else if (content) {
             window._aiHistory = msgs.slice(1).concat([{ role: 'assistant', content: content }]).slice(-10);
-            messages.innerHTML += `<div class="ai-message ai"><div class="ai-bubble">${formatAIResponse(content)}</div></div>`;
+            messages.innerHTML += `<div class="ai-message ai"><div class="ai-bubble">${formatAIResponse(content)}</div><button class="ai-copy-btn" onclick="aiCopyResponse(this)" title="复制回答">📋</button></div>`;
         } else {
             messages.innerHTML += `<div class="ai-message system"><div class="ai-bubble">未收到有效回复</div></div>`;
         }
@@ -6075,9 +6099,10 @@ document.addEventListener('keydown', function (e) {
   var MAIN_TABS = ['dashboard','workspace','library','map','tools','cbdb','ai','_plugins'];
   var target = null;
   if (key === '0') target = 'dashboard';
+  else if (key === '9') target = '_plugins'; // R67: Ctrl+9 跳插件管理
   else {
     var n = parseInt(key, 10);
-    if (n >= 1 && n <= MAIN_TABS.length) target = MAIN_TABS[n - 1];
+    if (n >= 1 && n <= 8) target = MAIN_TABS[n - 1];
   }
   if (target) {
     e.preventDefault();

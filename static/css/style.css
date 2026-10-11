@@ -188,9 +188,10 @@ body {
     font-family: 'Noto Serif SC', serif;
     font-size: 20px; font-weight: 700;
     color: var(--text-primary);
-    letter-spacing: 2px;
+    letter-spacing: 2px; white-space: nowrap;
 }
-.logo-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; letter-spacing: 1px; }
+.logo-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; letter-spacing: 1px; white-space: nowrap; }
+.logo { flex-shrink: 0; }
 .nav-tabs { display: flex; gap: 4px; }
 .nav-tab {
     padding: 8px 18px; border-radius: var(--radius-sm);

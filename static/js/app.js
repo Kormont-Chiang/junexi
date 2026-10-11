@@ -5829,8 +5829,8 @@ function initLibViewer() {
           if (blocked) { blockedLink.href = curUrl; blocked.style.display = 'flex'; }
         }
       } catch(e) {
-        // 跨域——检查一下 iframe 是否真的加载了内容
-        // 如果 10 秒后还在 loading 会被下面的超时捕获
+        // R50c: 跨域——代理后的站应该是同源；跨域说明被重定向到外部(Cloudflare/拒绝)= 内嵌失败
+        if (blocked) { blockedLink.href = curUrl; blocked.style.display = 'flex'; }
       }
     };
     // R50: 加载超时——10 秒后如果还在 loading 就提示可能失败

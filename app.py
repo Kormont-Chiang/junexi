@@ -79,6 +79,22 @@ def add_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # R66: CSP——限制脚本/样式来源,防止 XSS 注入
+    # 允许 inline script(模板内联 JS) 和 data: URI(地图瓦片), 禁止外部脚本
+    if request.path.startswith("/api/"):
+        # API 响应不需要 CSP
+        pass
+    elif request.path == "/" or request.path.startswith("/static/"):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com data:; "
+            "img-src 'self' data: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://*.arcgis.com https://*.is.autonavi.com https://webst0*.is.autonavi.com https://webrd0*.is.autonavi.com; "
+            "connect-src 'self' https://api.deepseek.com https://api.siliconflow.cn; "
+            "frame-src 'self'; "
+            "frame-ancestors 'none'"
+        )
     return response
 
 # ── R46: 全局错误处理 ──

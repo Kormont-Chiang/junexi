@@ -428,6 +428,56 @@ async function loadStats() {
     } catch {}
 }
 
+// R68: AI 翻译学术动态摘要为中文
+async function newsTranslate(idx, btn) {
+    var container = document.getElementById('newsList');
+    var zhDiv = document.getElementById('newsZh' + idx);
+    var absDiv = document.getElementById('newsAbs' + idx);
+    if (!zhDiv || !absDiv) return;
+    
+    // 如果已有翻译，切换显示
+    if (zhDiv.dataset.done === '1') {
+        zhDiv.style.display = zhDiv.style.display === 'none' ? '' : 'none';
+        return;
+    }
+    
+    // 获取摘要文本
+    var text = absDiv.textContent.trim();
+    if (!text) return;
+    
+    // 截断太长的摘要
+    if (text.length > 2000) text = text.substring(0, 2000) + '…';
+    
+    btn.textContent = '⏳ 翻译中…';
+    btn.disabled = true;
+    zhDiv.style.display = '';
+    zhDiv.innerHTML = '<div class="empty-hint">正在翻译…</div>';
+    
+    try {
+        var res = await apiFetch('/api/ai/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: [
+                    { role: 'system', content: '你是学术翻译助手。把以下英文学术摘要翻译成中文。要求：1) 准确传达学术内容，不意译；2) 人名、地名、专有名词首次出现括注原文；3) 保持学术论文的语体；4) 直接输出翻译结果，不要加"以下是翻译"等废话。' },
+                    { role: 'user', content: text }
+                ]
+            })
+        }, 30000);
+        var data = await res.json();
+        var translated = (data.response || data.message || data.text || '').trim();
+        if (!translated) throw new Error('空回复');
+        zhDiv.innerHTML = '<div class="news-zh-label">🇨🇳 AI 翻译</div><div class="news-zh-text">' + escapeHtml(translated).replace(/\n/g, '<br>') + '</div>';
+        zhDiv.dataset.done = '1';
+        btn.textContent = '🇨🇳 已译';
+    } catch (e) {
+        zhDiv.innerHTML = '<div class="empty-hint">翻译失败：' + escapeHtml(String(e).slice(0, 60)) + '</div>';
+        btn.textContent = '🇨🇳 译';
+    }
+    btn.disabled = false;
+}
+window.newsTranslate = newsTranslate;
+
 async function loadNews(force) {
     const container = document.getElementById('newsList');
     if (!container) return;
@@ -458,19 +508,23 @@ async function loadNews(force) {
             it.authors = _cleanFeedText(it.authors);
         });
         const srcKnown = Object.keys(srcCount);
+        // R68: 给每条新闻加AI翻译按钮
         container.innerHTML = srcChips + shown.map((it, idx) => {
             const si = Math.max(0, srcKnown.indexOf(it.source));
             const srcCls = 'news-src-c' + (si % 6);
             const abs = (it.abstract || '').trim();
+            const hasAbs = abs.length > 20;
             return `
             <div class="news-item news-feed-item">
                 <div class="news-feed-head">
                     <span class="news-src ${srcCls}">${escapeHtml(it.source || '')}</span>
                     <span class="news-date">${escapeHtml(it.date || '')}</span>
+                    ${hasAbs ? `<button class="news-translate-btn" id="newsTrans${idx}" onclick="newsTranslate(${idx}, this)" title="AI 翻译成中文">🇨🇳 译</button>` : ''}
                 </div>
                 <a class="news-feed-title" href="javascript:void(0)" onclick="openExternal('${(it.url || '').replace(/'/g, "%27")}')" title="打开原文">${escapeHtml(it.title || '')}</a>
                 <div class="news-feed-meta">${escapeHtml(it.authors || '')}</div>
                 ${abs ? `<div class="news-feed-abs" id="newsAbs${idx}" onclick="this.classList.toggle('open')">${escapeHtml(abs)}</div>` : ''}
+                <div class="news-zh-summary" id="newsZh${idx}" style="display:none"></div>
             </div>`;
         }).join('') + (shown.length ? '' : '<div class="empty-hint">这个源暂时没有条目</div>') + `<div class="news-feed-foot"><button class="kb-nav-btn" onclick="loadNews(true)">↻ 刷新抓取</button><button class="kb-nav-btn" onclick="toggleFeedSources()">⚙ 自定义源</button><span class="news-date">${data.fetched_at ? '更新于 ' + data.fetched_at.slice(11, 16) : ''}${data.stale ? ' · 离线缓存' : ''}</span></div><div id="feedSourcesPanel" style="display:none"></div>`;
         loadFeedSourcesPanel();

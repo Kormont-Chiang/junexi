@@ -538,7 +538,7 @@ async function loadNews(force) {
                     <span class="news-date">${escapeHtml(it.date || '')}</span>
                     ${hasAbs ? `<button class="news-translate-btn" id="newsTrans${idx}" onclick="newsTranslate(${idx}, this)" title="AI 翻译成中文">🇨🇳 译</button>` : ''}
                 </div>
-                <a class="news-feed-title" href="javascript:void(0)" onclick="openExternal('${(it.url || '').replace(/'/g, "%27")}')" title="打开原文">${escapeHtml(it.title || '')}</a>
+                <a class="news-feed-title" href="javascript:void(0)" onclick="openExternal('${(it.url || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "")}')" title="打开原文">${escapeHtml(it.title || '')}</a>
                 <div class="news-feed-meta">${escapeHtml(it.authors || '')}</div>
                 ${abs ? `<div class="news-feed-abs" id="newsAbs${idx}" onclick="this.classList.toggle('open')">${escapeHtml(abs)}</div>` : ''}
                 <div class="news-zh-summary" id="newsZh${idx}" style="display:none"></div>
@@ -2447,7 +2447,7 @@ async function loadCBDBDynasties() {
         const data = await res.json();
         if (!Array.isArray(data)) return;
         sel.innerHTML = '<option value="">全部朝代</option>' +
-            data.map(d => `<option value="${d.code}">${escapeHtml(d.name)}</option>`).join('');
+            data.map(d => `<option value="${escapeHtml(d.code)}">${escapeHtml(d.name)}</option>`).join('');
         sel.dataset.loaded = '1';
     } catch (e) { /* 保留默认项即可 */ }
 }

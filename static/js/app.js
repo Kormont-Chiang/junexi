@@ -6126,6 +6126,8 @@ function initLibViewer() {
     if (!card) return;
     var href = card.getAttribute('href') || '';
     if (!href || href.indexOf('http') !== 0) return;
+    // R58: data-external="1" 的卡片不走内嵌,直接新窗口
+    if (card.getAttribute('data-external') === '1') return;
     e.preventDefault();
     e.stopPropagation();
     var name = (card.querySelector('.db-name') || {}).textContent || href;

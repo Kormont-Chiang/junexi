@@ -6207,3 +6207,33 @@ document.addEventListener('keydown', function (e) {
 
 // ── 史料库内嵌查看器：平台内打开 + 笔记空间（R37）──
 // R70: initLibViewer 已删除——iframe 内嵌查看器废弃,改用 libOpenExternal 三步走
+// 点击外部链接 → 系统浏览器打开 + 六月息缩小靠左 + 打开 Obsidian 笔记
+document.addEventListener('click', function (e) {
+  if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+  var card = e.target && e.target.closest ? e.target.closest('#library .db-card') : null;
+  if (!card) return;
+  var href = card.getAttribute('href') || '';
+  if (!href || href.indexOf('http') !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var name = (card.querySelector('.db-name') || {}).textContent || href;
+  libOpenExternal(href, name.trim());
+}, true);
+
+async function libOpenExternal(url, name) {
+    // 1. 系统浏览器打开
+    try { await apiFetch('/api/open-url?u=' + encodeURIComponent(url)); } catch(e) {}
+    // 2. 六月息窗口缩小靠左
+    try { await apiFetch('/api/window/shrink-left', { method: 'POST' }); } catch(e) {}
+    // 3. 创建 Obsidian 笔记
+    try {
+        var noteName = (name || url).replace(/[\\/:*?"<>|]/g, '_').substring(0, 80);
+        await apiFetch('/api/obsidian/note/' + encodeURIComponent('外部资源/' + noteName) + '.md', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: '# ' + (name || url) + '\n\n## 来源\n' + url + '\n\n## 笔记\n\n' })
+        });
+    } catch(e) {}
+    showToast('已在外部浏览器打开 · Obsidian 笔记已建', 'success');
+}
+window.libOpenExternal = libOpenExternal;

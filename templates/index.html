@@ -360,10 +360,10 @@
 
             <!-- 🤖 史料库 AI 导购 -->
             <div class="lib-ai-panel">
-                <div class="db-section-title">🤖 不知道去哪查？问 AI</div>
-                <div class="lib-ai-chat" id="libAIChat"><div class="lib-ai-hint">例：想查宋代墓志材料去哪找 / 哪个库能查职官沿革 / 敦煌文书影像在哪看</div></div>
+                <div class="db-section-title">🤖 智能检索 · 不知道去哪查就问 AI</div>
+                <div class="lib-ai-chat" id="libAIChat"><div class="lib-ai-hint">例：帮我查苏轼的生平 → 自动 CBDB 检索 / 宋代墓志材料 → 联合检索+站点推荐 / 敦煌碑刻去哪找 → 导购推荐</div></div>
                 <div class="lib-ai-input-row">
-                    <input type="text" id="libAIInput" class="lib-ai-input" placeholder="想找某类资料，但不知道去哪个站……" onkeydown="if(event.key==='Enter')libAISend()">
+                    <input type="text" id="libAIInput" class="lib-ai-input" placeholder="自然语言检索：帮我查苏轼的生平 / 宋代墓志材料去哪找…" onkeydown="if(event.key==='Enter')libAISend()">
                     <button class="lib-ai-send" onclick="libAISend()">发送</button>
                 </div>
             </div>

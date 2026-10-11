@@ -63,7 +63,10 @@ def load_overrides():
 
 
 def save_overrides(ov):
-    json.dump(ov, open(_overrides_path(), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    """原子写入：先写临时文件再重命名，防止写入中断损坏 JSON。"""
+    tmp = _overrides_path() + ".tmp"
+    json.dump(ov, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    os.replace(tmp, _overrides_path())
 
 
 def effective_enabled(manifest, plugin_id, overrides):
@@ -122,7 +125,8 @@ def load_plugins(app):
                         wspec.loader.exec_module(wmod)
                         getattr(wmod, wv)(app)
                     except Exception:
-                        traceback.print_exc()
+                        import logging
+                        logging.getLogger("jx.plugins").error(f"warmup failed: {pid}: {traceback.format_exc()}")
                 nav = manifest.get("nav")
                 if nav:
                     nav_injects.append({

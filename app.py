@@ -52,6 +52,8 @@ def get_app_dir():
 app = Flask(__name__,
     template_folder=os.path.join(get_app_dir(), "templates"),
     static_folder=os.path.join(get_app_dir(), "static"))
+# R46: 请求体大小限制——OCR 上传 100MB 足够，防止异常大请求撑爆内存
+app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
 CORS(app)
 
 @app.after_request
@@ -81,6 +83,12 @@ def internal_error(e):
     app.logger.error(f"500 {request.method} {request.path}: {e}\n{tb}")
     if request.path.startswith("/api/"):
         return jsonify({"ok": False, "error": "Internal Server Error", "path": request.path}), 500
+    return e
+
+@app.errorhandler(413)
+def too_large(e):
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "Request Entity Too Large (max 100MB)", "path": request.path}), 413
     return e
 
 @app.errorhandler(Exception)

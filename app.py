@@ -60,6 +60,54 @@ def add_no_cache_headers(response):
     response.headers["Cache-Control"] = "no-store"
     return response
 
+# ── R46: 全局错误处理 ──
+@app.errorhandler(404)
+def not_found(e):
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "Not Found", "path": request.path}), 404
+    return e
+
+@app.errorhandler(405)
+def method_not_allowed(e):
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "Method Not Allowed", "path": request.path, "method": request.method}), 405
+    return e
+
+@app.errorhandler(500)
+def internal_error(e):
+    import traceback
+    tb = traceback.format_exc()
+    # 日志记录完整堆栈
+    app.logger.error(f"500 {request.method} {request.path}: {e}\n{tb}")
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "Internal Server Error", "path": request.path}), 500
+    return e
+
+@app.errorhandler(Exception)
+def unhandled(e):
+    import traceback
+    tb = traceback.format_exc()
+    app.logger.error(f"UNHANDLED {request.method} {request.path}: {type(e).__name__}: {e}\n{tb}")
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": f"{type(e).__name__}: {str(e)[:200]}", "path": request.path}), 500
+    # 非 API 路径让 Flask 默认处理（返回 500 HTML）
+    from flask import abort
+    return abort(500)
+
+# ── R46: API 请求日志 ──
+import time as _time
+@app.before_request
+def _api_log_start():
+    if request.path.startswith("/api/"):
+        request._start_time = _time.time()
+
+@app.after_request
+def _api_log_end(response):
+    if request.path.startswith("/api/") and hasattr(request, "_start_time"):
+        elapsed = (_time.time() - request._start_time) * 1000
+        app.logger.info(f"{request.method} {request.path} {response.status_code} {elapsed:.0f}ms")
+    return response
+
 @app.before_request
 def fix_raw_non_utf8_query():
     """宽容修复请求行的原始非 UTF-8 字节（如 PowerShell 把 GBK 字节直发 URL）。

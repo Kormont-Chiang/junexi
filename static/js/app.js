@@ -4353,6 +4353,14 @@ async function checkStatus() {
 
         const obsidianOk = data.obsidian;
         const deepseekOk = data.deepseek;
+        // R48: 收集所有服务状态用于 tooltip
+        const services = [];
+        if (data.cbdb) services.push('CBDB ✓');
+        if (obsidianOk) services.push('Obsidian ✓');
+        if (deepseekOk) services.push('DeepSeek ✓');
+        if (!data.cbdb) services.push('CBDB ✗');
+        if (!obsidianOk) services.push('Obsidian ✗');
+        if (!deepseekOk) services.push('DeepSeek ✗');
 
         dot.classList.remove('warn', 'error');
         if (obsidianOk && deepseekOk) {
@@ -4365,9 +4373,13 @@ async function checkStatus() {
             dot.classList.add('error');
             text.textContent = 'API 未连接';
         }
+        // R48: tooltip 显示具体服务
+        const tooltip = services.join(' · ');
+        dot.parentElement.title = tooltip;
     } catch {
         dot.classList.add('error');
         text.textContent = '后端未启动';
+        dot.parentElement.title = '无法连接到后端服务';
     }
 }
 

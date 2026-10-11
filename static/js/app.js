@@ -6,6 +6,25 @@
 const API_BASE = '';
 const VAULT_NAME = '论文写作';
 
+// ── R47: 统一 API 请求封装——超时+错误处理+兼容旧调用 ──
+async function apiFetch(url, options, timeoutMs) {
+    const opts = options || {};
+    const timeout = timeoutMs || 30000;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+        const resp = await fetch(url, { ...opts, signal: controller.signal });
+        clearTimeout(timer);
+        return resp;
+    } catch (e) {
+        clearTimeout(timer);
+        if (e.name === 'AbortError') {
+            throw new Error('请求超时(' + timeout + 'ms): ' + url);
+        }
+        throw e;
+    }
+}
+
 // ── Toast 通知 ─────────────────────────────────────────
 let toastContainer = null;
 function showToast(message, type = 'info', duration = 3000) {

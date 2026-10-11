@@ -5712,6 +5712,7 @@ function initLibViewer() {
   var lvnCount = document.getElementById('lvnCount');
   var lvnState = document.getElementById('lvnState');
   var curUrl = '', curName = '';
+  var _lvTimer = null; // R50b: 超时 timer 管理，防止旧 timer 干扰新 viewer
   var LS_KEY = 'junxi-libnotes';
 
   function loadAll() {
@@ -5820,21 +5821,21 @@ function initLibViewer() {
       try {
         // 同源检测：能读到 contentDocument 说明代理成功
         var doc = lvFrame.contentDocument || lvFrame.contentWindow.document;
-        if (doc && doc.body && doc.body.innerHTML.length < 10) {
-          // 空 body ——可能被 Cloudflare 拦截
-          if (blocked) { blockedLink.href = curUrl; blocked.style.display = 'flex'; }
-        }
-        // 检查标题是否 Cloudflare 验证页
+        var body = doc && doc.body;
+        var bodyLen = body ? body.innerHTML.length : 0;
         var title = doc.title || '';
-        if (/just a moment|checking your browser|cloudflare/i.test(title)) {
+        // 空白 body / Cloudflare 验证 / 极短内容 = 被拦截
+        if (bodyLen < 50 || /just a moment|checking your browser|cloudflare|attention required/i.test(title)) {
           if (blocked) { blockedLink.href = curUrl; blocked.style.display = 'flex'; }
         }
       } catch(e) {
-        // 跨域——正常（代理后的站通常是同源的，但有些重定向会跨域）
+        // 跨域——检查一下 iframe 是否真的加载了内容
+        // 如果 10 秒后还在 loading 会被下面的超时捕获
       }
     };
     // R50: 加载超时——10 秒后如果还在 loading 就提示可能失败
-    setTimeout(function() {
+    if (_lvTimer) clearTimeout(_lvTimer);
+    _lvTimer = setTimeout(function() {
       if (loading && loading.style.display !== 'none') {
         loading.style.display = 'none';
         if (blocked) { blockedLink.href = curUrl; blocked.style.display = 'flex'; }
@@ -5850,6 +5851,7 @@ function initLibViewer() {
     lv.style.display = 'none';
     lvFrame.src = 'about:blank';
     curUrl = ''; curName = '';
+    if (_lvTimer) clearTimeout(_lvTimer);
   }
   document.getElementById('lvClose').addEventListener('click', closeViewer);
   document.getElementById('lvExternal').addEventListener('click', function () {

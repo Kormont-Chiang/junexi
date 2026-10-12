@@ -1043,7 +1043,7 @@ body {
 
 /* ── AI 助手 ─────────────────────────────────────────── */
 /* R64: AI 助手三栏布局——左:提示词+模型 中:对话 右:笔记 */
-.ai-layout { display: flex; gap: 12px; align-items: stretch; }
+.ai-layout { display: flex; gap: 16px; align-items: stretch; }
 .ai-left-panel {
     width: 220px; min-width: 160px; max-width: 400px;
     display: flex; flex-direction: column; gap: 0;
@@ -1064,6 +1064,7 @@ body {
     resize: horizontal;
 }
 .ai-chat-container {
+    flex: 1; min-width: 0;
     display: flex; flex-direction: column;
     height: calc(100vh - 160px);
     min-height: 480px;
@@ -2548,7 +2549,7 @@ body {
 .taboo-alt { color: var(--success); }
 
 /* ── AI 助手 ─────────────────────────────────────────── */
-.ai-layout { max-width: 800px; margin: 0 auto; }
+.ai-layout { max-width: none; margin: 0; }
 .ai-chat-container {
     display: flex; flex-direction: column;
     height: calc(100vh - 160px);
@@ -4049,7 +4050,7 @@ body {
 .taboo-alt { color: var(--success); }
 
 /* ── AI 助手 ─────────────────────────────────────────── */
-.ai-layout { max-width: 800px; margin: 0 auto; }
+.ai-layout { max-width: none; margin: 0; }
 .ai-chat-container {
     display: flex; flex-direction: column;
     height: calc(100vh - 160px);
@@ -5535,7 +5536,7 @@ body {
 .taboo-alt { color: var(--success); }
 
 /* ── AI 助手 ─────────────────────────────────────────── */
-.ai-layout { max-width: 800px; margin: 0 auto; }
+.ai-layout { max-width: none; margin: 0; }
 .ai-chat-container {
     display: flex; flex-direction: column;
     height: calc(100vh - 160px);
@@ -7039,7 +7040,7 @@ body {
 .taboo-alt { color: var(--success); }
 
 /* ── AI 助手 ─────────────────────────────────────────── */
-.ai-layout { max-width: 800px; margin: 0 auto; }
+.ai-layout { max-width: none; margin: 0; }
 .ai-chat-container {
     display: flex; flex-direction: column;
     height: calc(100vh - 160px);
@@ -8525,7 +8526,7 @@ body {
 .taboo-alt { color: var(--success); }
 
 /* ── AI 助手 ─────────────────────────────────────────── */
-.ai-layout { max-width: 800px; margin: 0 auto; }
+.ai-layout { max-width: none; margin: 0; }
 .ai-chat-container {
     display: flex; flex-direction: column;
     height: calc(100vh - 160px);
@@ -10026,7 +10027,7 @@ body {
 .taboo-alt { color: var(--success); }
 
 /* ── AI 助手 ─────────────────────────────────────────── */
-.ai-layout { max-width: 800px; margin: 0 auto; }
+.ai-layout { max-width: none; margin: 0; }
 .ai-chat-container {
     display: flex; flex-direction: column;
     height: calc(100vh - 160px);
@@ -11512,7 +11513,7 @@ body {
 .taboo-alt { color: var(--success); }
 
 /* ── AI 助手 ─────────────────────────────────────────── */
-.ai-layout { max-width: 800px; margin: 0 auto; }
+.ai-layout { max-width: none; margin: 0; }
 .ai-chat-container {
     display: flex; flex-direction: column;
     height: calc(100vh - 160px);

@@ -3943,7 +3943,7 @@ async function loadTextPersons(textId, title) {
         const res = await apiFetch(`/api/cbdb/texts/${textId}/persons`);
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
-        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + '<p style="color:var(--text-muted)">暂无相关人物</p>'; return; }
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + emptyStateHTML({icon:'🔍', text:'暂无相关人物', hint:'调整筛选条件后重试'});; return; }
         cbdbRenderPersons(resultsDiv, data, {
             backTitle: title,
             columns: [
@@ -3974,7 +3974,7 @@ async function loadPlacePersons(addrId, includeSame) {
         const res = await apiFetch(`/api/cbdb/places/${addrId}/persons${includeSame ? '?include_same_coord=1' : ''}`);
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = renderCBDBBackBar(title) + `<p style="color:var(--danger);">${data.error}</p>`; return; }
-        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + '<p style="color:var(--text-muted)">暂无相关人物</p>'; return; }
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = renderCBDBBackBar(title) + emptyStateHTML({icon:'🔍', text:'暂无相关人物', hint:'调整筛选条件后重试'});; return; }
         const hasCoord = place.x_coord && place.y_coord;
         const toggleBtn = hasCoord ? `<button class="btn-secondary" style="margin-left:8px" onclick="loadPlacePersons(${addrId}, ${includeSame ? 'false' : 'true'})">${includeSame ? '✓ 已并入同坐标地址' : '并入同坐标地址'}</button>` : '';
         cbdbRenderPersons(resultsDiv, data, {
@@ -4243,7 +4243,7 @@ function renderNetworkPanel(panel, data, centerId, group) {
     const graph = document.getElementById('cbdbNetGraph');
     if (!graph) return;
     if (nodes.length <= 1) {
-        graph.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">暂无关系数据</div>';
+        graph.innerHTML = emptyStateHTML({icon:'🕸️', text:'暂无关系数据', hint:'在左侧选择检索类型和条件后点击查询'});
         return;
     }
     drawNetGraph(graph, nodes, edges, centerId);
@@ -4279,7 +4279,7 @@ function drawNetGraph(container, nodes, edges, centerId) {
         return;
     }
     if (!nodes || nodes.length <= 1) {
-        container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:40px">暂无关系数据</div>';
+        container.innerHTML = emptyStateHTML({icon:'🕸️', text:'暂无关系数据', hint:'调整筛选条件后重试'});
         return;
     }
 

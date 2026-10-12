@@ -13280,3 +13280,53 @@ table, .cbdb-table {
 .stat-value {
     border-radius: 4px;
 }
+
+/* ═══ R93: 时间线精致化 ═══ */
+
+/* 节点发光 */
+.timeline-item::before {
+    box-shadow: 0 0 6px var(--accent-glow), 0 0 12px var(--accent-glow);
+    transition: all 0.2s ease;
+}
+.timeline-item:hover::before {
+    transform: scale(1.3);
+    box-shadow: 0 0 8px var(--accent-dim), 0 0 16px var(--accent-glow);
+}
+
+/* 时间线容器渐变 */
+.timeline {
+    position: relative;
+    padding-left: 8px;
+}
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, 
+        var(--accent) 0%, 
+        var(--accent-dim) 30%,
+        var(--border-color) 100%);
+    opacity: 0.3;
+}
+
+/* 时间标签更精致 */
+.timeline-time {
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--accent-dim);
+    background: var(--accent-glow);
+    padding: 3px 6px;
+    border-radius: 4px;
+    text-align: center;
+    min-width: 32px;
+    height: fit-content;
+}
+
+/* 内容区hover */
+.timeline-content {
+    transition: color 0.15s ease;
+}
+.timeline-item:hover .timeline-content {
+    color: var(--text);
+}

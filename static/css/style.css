@@ -13087,3 +13087,71 @@ body.focus-mode .ai-chat-container { max-width: 900px; margin: 0 auto; }
     align-items: center;
     gap: 6px;
 }
+
+/* ═══ R89: 按钮系统美化 ═══ */
+
+/* 主按钮——光晕效果 */
+.btn-primary {
+    position: relative;
+    overflow: hidden;
+}
+.btn-primary::after {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+.btn-primary:hover::after {
+    opacity: 1;
+}
+.btn-primary:hover {
+    box-shadow: 0 4px 16px var(--accent-glow), 0 2px 8px rgba(0,0,0,0.2);
+    transform: translateY(-2px);
+}
+.btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+/* 次按钮——边框发光 */
+.btn-secondary {
+    transition: all 0.2s ease;
+}
+.btn-secondary:hover {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+    background: var(--accent-glow);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* 危险按钮 */
+.btn-danger {
+    transition: all 0.2s ease;
+}
+.btn-danger:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 4px 12px rgba(199, 84, 80, 0.3);
+}
+
+/* 所有按钮焦点 */
+button:focus-visible, .btn:focus-visible {
+    outline: 2px solid var(--accent-dim);
+    outline-offset: 2px;
+}
+
+/* 图标按钮微交互 */
+.ai-quick-btn, .dash-refresh, .block-toggle {
+    transition: all 0.2s ease;
+}
+.ai-quick-btn:hover, .dash-refresh:hover {
+    transform: scale(1.1);
+    color: var(--accent);
+}
+.block-toggle:hover {
+    opacity: 1;
+    color: var(--accent);
+}

@@ -457,6 +457,20 @@ function loadDashboardDebounced() {
     _dashLoadTimer = setTimeout(function() { loadDashboard(); }, 300);
 }
 
+// R94: 仪表盘自动刷新——每 5 分钟静默更新数据
+var _dashAutoRefresh = null;
+function startDashAutoRefresh() {
+    if (_dashAutoRefresh) clearInterval(_dashAutoRefresh);
+    _dashAutoRefresh = setInterval(function() {
+        // 只在仪表盘可见时刷新
+        var dash = document.getElementById('dashboard');
+        if (dash && dash.classList.contains('active')) {
+            loadDashboard();
+        }
+    }, 5 * 60 * 1000);
+}
+startDashAutoRefresh();
+
 async function loadDashboard() {
     renderRecentTabs();
     await Promise.all([loadStats(), loadNews(), loadRecentActivity(), loadPapersList()]);

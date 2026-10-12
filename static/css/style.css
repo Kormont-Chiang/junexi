@@ -118,14 +118,14 @@ body::before {
     top: 0; left: 0; right: 0; bottom: 0;
     pointer-events: none;
     z-index: 0;
-    opacity: var(--pattern-opacity, 0.15);
+    opacity: var(--pattern-opacity, 0.07);
 }
 
 /* 皂: 云雷纹——双层回字，青铜器暗纹 */
 :root[data-theme="zao"] body::before {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cg fill='none' stroke='%23c9a96e'%3E%3Cpath d='M4 4h32v8h-16v16h-8V12H4V4zm48 0h32v32h-8V16H52V4h-4zM4 48h8v16h16v8H4V48zm72 16h8v32H64v-8h16V64h4zM24 24h24v24H24V24zm6 6v12h12V30H30z' stroke-width='2'/%3E%3Cpath d='M52 52h40v40H52V52zm8 8v24h24V60H60z' stroke-width='1.2' opacity='0.5'/%3E%3C/g%3E%3C/svg%3E");
     background-size: 96px 96px;
-    --pattern-opacity: 0.15;
+    --pattern-opacity: 0.07;
 }
 
 /* 白: 洒金笺——金箔碎片+纤维纹理 */
@@ -12468,3 +12468,221 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 }
 .news-zh-label { font-size: 10px; color: var(--accent, #c9a86e); margin-bottom: 4px; font-weight: 600; }
 .news-zh-text { color: var(--text-secondary); }
+
+/* ═══ R77: 全面美化增强 ═══ */
+
+/* 1. 更柔和的卡片过渡 */
+.db-card, .dash-panel, .news-item, .result-card, .pm-row,
+.ai-quick-btn, .kb-chip, .tool-tab, .cbdb-type-tab {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 2. 卡片 hover 效果增强 */
+.db-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.3), 0 0 0 1px var(--accent-dim);
+}
+
+/* 3. 按钮统一过渡 */
+.btn-primary, .btn-secondary, .btn, button[class*='btn'] {
+    transition: all 0.2s ease;
+}
+
+/* 4. 输入框焦点效果 */
+input:focus, textarea:focus, select:focus {
+    box-shadow: 0 0 0 3px var(--accent-glow);
+    border-color: var(--accent-dim);
+    outline: none;
+}
+
+/* 5. 导航 tab 底部指示条动画 */
+.nav-tab {
+    position: relative;
+    transition: color 0.2s ease;
+}
+.nav-tab::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: var(--accent);
+    transition: all 0.25s ease;
+    transform: translateX(-50%);
+}
+.nav-tab:hover::after, .nav-tab.active::after {
+    width: 60%;
+}
+
+/* 6. 空状态区域美化 */
+.empty-hint {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+/* 7. 滚动条美化 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* 8. 面板标题统一字重 */
+.dash-panel-title, .ai-left-title, .pm-install-title,
+.lvn-head, .cbdb-back-bar .cbdb-view-title {
+    letter-spacing: 0.02em;
+}
+
+/* 9. 学术动态条目增强 */
+.news-feed-item {
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
+}
+.news-feed-item:hover {
+    border-left-color: var(--accent);
+    background: var(--bg-hover);
+}
+
+/* 10. 工具页空状态引导 */
+#tools .tool-panel .empty-hint {
+    padding: 60px 20px;
+    font-size: 14px;
+}
+
+/* 11. 表格行过渡 */
+.cbdb-table tbody tr {
+    transition: background 0.15s ease;
+}
+
+/* 12. 标签 chips 增强 */
+.kb-chip {
+    cursor: pointer;
+    user-select: none;
+}
+.kb-chip:hover {
+    filter: brightness(1.2);
+}
+
+/* ═══ R77b: 深度美化 ═══ */
+
+/* 卡片边框更精致——细线+微光 */
+.db-card, .dash-panel, .news-item, .result-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+}
+
+/* 面板圆角统一 */
+.dash-panel {
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+/* 统计数字更大更醒目 */
+.stat-card .stat-value {
+    font-size: 2.2em;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+/* 快速入口图标微浮起 */
+.quick-entry {
+    transition: all 0.2s ease;
+}
+.quick-entry:hover {
+    transform: translateX(4px);
+}
+
+/* 搜索框圆角更柔和 */
+#globalSearch, .search-input, input[type='search'] {
+    border-radius: 20px;
+}
+
+/* 学术动态标题更有层次感 */
+.news-feed-title {
+    font-weight: 500;
+    line-height: 1.5;
+    transition: color 0.2s ease;
+}
+.news-feed-title:hover {
+    color: var(--accent);
+}
+
+/* AI 对话气泡更柔和 */
+.ai-bubble {
+    border-radius: 16px;
+    line-height: 1.8;
+}
+.ai-message.user .ai-bubble {
+    border-bottom-right-radius: 4px;
+}
+.ai-message.ai .ai-bubble {
+    border-bottom-left-radius: 4px;
+}
+
+/* 工具页 tab 下划线指示 */
+.tool-tab {
+    position: relative;
+    padding-bottom: 8px;
+}
+.tool-tab::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: var(--accent);
+    transition: all 0.25s ease;
+    transform: translateX(-50%);
+}
+.tool-tab:hover::after, .tool-tab.active::after {
+    width: 50%;
+}
+
+/* CBDB 检索类型 tab 增强 */
+.cbdb-type-tab {
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+.cbdb-type-tab:hover {
+    background: var(--bg-hover);
+}
+.cbdb-type-tab.active {
+    background: var(--accent-glow);
+    color: var(--accent);
+}
+
+/* 插件管理行 hover */
+.pm-row {
+    transition: all 0.2s ease;
+}
+.pm-row:hover {
+    background: var(--bg-hover);
+}
+
+/* 底部版本栏更精致 */
+.app-footer {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 8px 16px;
+    border-top: 1px solid var(--border-color);
+    letter-spacing: 0.03em;
+}
+
+/* toast 通知圆角 */
+.toast {
+    border-radius: 10px;
+}

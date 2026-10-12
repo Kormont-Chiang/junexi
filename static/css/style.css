@@ -13228,3 +13228,55 @@ button:focus-visible, .btn:focus-visible {
     background: var(--bg-hover);
     color: var(--accent);
 }
+
+/* ═══ R92: 圆角柔化系统 ═══ */
+
+/* 面板更柔和 */
+.panel {
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+}
+.panel:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.06);
+}
+
+/* 卡片圆角统一 */
+.db-card, .result-card, .stat-card, .vault-stat, .dash-panel {
+    border-radius: 10px;
+}
+
+/* 搜索框/输入框圆角 */
+.search-input, .lib-search, .ai-input, textarea, .quick-note-textarea {
+    border-radius: 8px;
+}
+
+/* 按钮圆角统一 */
+.btn-primary, .btn-secondary, .ai-quick-btn, .block-toggle, .dash-refresh {
+    border-radius: 8px;
+}
+
+/* 文件夹树圆角 */
+.lib-folder, .lib-folder-item {
+    border-radius: 8px;
+}
+
+/* Badge 圆角 */
+.badge, .cbdb-tab, .cbdb-type-tab {
+    border-radius: 6px;
+}
+
+/* 表格圆角 */
+table, .cbdb-table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* 提示词分类圆角 */
+.prompt-cat {
+    border-radius: 8px;
+}
+
+/* 统计卡数字 */
+.stat-value {
+    border-radius: 4px;
+}

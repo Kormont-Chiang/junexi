@@ -6269,6 +6269,12 @@ document.addEventListener('keydown', function (e) {
     e.preventDefault();
     var btn = document.querySelector('.nav-tab[data-tab="' + target + '"]');
     if (btn) btn.click();
+    return;
+  }
+  // R80: Ctrl+B 快速打开 Obsidian
+  if (key === 'b' || key === 'B') {
+    e.preventDefault();
+    openObsidianURI('');
   }
 });
 

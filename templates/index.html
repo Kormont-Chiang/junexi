@@ -911,16 +911,17 @@
                 </div>
             </div>
 
-            <!-- 🔍 Obsidian Vault 搜索 (原有内容保留在下面) -->
+            <!-- 🔍 Obsidian Vault 搜索 + 文件夹树 -->
             <div class="db-section">
-                <div class="db-section-title">🔍 Obsidian Vault 搜索</div>
+                <div class="db-section-title">🔍 Obsidian Vault</div>
                 <div class="panel" style="margin-bottom:0">
                     <div class="search-row" style="margin-bottom:12px">
                         <input type="text" id="obsidianSearchInput" class="search-input" style="margin-bottom:0;flex:1" placeholder="搜索自己的 Vault 笔记...">
                         <button class="btn-primary" onclick="searchVault()">搜索</button>
                     </div>
 
-            <div id="obsidianSearchResults"></div>
+                    <div id="libVaultTree" style="margin-bottom:12px"></div>
+                    <div id="obsidianSearchResults"></div>
                 </div>
             </div>
         </div>

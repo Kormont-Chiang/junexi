@@ -1994,8 +1994,62 @@ async function createPaper() {
 // ── 史料库 ────────────────────────────────────────────
 
 async function loadLibrary() {
-    // 史料库页面以数据库导航为主，Vault 搜索由用户手动触发
+    // R91: 初始化时加载 Vault 文件夹结构
+    const container = document.getElementById('libVaultTree');
+    if (!container || container.dataset.loaded) return;
+    container.dataset.loaded = '1';
+    
+    container.innerHTML = '<div class="loading" style="margin:20px auto;display:block"></div>';
+    
+    try {
+        const res = await apiFetch('/api/obsidian/stats');
+        const data = await res.json();
+        const folders = data.folders || {};
+        
+        var html = '<div style="padding:12px 0 8px;font-size:13px;font-weight:600;color:var(--muted)">📂 Vault 文件夹</div>';
+        
+        Object.entries(folders).forEach(function(pair) {
+            var name = pair[0], info = pair[1];
+            var subfolders = info.subfolders || [];
+            var fileCount = info.files || 0;
+            
+            html += '<div class="lib-folder" onclick="toggleFolder(this)">';
+            html += '<div class="lib-folder-header">';
+            html += '<span class="lib-folder-icon">📂</span>';
+            html += '<span class="lib-folder-name">' + escapeHtml(name) + '</span>';
+            html += '<span class="lib-folder-count">' + fileCount + '</span>';
+            html += '</div>';
+            
+            if (subfolders.length) {
+                html += '<div class="lib-folder-children" style="display:none">';
+                subfolders.forEach(function(sub) {
+                    html += '<div class="lib-folder-item" onclick="event.stopPropagation();openObsidianURI(\'' + escapeHtml(name + '/' + sub) + '/\')">';
+                    html += '<span>📄</span> ' + escapeHtml(sub);
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+            html += '</div>';
+        });
+        
+        if (!Object.keys(folders).length) {
+            html = emptyStateHTML({icon:'📂', text:'Vault 暂无文件夹', hint:'在 Obsidian 中创建笔记后自动同步'});
+        }
+        
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = emptyStateHTML({icon:'⚠️', text:'无法加载 Vault', hint:'请确认 Obsidian 已连接'});
+    }
 }
+
+// R91: 文件夹折叠/展开
+function toggleFolder(el) {
+    var children = el.querySelector('.lib-folder-children');
+    if (children) {
+        children.style.display = children.style.display === 'none' ? 'block' : 'none';
+    }
+}
+window.toggleFolder = toggleFolder;
 
 async function viewLibraryFile(path) {
     const detail = document.getElementById('obsidianSearchResults');

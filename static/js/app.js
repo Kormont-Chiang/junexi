@@ -3455,7 +3455,7 @@ async function runKinPath(aId, bId) {
         }
         const arrow = '<span style="color:var(--text-muted);margin:0 4px">→</span>';
         const names = (d.persons || []).map(p =>
-            '<span class="cbdb-name" onclick="loadCBDBPersonDetail(' + p.id + ');event.stopPropagation()">' + escapeHtml(p.name_chn) + '</span>'
+            '<span class="cbdb-name" onclick="loadCBDBPersonDetail(' + Number(p.id) + ');event.stopPropagation()">' + escapeHtml(p.name_chn) + '</span>'
         ).join(arrow);
         const mo = d.mourning || {};
         const moBadge = mo.mourning
@@ -3465,7 +3465,7 @@ async function runKinPath(aId, bId) {
             '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:2px;line-height:1.9">' + names + moBadge + '</div>'
             + '<div style="color:var(--text-muted);margin-top:4px">'
             + escapeHtml(d.rel_chain || '')
-            + ' · ' + d.depth + ' 段关系'
+            + ' · ' + Number(d.depth) + ' 段关系'
             + (mo.kintype ? ' · ' + escapeHtml(mo.kintype) : '')
             + '</div>';
     } catch (e) {
@@ -5625,15 +5625,16 @@ function toolSourcesHtml(key) {
     const cfg = TOOL_SOURCES[key];
     if (!cfg) return '';
     const btns = (cfg.online || []).map((o, i) => {
-        if (o.act === 'cbdb') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'cbdb\')">' + o.label + '</button>';
-        if (o.act === 'cbdb_office') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'cbdb_office\')">' + o.label + '</button>';
-        if (o.act === 'cbdb_place') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'cbdb_place\')">' + o.label + '</button>';
-        if (o.act === 'map') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'map\')">' + o.label + '</button>';
-        return '<a class="tool-src-btn" href="' + o.url + '" target="_blank" rel="noopener">' + o.label + '</a>';
+        var safeLabel = escapeHtml(o.label);
+        if (o.act === 'cbdb') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'cbdb\')">' + safeLabel + '</button>';
+        if (o.act === 'cbdb_office') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'cbdb_office\')">' + safeLabel + '</button>';
+        if (o.act === 'cbdb_place') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'cbdb_place\')">' + safeLabel + '</button>';
+        if (o.act === 'map') return '<button class="tool-src-btn" onclick="toolSrcGoto(\'' + key + '\',\'map\')">' + safeLabel + '</button>';
+        return '<a class="tool-src-btn" href="' + escapeHtml(o.url) + '" target="_blank" rel="noopener">' + escapeHtml(o.label) + '</a>';
     }).join('');
     return '<div class="tool-sources"><div class="tool-sources-head">📎 来源与核查</div>' +
-        '<div class="tool-sources-book">本库依据：' + cfg.book + '</div>' +
-        '<div class="tool-sources-note">' + cfg.note + '</div>' +
+        '<div class="tool-sources-book">本库依据：' + escapeHtml(cfg.book) + '</div>' +
+        '<div class="tool-sources-note">' + escapeHtml(cfg.note) + '</div>' +
         '<div class="tool-sources-btns">' + btns + '</div></div>';
 }
 window.toolSourcesHtml = toolSourcesHtml;

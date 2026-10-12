@@ -276,6 +276,14 @@ async function togglePlugin(pid) {
 window.togglePlugin = togglePlugin;
 
 function switchTab(tabId) {
+    // R78: 记录最近使用的页签
+    try {
+        var _rh = _lsGet('jx_recent_tabs', []);
+        _rh = _rh.filter(function(x) { return x !== tabId; });
+        _rh.unshift(tabId);
+        _rh = _rh.slice(0, 6);
+        _lsSet('jx_recent_tabs', _rh);
+    } catch (e) { /* 静默 */ }
     // 离开地图页签时停掉进行中的 flyTo 动画：0 尺寸容器上动画每帧抛 Invalid LatLng NaN
     if (tabId !== 'map' && chgisMap && chgisMap._animating) {
         try { chgisMap.stop(); } catch (e) { /* 防御 */ }
@@ -400,12 +408,30 @@ async function saveQuickNote() {
 // ── 仪表盘数据 ─────────────────────────────────────────
 // R74: 防抖——500ms 内不重复加载仪表盘
 var _dashLoadTimer = null;
+
+// R78: 渲染最近使用的页签
+function renderRecentTabs() {
+    var bar = document.getElementById('recentBar');
+    var chips = document.getElementById('recentChips');
+    if (!bar || !chips) return;
+    var rh = _lsGet('jx_recent_tabs', []);
+    if (!rh.length) { bar.style.display = 'none'; return; }
+    var labels = { dashboard: '仪表盘', workspace: '论文工作', library: '史料库', map: '历史地图', tools: '史学工具', cbdb: 'CBDB 检索', ai: 'AI 助手', zotero: 'Zotero', acad_feed: '学术动态' };
+    chips.innerHTML = rh.map(function(id) {
+        var label = labels[id] || id;
+        var emoji = { dashboard: '📊', workspace: '📄', library: '📚', map: '🗺️', tools: '🔧', cbdb: '🏛️', ai: '🤖', zotero: '📖', acad_feed: '📰' }[id] || '📌';
+        return '<button class="recent-chip" onclick="switchTab(\'' + id + '\')">' + emoji + ' ' + escapeHtml(label) + '</button>';
+    }).join('');
+    bar.style.display = '';
+}
+
 function loadDashboardDebounced() {
     if (_dashLoadTimer) clearTimeout(_dashLoadTimer);
     _dashLoadTimer = setTimeout(function() { loadDashboard(); }, 300);
 }
 
 async function loadDashboard() {
+    renderRecentTabs();
     await Promise.all([loadStats(), loadNews(), loadRecentActivity(), loadPapersList()]);
 }
 
@@ -4420,8 +4446,8 @@ function _kbKbForPrompt(text) {
 
 let _aiKbExtra = ''; // 手动引用的知识库条目(拼接进 system prompt)
 // R71: 安全 localStorage 封装——磁盘满/隐私模式下不崩
-function _lsGet(k) { try { return localStorage.getItem(k); } catch(e) { return null; } }
-function _lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch(e) { return false; } }
+function _lsGet(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : (d !== undefined ? d : null); } catch(e) { return d !== undefined ? d : null; } }
+function _lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e) { return false; } }
 function _lsDel(k) { try { localStorage.removeItem(k); return true; } catch(e) { return false; } }
 
 let _aiModel = _lsGet('jx_ai_model') || '';

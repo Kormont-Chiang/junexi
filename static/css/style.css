@@ -13155,3 +13155,21 @@ button:focus-visible, .btn:focus-visible {
     opacity: 1;
     color: var(--accent);
 }
+
+/* ═══ R90: Vault 统计可点击 ═══ */
+.vault-stat.clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm);
+    padding: 8px;
+}
+.vault-stat.clickable:hover {
+    background: var(--bg-hover);
+    transform: translateY(-2px);
+}
+.vault-stat.clickable:hover .vault-stat-num {
+    color: var(--accent);
+}
+.vault-stat.clickable:hover .vault-stat-label {
+    color: var(--text);
+}

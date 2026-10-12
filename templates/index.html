@@ -205,15 +205,15 @@
                     <div class="panel" data-block="dash-vault">
                         <div class="panel-header"><span class="panel-icon">📂</span> Vault 概览 <span class="block-toggle" data-block="dash-vault" title="显示/隐藏">👁</span></div>
                         <div id="vaultOverview" class="vault-overview">
-                            <div class="vault-stat">
+                            <div class="vault-stat clickable" onclick="switchTab('library')" title="浏览史料库">
                                 <span class="vault-stat-num" id="vaultTotalFiles">-</span>
                                 <span class="vault-stat-label">文件</span>
                             </div>
-                            <div class="vault-stat">
+                            <div class="vault-stat clickable" onclick="openObsidianURI('')" title="在 Obsidian 中打开 Vault">
                                 <span class="vault-stat-num" id="vaultTotalFolders">-</span>
                                 <span class="vault-stat-label">文件夹</span>
                             </div>
-                            <div class="vault-stat">
+                            <div class="vault-stat clickable" onclick="openObsidianURI('')" title="在 Obsidian 中打开根目录">
                                 <span class="vault-stat-num" id="vaultRootFiles">-</span>
                                 <span class="vault-stat-label">根目录</span>
                             </div>

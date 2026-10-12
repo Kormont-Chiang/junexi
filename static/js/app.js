@@ -4501,18 +4501,62 @@ const AI_PROMPTS = [
   ]},
 ];
 
-// R64: 左侧提示词库列表加载
+// R84: 提示词库——分类折叠 + 搜索
 function aiPromptLibLoad() {
     var list = document.getElementById('aiPromptLibList');
     if (!list) return;
     var flat = [];
     AI_PROMPTS.forEach(function(g) { g.items.forEach(function(it) { flat.push(it); }); });
     window._aiPromptFlat = flat;
-    list.innerHTML = flat.map(function(it, i) {
-        return '<button class="ai-quick-btn" onclick="aiPromptPick(window._aiPromptFlat[' + i + '])" style="text-align:left;font-size:11px;padding:4px 6px">' + it.label + '</button>';
-    }).join('');
+    window._aiPromptFilter = '';
+    renderPromptLib();
 }
 window.aiPromptLibLoad = aiPromptLibLoad;
+
+function renderPromptLib() {
+    var list = document.getElementById('aiPromptLibList');
+    if (!list) return;
+    var filter = (window._aiPromptFilter || '').toLowerCase();
+    var expanded = window._aiPromptExpanded || {};
+    var html = '';
+    AI_PROMPTS.forEach(function(g, gi) {
+        var visible = g.items.filter(function(it) {
+            return !filter || it.label.toLowerCase().includes(filter) || it.text.toLowerCase().includes(filter);
+        });
+        if (!visible.length) return;
+        var isOpen = expanded[gi] !== undefined ? expanded[gi] : (gi === 0);
+        html += '<div class="ai-prompt-cat">';
+        html += '<button class="ai-prompt-cat-header" onclick="aiPromptToggleCat(' + gi + ')">';
+        html += '<span class="ai-prompt-cat-arrow">' + (isOpen ? '▼' : '▶') + '</span> ';
+        html += escapeHtml(g.cat) + ' <span style="color:var(--muted);font-weight:400">' + visible.length + '</span>';
+        html += '</button>';
+        if (isOpen) {
+            html += '<div class="ai-prompt-cat-items">';
+            visible.forEach(function(it) {
+                var idx = window._aiPromptFlat.indexOf(it);
+                html += '<button class="ai-quick-btn ai-prompt-item" onclick="aiPromptPick(window._aiPromptFlat[' + idx + '])">' + escapeHtml(it.label) + '</button>';
+            });
+            html += '</div>';
+        }
+        html += '</div>';
+    });
+    if (!html) html = '<div style="font-size:11px;color:var(--muted);padding:8px">无匹配提示词</div>';
+    list.innerHTML = html;
+}
+window.renderPromptLib = renderPromptLib;
+
+function aiPromptToggleCat(gi) {
+    if (!window._aiPromptExpanded) window._aiPromptExpanded = {};
+    window._aiPromptExpanded[gi] = !window._aiPromptExpanded[gi];
+    renderPromptLib();
+}
+window.aiPromptToggleCat = aiPromptToggleCat;
+
+function aiPromptSearch(val) {
+    window._aiPromptFilter = val || '';
+    renderPromptLib();
+}
+window.aiPromptSearch = aiPromptSearch;
 
 // 旧的 toggle 函数保留兼容,但现在左侧常显
 function aiPromptLibToggle() {

@@ -12984,3 +12984,106 @@ body.focus-mode .ai-chat-container { max-width: 900px; margin: 0 auto; }
 .doc-icon {
     transition: transform 0.2s ease;
 }
+
+/* ═══ R88: CBDB 结果卡片美化 ═══ */
+.result-card {
+    position: relative;
+    overflow: hidden;
+}
+.result-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent-dim);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.result-card:hover::before {
+    opacity: 1;
+}
+.result-card:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.result-card-title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.result-card-badge {
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 10px;
+    padding: 2px 8px;
+}
+
+/* 表格行 hover */
+.cbdb-table tbody tr {
+    transition: all 0.15s ease;
+}
+.cbdb-table tbody tr:hover {
+    background: var(--accent-glow);
+    transform: translateX(2px);
+}
+
+/* 检索类型 tab 更柔和 */
+.cbdb-type-tab {
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+.cbdb-type-tab:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+}
+.cbdb-type-tab.active {
+    background: var(--accent-glow);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* 详情页返回按钮 */
+.cbdb-back-bar {
+    padding: 10px 0;
+    margin-bottom: 16px;
+}
+.cbdb-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.cbdb-back-btn:hover {
+    border-color: var(--accent-dim);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+/* 详情区块 */
+.cbdb-detail-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+}
+.cbdb-detail-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}

@@ -6310,3 +6310,23 @@ async function libOpenExternal(url, name) {
     showToast('已在外部浏览器打开 · Obsidian 笔记已建', 'success');
 }
 window.libOpenExternal = libOpenExternal;
+
+// R82: 专注模式——F11 或 Ctrl+Shift+F 切换
+(function() {
+    var focusMode = false;
+    document.addEventListener('keydown', function(e) {
+        // F11 or Ctrl+Shift+F
+        if (e.key === 'F11' || (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f'))) {
+            e.preventDefault();
+            focusMode = !focusMode;
+            document.body.classList.toggle('focus-mode', focusMode);
+            showToast(focusMode ? '专注模式 · 按 F11 退出' : '退出专注模式', 'info');
+        }
+        // Esc also exits
+        if (e.key === 'Escape' && focusMode) {
+            focusMode = false;
+            document.body.classList.remove('focus-mode');
+            showToast('退出专注模式', 'info');
+        }
+    });
+})();

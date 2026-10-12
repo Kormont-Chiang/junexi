@@ -12789,3 +12789,14 @@ input:focus, textarea:focus, select:focus {
 .db-card:nth-child(4), .dash-panel:nth-child(4) { animation-delay: 0.2s; }
 .db-card:nth-child(5), .dash-panel:nth-child(5) { animation-delay: 0.25s; }
 .db-card:nth-child(6), .dash-panel:nth-child(6) { animation-delay: 0.3s; }
+
+/* ═══ R82: 专注模式 ═══ */
+body.focus-mode .top-bar { display: none !important; }
+body.focus-mode .global-search-bar { display: none !important; }
+body.focus-mode .recent-bar { display: none !important; }
+body.focus-mode .panel-header .block-toggle { display: none !important; }
+body.focus-mode .app-footer { display: none !important; }
+body.focus-mode .page { padding-top: 16px; }
+body.focus-mode .ai-left-panel { display: none !important; }
+body.focus-mode .ai-layout { grid-template-columns: 1fr !important; }
+body.focus-mode .ai-chat-container { max-width: 900px; margin: 0 auto; }

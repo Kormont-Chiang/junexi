@@ -276,6 +276,13 @@ async function togglePlugin(pid) {
 window.togglePlugin = togglePlugin;
 
 function switchTab(tabId) {
+    // R85: 切换 tab 时恢复 CBDB 结果区显示，隐藏全局搜索结果
+    if (tabId !== 'cbdb') {
+        var gsr = document.getElementById('globalSearchResults');
+        var cr = document.getElementById('cbdbResults');
+        if (gsr) gsr.style.display = 'none';
+        if (cr) cr.style.display = '';
+    }
     // R78: 记录最近使用的页签
     try {
         var _rh = _lsGet('jx_recent_tabs', []);
@@ -488,7 +495,12 @@ async function loadStats() {
         document.getElementById('vaultTotalFiles').textContent = totalFiles;
         document.getElementById('vaultTotalFolders').textContent = totalFolders;
         document.getElementById('vaultRootFiles').textContent = rootItems;
-    } catch {}
+    } catch {
+        ['statPapers','statNotes','statPeople','statSources'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el && el.textContent === '-') el.textContent = '0';
+        });
+    }
 }
 
 // R68: AI 翻译学术动态摘要为中文
@@ -1891,6 +1903,8 @@ async function loadWorkspace() {
                 <div class="empty-state-hint">请确认 Obsidian 已连接</div>
             </div>
         `;
+        document.getElementById('wsPaperCount').textContent = '0';
+        loadWorkspaceStats();
     }
 }
 
@@ -1966,7 +1980,11 @@ async function loadWorkspaceStats() {
         const chars = stats.total_chars || 0;
         document.getElementById('wsTotalWords').textContent = chars > 10000 ? (chars / 10000).toFixed(1) + '万' : chars;
         document.getElementById('wsLastEdit').textContent = '今天';
-    } catch {}
+    } catch {
+        document.getElementById('wsTodayNotes').textContent = '0';
+        document.getElementById('wsTotalWords').textContent = '0';
+        document.getElementById('wsLastEdit').textContent = '—';
+    }
 }
 
 async function createPaper() {
@@ -5016,6 +5034,71 @@ async function globalSearch() {
     }
 }
 
+// R85: 多源全局搜索——同时搜 Obsidian + CBDB
+async function globalSearchMulti() {
+    const input = document.getElementById('obsidianSearchInput');
+    const query = input ? input.value.trim() : '';
+    if (!query) return;
+
+    switchTab('cbdb');
+    // Hide CBDB default results, show our multi-source panel
+    var resultsDiv = document.getElementById('globalSearchResults');
+    var cbdbDiv = document.getElementById('cbdbResults');
+    if (!resultsDiv) return;
+    // Delay to let switchTab's CBDB init settle
+    setTimeout(function() {
+        if (cbdbDiv) cbdbDiv.style.display = 'none';
+        resultsDiv.style.display = 'block';
+        resultsDiv.innerHTML = '<div class="loading" style="margin:12px auto;display:block"></div><p style="text-align:center;color:var(--text-muted);font-size:13px">多源搜索「' + escapeHtml(query) + '」...</p>';
+    }, 100);
+
+    // Parallel fetch: Obsidian + CBDB person name search
+    const [obsRes, cbdbRes] = await Promise.allSettled([
+        apiFetch(`/api/obsidian/search?q=${encodeURIComponent(query)}`).then(r => r.json()),
+        apiFetch(`/api/cbdb/search?name=${encodeURIComponent(query)}`).then(r => r.json())
+    ]);
+
+    var html = '';
+
+    // CBDB results
+    if (cbdbRes.status === 'fulfilled') {
+        var persons = Array.isArray(cbdbRes.value) ? cbdbRes.value : ((cbdbRes.value && cbdbRes.value.persons) || []);
+        if (persons.length) {
+            html += '<div style="padding:8px 0 4px;font-size:12px;font-weight:600;color:var(--muted)">🏛️ CBDB 人物 (' + persons.length + ')</div>';
+            html += persons.slice(0, 5).map(function(p) {
+                return '<div class="result-card" onclick="loadCBDBPersonDetail(' + Number(p.id) + ')">' +
+                    '<div class="result-card-title">' + escapeHtml(p.name_chn) + '</div>' +
+                    '<div class="result-card-body">' +
+                    (p.dynasty ? '<span class="result-card-badge">' + escapeHtml(p.dynasty) + '</span>' : '') +
+                    (p.birthyear ? '<span style="font-size:12px;color:var(--text-muted)">' + Number(p.birthyear) + '-' + (p.deathyear ? Number(p.deathyear) : '?') + '</span>' : '') +
+                    '</div></div>';
+            }).join('');
+        }
+    }
+
+    // Obsidian results
+    if (obsRes.status === 'fulfilled') {
+        var files = obsRes.value;
+        if (Array.isArray(files) && files.length) {
+            html += '<div style="padding:8px 0 4px;font-size:12px;font-weight:600;color:var(--muted)">📄 Obsidian 笔记 (' + Math.min(files.length, 5) + ')</div>';
+            html += files.slice(0, 5).map(function(f) {
+                var path = f.path || f;
+                var name = (f.basename || f).replace('.md', '');
+                return '<div class="doc-item" onclick="openObsidianURI(\'' + path.replace(/'/g, "\\'") + '\')">' +
+                    '<div class="doc-icon">📄</div>' +
+                    '<div class="doc-info"><div class="doc-title">' + escapeHtml(name) + '</div>' +
+                    '<div class="doc-meta">' + escapeHtml(path) + '</div></div></div>';
+            }).join('');
+        }
+    }
+
+    if (!html) {
+        html = emptyStateHTML({icon:'🔍', text:'未找到「' + query + '」', hint:'试试更换关键词，或去 CBDB / Obsidian 单独搜索'});
+    }
+
+    resultsDiv.innerHTML = html;
+}
+
 // ── 史料地图 ───────────────────────────────────────────
 let chgisMap = null;
 let currentDynastyLayer = null;
@@ -5887,7 +5970,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 绑定搜索
     const searchInput = document.getElementById('obsidianSearchInput');
-    if (searchInput) searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') globalSearch(); });
+    if (searchInput) searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') globalSearchMulti(); });
 
     // 绑定回车键
     const aiInput = document.getElementById('aiChatInput');

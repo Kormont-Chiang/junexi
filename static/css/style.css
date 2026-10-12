@@ -12819,3 +12819,55 @@ body.focus-mode .ai-chat-container { max-width: 900px; margin: 0 auto; }
 .ai-prompt-cat-items { padding-left: 8px; }
 .ai-prompt-item { display: block; width: 100%; text-align: left; font-size: 11px; padding: 4px 6px; margin-bottom: 1px; }
 #aiPromptSearch:focus { border-color: var(--accent-dim); box-shadow: 0 0 0 2px var(--accent-glow); }
+
+/* ═══ R86: 工作台布局填充 ═══ */
+.workspace-layout {
+    min-height: calc(100vh - 200px);
+    align-items: stretch;
+}
+.workspace-layout > * {
+    height: 100%;
+}
+.ws-center-panel {
+    display: flex;
+    flex-direction: column;
+}
+.ws-center-panel .doc-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* ═══ R86b: 面板填充高度 ═══ */
+.workspace-layout {
+    min-height: calc(100vh - 220px);
+    align-items: stretch;
+}
+.workspace-layout > .panel {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: 100%;
+}
+.workspace-layout .panel-header {
+    flex-shrink: 0;
+}
+#workspacePapers {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 200px;
+}
+#paperPreview {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+#paperPreview .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+.ws-tools {
+    flex: 1;
+}

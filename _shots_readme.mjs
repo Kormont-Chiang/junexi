@@ -1,10 +1,10 @@
 // README 截图 v4：表单态/地图默认态/插件页（无搜索交互）
-import puppeteer from 'puppeteer-core';
+import { launchE2E } from './_e2e_browser.mjs';
 import fs from 'fs';
 const PORT = process.argv[2];
 const OUT = 'C:/Users/Lenovo/.kimi_openclaw/workspace/historia-server/docs/screenshots';
 fs.mkdirSync(OUT, { recursive: true });
-const b = await puppeteer.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--no-sandbox', '--force-device-scale-factor=1.5'], protocolTimeout: 600000 });
+const b = await launchE2E();
 const pg = await b.newPage();
 await pg.setViewport({ width: 1440, height: 900 });
 await pg.setCacheEnabled(false);

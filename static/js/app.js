@@ -425,6 +425,26 @@ function renderRecentTabs() {
     bar.style.display = '';
 }
 
+
+// R79: 统一空状态——带引导提示
+function emptyStateHTML(opts) {
+    var icon = opts.icon || '📭';
+    var text = opts.text || '暂无数据';
+    var hint = opts.hint || '';
+    var action = opts.action || '';
+    var actionLabel = opts.actionLabel || '';
+    var actionTab = opts.actionTab || '';
+    var html = '<div class="empty-state">';
+    html += '<div class="empty-state-icon">' + icon + '</div>';
+    html += '<div class="empty-state-text">' + escapeHtml(text) + '</div>';
+    if (hint) html += '<div class="empty-state-hint">' + escapeHtml(hint) + '</div>';
+    if (action && actionTab) {
+        html += '<button class="empty-state-action" onclick="switchTab(\'' + actionTab + '\')">' + escapeHtml(actionLabel) + '</button>';
+    }
+    html += '</div>';
+    return html;
+}
+
 function loadDashboardDebounced() {
     if (_dashLoadTimer) clearTimeout(_dashLoadTimer);
     _dashLoadTimer = setTimeout(function() { loadDashboard(); }, 300);
@@ -3158,7 +3178,7 @@ async function cbdbMapGroupToList(cacheKey) {
             body: JSON.stringify({ filters: {}, person_ids: ids.slice(0, 5000) })
         });
         const data = await res.json();
-        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配人物</p>'; return; }
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = emptyStateHTML({icon:'🔍', text:'未找到匹配人物', hint:'试试更换姓名、朝代或筛选条件'}); return; }
         cbdbRenderPersons(resultsDiv, data, {
             backTitle: '地图聚点（' + ids.length + ' 人）',
             columns: [
@@ -3476,7 +3496,7 @@ async function runKinPath(aId, bId) {
         const d = await res.json();
         if (d.error) { box.innerHTML = '<p style="color:var(--danger)">' + escapeHtml(d.error) + '</p>'; return; }
         if (!d.found) {
-            box.innerHTML = '<p style="color:var(--text-muted)">' + escapeHtml(d.reason || '未找到路径') + '</p>';
+            box.innerHTML = emptyStateHTML({icon:'🔍', text:escapeHtml(d.reason || '未找到路径'), hint:'两人可能无亲属关系，或超出最大搜索深度'});
             return;
         }
         const arrow = '<span style="color:var(--text-muted);margin:0 4px">→</span>';
@@ -3577,7 +3597,7 @@ async function searchCBDB() {
             const res = await apiFetch(`/api/cbdb/search?name=${encodeURIComponent(q)}${dy ? '&dy=' + encodeURIComponent(dy) : ''}${gender ? '&gender=' + gender : ''}${place ? '&addr_id=' + place.id : ''}${byF ? '&by_from=' + byF : ''}${byT ? '&by_to=' + byT : ''}${dyF ? '&dy_from=' + dyF : ''}${dyT ? '&dy_to=' + dyT : ''}${ixF ? '&index_from=' + ixF : ''}${ixT ? '&index_to=' + ixT : ''}`);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
-            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到结果</p>'; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = emptyStateHTML({icon:'🔍', text:'未找到结果', hint:'尝试更换关键词或调整筛选条件'}); return; }
             cbdbRenderPersons(resultsDiv, data, {
                 columns: [
                     { label: '姓名', render: p => `<span class="cbdb-name">${escapeHtml(p.name_chn || p.name)}</span>` },
@@ -3596,7 +3616,7 @@ async function searchCBDB() {
             const res = await apiFetch(`/api/cbdb/offices/search?q=${encodeURIComponent(q)}${cat ? '&category=' + encodeURIComponent(cat) : ''}`);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
-            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配官职</p>'; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = emptyStateHTML({icon:'⚖️', text:'未找到匹配官职', hint:'试试简化官名或使用门类筛选'}); return; }
             resultsDiv.innerHTML = `
                 <div class="cbdb-result-meta">共 ${data.length} 个官职，点击查看任职者列表</div>
                 ${data.map(o => `
@@ -3612,7 +3632,7 @@ async function searchCBDB() {
             const res = await apiFetch(`/api/cbdb/status/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
-            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配身份类型</p>'; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = emptyStateHTML({icon:'🏷️', text:'未找到匹配身份类型', hint:'换个关键词试试'}); return; }
             resultsDiv.innerHTML = `
                 <div class="cbdb-result-meta">共 ${data.length} 种身份类型，点击查看人物列表</div>
                 ${data.map(s => `
@@ -3624,7 +3644,7 @@ async function searchCBDB() {
             const res = await apiFetch(`/api/cbdb/texts/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
-            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配著作</p>'; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = emptyStateHTML({icon:'📚', text:'未找到匹配著作', hint:'试试书名关键词或作者名'}); return; }
             resultsDiv.innerHTML = `
                 <div class="cbdb-result-meta">共 ${data.length} 部著作，点击查看相关人物</div>
                 ${data.map(tx => `
@@ -3648,7 +3668,7 @@ async function searchCBDB() {
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
             const persons = data.persons || [];
-            if (!persons.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">该年份未找到在世人物</p>'; return; }
+            if (!persons.length) { resultsDiv.innerHTML = emptyStateHTML({icon:'📅', text:'该年份未找到在世人物', hint:'检查年份是否在 618-1912 范围内'}); return; }
             const scopeNote = (window._cbdbScope && window._cbdbScope.ids.length) ? `（∩ 查询范围 ${window._cbdbScope.ids.length} 人）` : '';
             const entryNote = data.entry_name ? `（入仕：${escapeHtml(data.entry_name)}）` : '';
             cbdbRenderPersons(resultsDiv, persons, {
@@ -3669,7 +3689,7 @@ async function searchCBDB() {
             const res = await apiFetch(`/api/cbdb/entries/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
-            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配入仕方式</p>'; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = emptyStateHTML({icon:'🎓', text:'未找到匹配入仕方式', hint:'换个关键词试试'}); return; }
             resultsDiv.innerHTML = `
                 <div class="cbdb-result-meta">共 ${data.length} 种入仕方式，点击查看人物列表</div>
                 ${data.map(en => `
@@ -3688,7 +3708,7 @@ async function searchCBDB() {
             const res = await apiFetch(url);
             const data = await res.json();
             if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
-            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配地名</p>'; return; }
+            if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = emptyStateHTML({icon:'🏛️', text:'未找到匹配地名', hint:'试试地名简称或上一级行政区'}); return; }
             window._cbdbPlaceCache = {};
             data.forEach(pl => { window._cbdbPlaceCache[pl.addr_id] = pl; });
             resultsDiv.innerHTML = `
@@ -3762,7 +3782,7 @@ async function runAdvancedQuery() {
         }
         const data = await res.json();
         if (data.error) { resultsDiv.innerHTML = `<p style="color:var(--danger);">${data.error}</p>`; return; }
-        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到匹配人物</p>'; return; }
+        if (!Array.isArray(data) || !data.length) { resultsDiv.innerHTML = emptyStateHTML({icon:'🔍', text:'未找到匹配人物', hint:'试试更换姓名、朝代或筛选条件'}); return; }
         if (useScope) desc.push(`范围内${scope.ids.length}人`);
         cbdbRenderPersons(resultsDiv, data, {
             extraMeta: useScope ? `<div class="cbdb-result-meta" style="color:var(--accent)">⇅ 已应用查询范围（${scope.ids.length} 人）取交集</div>` : '',
@@ -5157,7 +5177,7 @@ function searchMapPlace() {
     const allResults = [...cityResults, ...placeResults];
 
     if (allResults.length === 0) {
-        resultsDiv.innerHTML = '<p style="color:var(--text-muted)">未找到相关地点</p>';
+        resultsDiv.innerHTML = emptyStateHTML({icon:'📍', text:'未找到相关地点', hint:'试试地名简称或拼音'});
         return;
     }
 
@@ -5395,7 +5415,7 @@ function searchEra() {
     const results = eras.filter(e => e.era && e.era.includes(query));
 
     if (results.length === 0) {
-        container.innerHTML = '<p style="color:var(--text-muted)">未找到相关年号</p>';
+        container.innerHTML = emptyStateHTML({icon:'📅', text:'未找到相关年号', hint:'试试年号关键词或朝代筛选'});
         return;
     }
 
@@ -5510,7 +5530,7 @@ function searchOfficial() {
     );
 
     if (results.length === 0) {
-        container.innerHTML = '<p style="color:var(--text-muted)">未找到相关职官</p>';
+        container.innerHTML = emptyStateHTML({icon:'⚖️', text:'未找到相关职官', hint:'试试官名简称或门类筛选'});
         return;
     }
 
@@ -5702,7 +5722,7 @@ function searchTaboo() {
     );
 
     if (results.length === 0) {
-        container.innerHTML = '<p style="color:var(--text-muted)">未找到相关避讳记录</p>';
+        container.innerHTML = emptyStateHTML({icon:'🚫', text:'未找到相关避讳记录', hint:'试试单字查询或更换朝代'});
         return;
     }
 
@@ -5782,7 +5802,7 @@ function searchVersion() {
     );
 
     if (results.length === 0) {
-        container.innerHTML = '<p style="color:var(--text-muted)">未找到相关版本记录</p>';
+        container.innerHTML = emptyStateHTML({icon:'📖', text:'未找到相关版本记录', hint:'试试书名或作者名'});
         return;
     }
 

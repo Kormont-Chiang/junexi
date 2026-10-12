@@ -12727,3 +12727,39 @@ input:focus, textarea:focus, select:focus {
     color: var(--accent);
     background: var(--accent-glow);
 }
+
+/* ═══ R79: 空状态增强 ═══ */
+.empty-state-action {
+    margin-top: 12px;
+    padding: 6px 18px;
+    border-radius: 20px;
+    border: 1px solid var(--accent-dim);
+    background: var(--accent-glow);
+    color: var(--accent);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.empty-state-action:hover {
+    background: var(--accent);
+    color: var(--bg-primary);
+}
+.empty-state {
+    padding: 32px 20px;
+    text-align: center;
+}
+.empty-state-icon {
+    font-size: 2.5em;
+    margin-bottom: 8px;
+    opacity: 0.5;
+}
+.empty-state-text {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+.empty-state-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+}

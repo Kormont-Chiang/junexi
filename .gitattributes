@@ -1,0 +1,6 @@
+# 确保 GitHub 语言检测正确——Python 为主
+static/* linguist-vendored
+templates/* linguist-vendored
+docs/* linguist-documentation
+_archive/* linguist-vendored
+node_modules/* linguist-vendored

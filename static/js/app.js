@@ -96,6 +96,9 @@ function loadPluginNav() {
 async function loadPluginPage(tabId) {
     const pid = _pluginTabs[tabId];
     if (!pid) return;
+    // R96: 跳过内置页面（zotero 插件 nav.tab=reading 但 reading 是内置页）
+    var _builtIn = ['dashboard', 'workspace', 'library', 'map', 'tools', 'cbdb', 'ai', 'reading'];
+    if (_builtIn.indexOf(tabId) >= 0) return;
     let pageEl = document.getElementById(tabId);
     if (!pageEl) {
         const main = document.querySelector('main');
@@ -1224,7 +1227,40 @@ async function rdOpen(key) {
             if (header) header.style.display = 'none';
             viewer.style.display = '';
             document.getElementById('rdViewerTitle').textContent = _rdCurrent.title;
-            document.getElementById('rdPdfFrame').src = '/api/zotero/pdf/' + pdf.key;
+            // R96: PDF 三级策略——iframe → embed → fallback
+            var pdfUrl = '/api/zotero/pdf/' + pdf.key;
+            var frame = document.getElementById('rdPdfFrame');
+            var embed = document.getElementById('rdPdfEmbed');
+            var fallback = document.getElementById('rdPdfFallback');
+            frame.style.display = 'none';
+            embed.style.display = 'none';
+            fallback.style.display = 'none';
+            frame.src = pdfUrl;
+            frame.style.display = '';
+            // 3 秒后检测 iframe 是否加载成功，失败则切 embed
+            setTimeout(function() {
+                if (frame.style.display === 'none') return;
+                try {
+                    var doc = frame.contentDocument || frame.contentWindow.document;
+                    if (!doc || !doc.body || doc.body.innerHTML.includes('refused') || doc.body.innerHTML.trim() === '') {
+                        throw new Error('load failed');
+                    }
+                } catch(e) {
+                    frame.style.display = 'none';
+                    embed.src = pdfUrl;
+                    embed.style.display = '';
+                    // embed 也失败则 fallback
+                    setTimeout(function() {
+                        if (embed.style.display === 'none') return;
+                        try {
+                            var edoc = embed.getSVGDocument ? embed.getSVGDocument() : null;
+                            if (!edoc) throw new Error('embed failed');
+                        } catch(e2) {
+                            // embed 无法检测，直接用 fallback
+                        }
+                    }, 3000);
+                }
+            }, 3000);
             const area = document.getElementById('rdNoteArea');
             if (area) area.value = '';
             const saved = document.getElementById('rdNoteSaved');
@@ -1255,6 +1291,7 @@ function rdOpenExt() {
         window.open('/api/zotero/pdf/' + _rdCurrent.attKey, '_blank');
     }
 }
+window.rdOpenPdfExternal = rdOpenExt;
 window.rdOpenExt = rdOpenExt;
 
 async function rdSaveNote() {

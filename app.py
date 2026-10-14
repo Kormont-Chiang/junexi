@@ -77,7 +77,9 @@ def add_no_cache_headers(response):
 def add_security_headers(response):
     # R46c: 安全响应头——本地应用，收紧不必要的浏览器行为
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
+    # R96: PDF 端点必须允许 iframe 内嵌，否则 WebView2 无法显示
+    if not request.path.startswith("/api/zotero/pdf/"):
+        response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     # R66: CSP——限制脚本/样式来源,防止 XSS 注入
     # 允许 inline script(模板内联 JS) 和 data: URI(地图瓦片), 禁止外部脚本

@@ -380,6 +380,11 @@ def zotero_pdf(att_key):
         if not fp or not os.path.isfile(fp):
             return jsonify({"ok": False, "error": "file not found"}), 404
         _log_activity("read", (d.get("title") or "PDF").replace(".pdf", "")[:60])
-        return send_file(fp, mimetype="application/pdf", conditional=True)
+        # R96: WebView2 iframe PDF——用 ASCII 文件名避免 Content-Disposition 中文乱码
+        import re as _re
+        _safe_name = _re.sub(r'[^\w\s\-\.]', '', d.get("title", "document.pdf"))
+        if not _safe_name.lower().endswith('.pdf'):
+            _safe_name += '.pdf'
+        return send_file(fp, mimetype="application/pdf", conditional=True, download_name=_safe_name, as_attachment=False)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:150]}), 500

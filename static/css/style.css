@@ -13330,3 +13330,36 @@ table, .cbdb-table {
 .timeline-item:hover .timeline-content {
     color: var(--text);
 }
+
+/* ═══ R97: 读文献列表折叠 ═══ */
+.rd-list-wrap {
+    max-height: 120px;
+    overflow-y: auto;
+    transition: max-height 0.3s ease;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px;
+}
+.rd-list-wrap.expanded {
+    max-height: 400px;
+}
+.rd-list-wrap .doc-list {
+    max-height: none !important;
+}
+.rd-list-toggle {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg-tertiary);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    margin-bottom: 6px;
+    transition: all 0.2s;
+}
+.rd-list-toggle:hover {
+    color: var(--accent);
+    background: var(--accent-glow);
+}

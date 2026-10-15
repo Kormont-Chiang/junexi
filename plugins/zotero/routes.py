@@ -388,3 +388,48 @@ def zotero_pdf(att_key):
         return send_file(fp, mimetype="application/pdf", conditional=True, download_name=_safe_name, as_attachment=False)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)[:150]}), 500
+
+# ════════════════════════════════════════════════════════════════
+# R102: AI 工具注册——Zotero 书库检索两件(第二个注册工具的插件)
+# ════════════════════════════════════════════════════════════════
+try:
+    from agent_tools import tool as _ai_tool, list_brief as _ai_brief
+
+    @_ai_tool("zotero_search",
+               "检索 Zotero 本地书库(需 Zotero 客户端在运行)。返回条目 key/题名/作者/年份/类型。",
+               params={"type": "object",
+                       "properties": {"q": {"type": "string", "description": "检索词: 题名/作者/关键词"}},
+                       "required": ["q"]},
+               action=None)
+    def _t_zotero_search(q):
+        try:
+            _s, data = _zotero_get("/api/users/0/items", {
+                "q": str(q).strip(), "itemType": "-attachment", "limit": 10,
+                "sort": "dateModified", "direction": "desc"})
+        except Exception as e:
+            return {"error": "Zotero 客户端未运行或不可达: %s" % str(e)[:100]}
+        items = _zotero_map_items(data)
+        if not items:
+            return {"total": 0, "items": [], "hint": "未命中"}
+        return {"total": len(items),
+                "items": _ai_brief(items, limit=10,
+                                   fields=["key", "title", "creators", "year", "itemType"])}
+
+    @_ai_tool("zotero_recent",
+               "列出 Zotero 书库最近更新的 10 条(无需参数, 适合'我最近收了什么文献')。",
+               params={"type": "object", "properties": {}},
+               action=None)
+    def _t_zotero_recent():
+        try:
+            _s, data = _zotero_get("/api/users/0/items", {
+                "itemType": "-attachment", "limit": 10,
+                "sort": "dateModified", "direction": "desc"})
+        except Exception as e:
+            return {"error": "Zotero 客户端未运行或不可达: %s" % str(e)[:100]}
+        items = _zotero_map_items(data)
+        return {"total": len(items),
+                "items": _ai_brief(items, limit=10,
+                                   fields=["key", "title", "creators", "year", "itemType"])}
+except Exception:
+    import logging as _lg_zt
+    _lg_zt.getLogger("jx.plugins").error("zotero AI tools 注册失败", exc_info=True)

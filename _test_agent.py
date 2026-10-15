@@ -31,12 +31,19 @@ spec = importlib.util.spec_from_file_location(
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 
+# R102: Zotero 插件工具(cbdb 之外第二个注册方)
+_spec_zt = importlib.util.spec_from_file_location(
+    "jx_plugin_zotero", os.path.join("plugins", "zotero", "routes.py"))
+_mod_zt = importlib.util.module_from_spec(_spec_zt)
+_spec_zt.loader.exec_module(_mod_zt)
+
 import agent_tools
 
 tools = agent_tools.get_openai_tools()
 names = [t["function"]["name"] for t in tools]
 print(f"已注册工具: {names}")
-check("注册 9 件 CBDB 工具", len(tools) == 9, str(names))
+check("注册 11 件工具(cbdb 9 + zotero 2)", len(tools) == 11, str(names))
+check("zotero 工具已注册", "zotero_search" in names and "zotero_recent" in names)
 check("schema 合规(name/desc/params)",
       all(t["function"]["name"] and t["function"]["description"]
           and t["function"]["parameters"].get("type") == "object" for t in tools))

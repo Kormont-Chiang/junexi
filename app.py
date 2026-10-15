@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 六月息 · 历史学学术面板后端
 Flask + DeepSeek + CBDB + Obsidian Local REST API
@@ -26,7 +26,7 @@ load_dotenv()
 # ── Config ──────────────────────────────────────────────
 OBSIDIAN_VAULT = "论文写作"
 OBSIDIAN_API_PORT = 27123  # Local REST API 插件默认端口
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.3.1"
 APP_REPO = "Kormont-Chiang/junexi"
 OBSIDIAN_API_KEY = os.environ.get("OBSIDIAN_API_KEY", "")
 DEEPSEEK_MODEL = "deepseek-chat"  # 默认模型

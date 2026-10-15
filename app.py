@@ -25,7 +25,7 @@ load_dotenv()
 # ── Config ──────────────────────────────────────────────
 OBSIDIAN_VAULT = "论文写作"
 OBSIDIAN_API_PORT = 27123  # Local REST API 插件默认端口
-APP_VERSION = "0.3.2"
+APP_VERSION = "0.3.3"
 APP_REPO = "Kormont-Chiang/junexi"
 OBSIDIAN_API_KEY = os.environ.get("OBSIDIAN_API_KEY", "")
 DEEPSEEK_MODEL = "deepseek-chat"  # 默认模型

@@ -31,6 +31,7 @@ MAX_TOOL_CALLS = 10  # 模型一轮可并行发多个 tool_call, 必须按调用
 def ai_agent():
     """AI 工具循环(agent 模式): 模型自主决定调哪些工具, 最多 MAX_AGENT_STEPS 步"""
     from app import deepseek_chat  # 延迟导入: 插件加载时 app 尚在初始化
+    from datetime import date as _date
 
     data = request.json or {}
     message = (data.get("message") or "").strip()
@@ -41,7 +42,9 @@ def ai_agent():
     if not tools:
         return jsonify({"error": "当前没有可用工具(各插件未注册任何 AI 工具)"})
 
-    messages = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
+    # 带上今天日期: 模型不知道当前时间, "标题带日期"类请求否则瞎编
+    system_prompt = "今天是 %s。\n%s" % (_date.today().isoformat(), AGENT_SYSTEM_PROMPT)
+    messages = [{"role": "system", "content": system_prompt}]
     # R100: 多轮操作对话——前端带最近 10 轮简史(user/assistant 才收, 防注入其他角色)
     for h in (data.get("history") or [])[-10:]:
         if not isinstance(h, dict):

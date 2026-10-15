@@ -18,6 +18,7 @@ from urllib.parse import quote, unquote
 from flask import Flask, jsonify, request, render_template, send_from_directory, send_file, Response
 from flask_cors import CORS
 from dotenv import load_dotenv
+from agent_tools import get_openai_tools, execute_tool, tool_message_content
 
 # 加载环境变量
 load_dotenv()
@@ -228,7 +229,15 @@ def _model_cfg(model_id):
     return AI_MODELS[0]
 
 
-def deepseek_chat(messages, stream=False, model_id=None):
+def _ai_payload(model_name, messages, stream, tools=None):
+    """R99: 组装模型请求体; function-calling 工具数组仅在有工具时附加"""
+    p = {"model": model_name, "messages": messages, "stream": stream}
+    if tools:
+        p["tools"] = tools
+    return p
+
+
+def deepseek_chat(messages, stream=False, model_id=None, tools=None):
     """按 model_id 分发: deepseek=直连官方API, siliconflow=硅基流动, openclaw=本机网关"""
     cfg = _model_cfg(model_id)
     model_name = cfg.get("model", DEEPSEEK_MODEL)
@@ -242,7 +251,7 @@ def deepseek_chat(messages, stream=False, model_id=None):
         try:
             r = requests.post("https://api.siliconflow.cn/v1/chat/completions",
                 headers={"Authorization": f"Bearer {sf_key}", "Content-Type": "application/json"},
-                json={"model": model_name, "messages": messages, "stream": stream},
+                json=_ai_payload(model_name, messages, stream, tools),
                 timeout=120)
             if r.status_code == 200:
                 return r.json()
@@ -263,7 +272,7 @@ def deepseek_chat(messages, stream=False, model_id=None):
         try:
             r = requests.post("https://api.deepseek.com/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={"model": model_name, "messages": messages, "stream": stream},
+                json=_ai_payload(model_name, messages, stream, tools),
                 timeout=120)
             if r.status_code == 200:
                 return r.json()
@@ -276,7 +285,7 @@ def deepseek_chat(messages, stream=False, model_id=None):
     # OpenClaw 本地 gateway(兜底)
     try:
         r = requests.post("http://127.0.0.1:8642/v1/chat/completions",
-            json={"model": model_name, "messages": messages, "stream": stream},
+            json=_ai_payload(model_name, messages, stream, tools),
             timeout=60)
         if r.status_code == 200:
             return r.json()
@@ -891,6 +900,82 @@ def ai_analyze():
     ]
     result = deepseek_chat(messages)
     return jsonify(result)
+
+
+
+# ── API: AI Agent (R99: 工具循环——AI 从"嘴"到"手") ─────
+MAX_AGENT_STEPS = 6
+
+AGENT_SYSTEM_PROMPT = (
+    "你是「六月息」历史研究工作台的 AI 助手。你已接入 JuneXi 的工具, 可以直接操作它的功能:\n"
+    "- 检索 CBDB 中国历代人物传记数据库(姓名含字/号/别名, 简体自动转繁体检索)\n"
+    "- 查看人物详情(生卒/字号/谥号/籍贯/官职履历)\n"
+    "- 列出人物亲属(五服内血亲带服制, 或全部亲属记录)\n"
+    "- 把人物标到历史地图(单人=生平轨迹视图, 多人=群体分布)\n"
+    "当用户请求可用工具完成时, 优先调工具(可多步组合), 拿到结果后用中文简洁回答, "
+    "并顺带说明你在 JuneXi 里打开了什么页面或地图。纯聊天、写作、翻译类问题不用工具, 直接答。\n"
+    "铁律: 人物 ID 必须通过 search_person 先查, 绝不凭记忆编造 ID; 一步工具拿不到就换参数重试或如实说明。"
+)
+
+
+@app.route("/api/ai/agent", methods=["POST"])
+def ai_agent():
+    """AI 工具循环(agent 模式): 模型自主决定调哪些工具, 最多 MAX_AGENT_STEPS 步"""
+    data = request.json or {}
+    message = (data.get("message") or "").strip()
+    if not message:
+        return jsonify({"error": "message 不能为空"})
+
+    tools = get_openai_tools()
+    if not tools:
+        return jsonify({"error": "当前没有可用工具(插件未注册任何 AI 工具)"})
+
+    messages = [
+        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
+        {"role": "user", "content": message},
+    ]
+    steps = []
+    actions = []
+    final = ""
+    model_id = data.get("model")
+
+    for _step in range(MAX_AGENT_STEPS):
+        result = deepseek_chat(messages, model_id=model_id, tools=tools)
+        if not isinstance(result, dict) or "choices" not in result:
+            err = result.get("error") if isinstance(result, dict) else "模型服务不可用"
+            return jsonify({"error": err, "steps": steps, "actions": actions})
+        msg = result["choices"][0]["message"]
+        tool_calls = msg.get("tool_calls") or []
+        content = msg.get("content") or ""
+        if not tool_calls:
+            final = content
+            break
+        messages.append(msg)
+        for tc in tool_calls:
+            fn = tc.get("function") or {}
+            fname = fn.get("name", "")
+            try:
+                args = json.loads(fn.get("arguments") or "{}")
+            except Exception:
+                args = {}
+            tresult, action = execute_tool(fname, args)
+            ok = not (isinstance(tresult, dict) and tresult.get("error"))
+            steps.append({"tool": fname, "args": args, "ok": ok})
+            if action:
+                actions.append(action)
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.get("id", ""),
+                "name": fname,
+                "content": tool_message_content(tresult),
+            })
+    else:
+        return jsonify({"response": "(已达最大步数, 请缩小范围重试)", "steps": steps, "actions": actions})
+
+    return jsonify({"response": final, "steps": steps, "actions": actions})
+
+
+
 
 # ── API: CHGIS ──────────────────────────────────────────
 

@@ -1303,6 +1303,10 @@
                         <div id="aiModelDesc" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
                         <button class="ai-quick-btn" onclick="aiKeySetup()" style="margin-top:6px" title="配置 API Key">🔑 配置 Key</button>
                         <div id="aiBalancePanel" style="margin-top:6px;font-size:11px"></div>
+                        <label title="开启后, AI 将直接操作 JuneXi: 检索/打开详情/上图(试验)" style="display:flex;align-items:center;gap:5px;margin-top:8px;font-size:11px;cursor:pointer;color:var(--text)">
+                            <input type="checkbox" id="aiAgentMode" onchange="aiAgentModeToggle(this.checked)" style="cursor:pointer">
+                            <span>🕹 自动操作 JuneXi <span style="color:var(--muted)">(试验)</span></span>
+                        </label>
                     </div>
                     <div class="ai-left-section" id="aiKeyPanel" style="display:none">
                         <div class="ai-left-title">🔧 API Key</div>

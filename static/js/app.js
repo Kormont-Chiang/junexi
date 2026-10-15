@@ -4985,6 +4985,13 @@ async function sendAIChat() {
     const text = input.value.trim();
     if (!text) return;
 
+    // R99: agent 模式——AI 直接操作 JuneXi(查库/详情/上图)
+    if ((document.getElementById('aiAgentMode') || {}).checked) {
+        input.value = '';
+        sendAIChatAgent(text);
+        return;
+    }
+
     // 添加用户消息
     messages.innerHTML += `<div class="ai-message user"><div class="ai-bubble">${escapeHtml(text)}</div></div>`;
     input.value = '';
@@ -6562,3 +6569,77 @@ window.libOpenExternal = libOpenExternal;
         }
     });
 })();
+
+
+// ═══════════════════ R99: AI Agent 模式——助手从"嘴"到"手" ═══════════════════
+async function sendAIChatAgent(text) {
+    const box = document.getElementById('aiChatMessages');
+    box.innerHTML += `<div class="ai-message user"><div class="ai-bubble">${escapeHtml(text)}</div></div>`;
+    const loadingId = 'ai-loading-' + Date.now();
+    box.innerHTML += `<div class="ai-message system" id="${loadingId}"><div class="ai-bubble"><div class="loading"></div> 正在操作 JuneXi…</div></div>`;
+    box.scrollTop = box.scrollHeight;
+    try {
+        const res = await apiFetch('/api/ai/agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, model: window._aiModel || undefined })
+        });
+        const data = await res.json();
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+        if (data.error) {
+            box.innerHTML += `<div class="ai-message system"><div class="ai-bubble">⚠️ ${escapeHtml(data.error)}</div></div>`;
+        } else {
+            const steps = data.steps || [];
+            let stepHtml = '';
+            if (steps.length) {
+                stepHtml = `<div style="font-size:11px;color:var(--muted);margin-bottom:4px">⚙️ 已执行 ${steps.length} 步: ` +
+                    steps.map(s => `<span style="color:${s.ok ? 'var(--accent, #2e7d4f)' : 'var(--danger)'}">${escapeHtml(s.tool)}${s.ok ? ' ✓' : ' ✗'}</span>`).join(' → ') +
+                    '</div>';
+            }
+            const content = data.response || '(无回复)';
+            box.innerHTML += `<div class="ai-message ai">${stepHtml}<div class="ai-bubble">${formatAIResponse(content)}</div><button class="ai-copy-btn" onclick="aiCopyResponse(this)" title="复制回答">📋</button></div>`;
+            if (data.actions && data.actions.length) {
+                showToast(`AI 正在操作 JuneXi(${data.actions.length} 个动作)…`, 'info', 2000);
+                await aiRunActions(data.actions);
+            }
+        }
+    } catch (e) {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
+        box.innerHTML += `<div class="ai-message system"><div class="ai-bubble">请求失败: ${escapeHtml(e.message)}</div></div>`;
+    }
+    box.scrollTop = box.scrollHeight;
+}
+
+// AI 动作分发: 后端工具执行成功后按模板生成, 前端逐条驱动现有页面函数
+async function aiRunActions(actions) {
+    for (const a of actions) {
+        try {
+            if (a.type === 'cbdb_search' && a.name) {
+                searchCBDBByName(a.name);
+            } else if (a.type === 'cbdb_person' && a.id) {
+                loadCBDBPersonDetail(a.id);
+            } else if (a.type === 'cbdb_map' && Array.isArray(a.ids) && a.ids.length) {
+                window._cbdbMapLastIds = a.ids;
+                window._cbdbMapLastTitle = a.ids.length + ' 人(AI)';
+                if (a.ids.length === 1) { await cbdbPlotTrajectory(); }
+                else { await cbdbPlotGroupOnMap(); }
+            }
+        } catch (e) { console.error('AI action failed:', a, e); }
+    }
+}
+
+function aiAgentModeToggle(on) {
+    try { localStorage.setItem('jx_ai_agent', on ? '1' : '0'); } catch (e) {}
+    if (on && typeof showToast === 'function') showToast('自动操作已开启: AI 回答后会直接操作 JuneXi(试验)', 'info', 2500);
+}
+
+function _aiAgentModeRestore() {
+    try {
+        const cb = document.getElementById('aiAgentMode');
+        if (cb) cb.checked = localStorage.getItem('jx_ai_agent') === '1';
+    } catch (e) {}
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _aiAgentModeRestore);
+else _aiAgentModeRestore();

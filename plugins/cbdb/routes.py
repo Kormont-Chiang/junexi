@@ -3173,3 +3173,87 @@ def cbdb_health():
     except Exception:
         ok = False
     return jsonify({"ok": ok})
+
+
+# ════════════════════════════════════════════════════════════════
+# R99: AI 工具注册——让六月息 AI 助手直接查库/上图(试点 4 件)
+# 本模块被 plugin_loader 导入时即注册; app.py /api/ai/agent 消费
+# ════════════════════════════════════════════════════════════════
+try:
+    from agent_tools import tool as _ai_tool, list_brief as _ai_brief
+
+    @_ai_tool("search_person",
+               "在 CBDB 按姓名检索人物。支持姓+名、字/号/别名(如'子瞻'能找到苏轼), 简体自动转繁体, "
+               "纯数字当人物ID直达。返回前10条候选(ID/姓名/朝代/生卒), 后续接 get_person_detail / list_person_kin / show_persons_on_map。",
+               params={"type": "object",
+                       "properties": {"name": {"type": "string", "description": "人物姓名, 如 王安石 / 子瞻 / 苏轼"}},
+                       "required": ["name"]},
+               action={"type": "cbdb_search", "name": "{name}"})
+    def _t_cbdb_search_person(name):
+        if not CBDBConnection.is_available():
+            return {"error": "CBDB 本地数据库未连接"}
+        persons = CBDBConnection.search_persons(str(name).strip(), limit=10)
+        if not persons:
+            return {"total": 0, "persons": [], "hint": "未命中: 可换字号/别名重试"}
+        return {"total": len(persons),
+                "persons": _ai_brief(persons, limit=10,
+                                     fields=["id", "name", "dynasty", "birthyear", "deathyear", "index_year"])}
+
+    @_ai_tool("get_person_detail",
+               "取 CBDB 人物详情: 生卒年/字号/谥号/籍贯/社会区分/官职履历等。person_id 来自 search_person。",
+               params={"type": "object",
+                       "properties": {"person_id": {"type": "integer", "description": "人物ID"}},
+                       "required": ["person_id"]},
+               action={"type": "cbdb_person", "id": "{person_id}"})
+    def _t_cbdb_person_detail(person_id):
+        if not CBDBConnection.is_available():
+            return {"error": "CBDB 本地数据库未连接"}
+        d = CBDBConnection.get_person_detail(int(person_id))
+        if not d:
+            return {"error": f"人物 {person_id} 不存在"}
+        return d
+
+    @_ai_tool("list_person_kin",
+               "列出人物亲属。kin='mourning' 五服内(带服制: 斬衰三年/期年/小功/緦麻), kin='all' 全部亲属记录(200条内)。",
+               params={"type": "object",
+                       "properties": {"person_id": {"type": "integer"},
+                                      "kin": {"type": "string", "enum": ["mourning", "all"]}},
+                       "required": ["person_id"]},
+               action=None)
+    def _t_cbdb_person_kin(person_id, kin="mourning"):
+        if not CBDBConnection.is_available():
+            return {"error": "CBDB 本地数据库未连接"}
+        pid = int(person_id)
+        if kin == "all":
+            items = CBDBConnection.get_person_kin(pid, limit=200) or []
+            return {"total": len(items), "kin": _ai_brief(items, limit=10,
+                    fields=["id", "name_chn", "relation", "dynasty", "birthyear", "deathyear"])}
+        data = CBDBConnection.get_person_kin_recursive(pid, up=4, down=4, col=3, mar=1)
+        persons = data.get("persons", []) if isinstance(data, dict) else []
+        return {"total": data.get("total", len(persons)) if isinstance(data, dict) else len(persons),
+                "truncated": bool(data.get("truncated")) if isinstance(data, dict) else False,
+                "persons": _ai_brief(persons, limit=10, fields=["id", "name", "relation", "mourning"])}
+
+    @_ai_tool("show_persons_on_map",
+               "把人物标到历史地图(前端自动切地图页渲染)。单人=生平轨迹视图(分类节点+按年连线+此时官职), "
+               "多人=群体分布(散点/聚簇, 仅籍贯居住等本地址)。",
+               params={"type": "object",
+                       "properties": {"person_ids": {"type": "array", "items": {"type": "integer"},
+                                                      "description": "人物ID列表, 来自 search_person"}},
+                       "required": ["person_ids"]},
+               action={"type": "cbdb_map", "ids": "{person_ids}"})
+    def _t_cbdb_show_on_map(person_ids):
+        if not CBDBConnection.is_available():
+            return {"error": "CBDB 本地数据库未连接"}
+        ids = [int(x) for x in (person_ids or [])][:200]
+        if not ids:
+            return {"error": "person_ids 为空"}
+        geo = CBDBConnection.persons_geojson(ids, addr_source=("all" if len(ids) == 1 else "bio"),
+                                             with_offices=(len(ids) == 1))
+        feats = geo.get("features", []) if isinstance(geo, dict) else []
+        return {"mapped_features": len(feats),
+                "note": "前端地图页将自动渲染" if feats else "这些人物都没有可定位的地址记录"}
+
+except Exception:
+    import logging as _lg
+    _lg.getLogger("jx.plugins").error("cbdb AI tools 注册失败", exc_info=True)

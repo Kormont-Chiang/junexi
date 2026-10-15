@@ -3245,6 +3245,9 @@ try:
     def _t_cbdb_show_on_map(person_ids):
         if not CBDBConnection.is_available():
             return {"error": "CBDB 本地数据库未连接"}
+        # 模型有时把单个 id 序列化成字符串("1762" 或 "1762,1493"): 归一化, 防逐字符拆成 [1,7,6,2]
+        if isinstance(person_ids, str):
+            person_ids = [t for t in re.split(r"[,，\s]+", person_ids.strip()) if t]
         ids = [int(x) for x in (person_ids or [])][:200]
         if not ids:
             return {"error": "person_ids 为空"}

@@ -65,6 +65,15 @@ if CBDB.is_available():
     check("上图 单人返回 mapped_features", "mapped_features" in r3 and not r3.get("error"), str(r3)[:120])
     check("上图 动作带 ids", a3 and a3.get("type") == "cbdb_map" and a3.get("ids") == [wang["id"]], str(a3))
 
+    # R99c: 模型把 id 序列化成字符串时不得逐字符拆解(“1762” → [1,7,6,2] 事故)
+    r3s, a3s = agent_tools.execute_tool("show_persons_on_map", {"person_ids": str(wang["id"])})
+    check("上图 字符串id 与列表id 结果一致", r3s.get("mapped_features") == r3.get("mapped_features"),
+          f"str->{r3s.get('mapped_features')} list->{r3.get('mapped_features')}")
+    r3c, _ = agent_tools.execute_tool("show_persons_on_map", {"person_ids": f"{wang['id']},1493"})
+    r3l, _ = agent_tools.execute_tool("show_persons_on_map", {"person_ids": [wang["id"], 1493]})
+    check("上图 逗号串 id 与列表一致", r3c.get("mapped_features") == r3l.get("mapped_features"),
+          f"str->{r3c.get('mapped_features')} list->{r3l.get('mapped_features')}")
+
     r4, _ = agent_tools.execute_tool("list_person_kin", {"person_id": wang["id"], "kin": "mourning"})
     check("五服递归 total>0", r4.get("total", 0) > 0, str(r4)[:120])
 

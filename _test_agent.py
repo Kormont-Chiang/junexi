@@ -44,9 +44,20 @@ import agent_tools
 tools = agent_tools.get_openai_tools()
 names = [t["function"]["name"] for t in tools]
 print(f"已注册工具: {names}")
-check("注册 14 件工具(cbdb 9 + zotero 2 + obsidian 3)", len(tools) == 14, str(names))
+check("注册 16 件工具(cbdb 9 + zotero 2 + obsidian 3 + 史学 2)", len(tools) == 16, str(names))
+check("史学工具已注册", all(n in names for n in ["era_lookup", "place_dict_lookup"]))
 check("obsidian 工具已注册", all(n in names for n in ["search_notes", "create_note", "read_note"]))
 check("zotero 工具已注册", "zotero_search" in names and "zotero_recent" in names)
+# 3.2 R104: 史学工具实测(年号=确定性命中, 走真实数据)
+import app as _app4  # noqa: E402  (已 import, 此处仅强调顺序)
+r_era, _a_era = agent_tools.execute_tool("era_lookup", {"q": "建元"})
+check("era_lookup 建元命中(真实数据; 贞观暂缺系OCR对齐事故另案处理)",
+      isinstance(r_era, dict) and r_era.get("total", 0) > 0 and r_era.get("items"),
+      str(r_era)[:150])
+r_dm, _a_dm = agent_tools.execute_tool("place_dict_lookup", {"q": "洛阳"})
+check("place_dict_lookup 洛阳(partial 数据可 0 但结构正常)",
+      isinstance(r_dm, dict) and "error" not in r_dm, str(r_dm)[:150])
+
 check("schema 合规(name/desc/params)",
       all(t["function"]["name"] and t["function"]["description"]
           and t["function"]["parameters"].get("type") == "object" for t in tools))

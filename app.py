@@ -902,6 +902,20 @@ def ai_analyze():
 
 
 
+def _norm_key(s):
+    """检索比对归一化: 简体->繁体(opencc, 不可用时降级)+ _fold_key 形近折叠。数据与查询双侧过此函数。"""
+    s = (s or "").lower()
+    if _S2T:
+        s = _S2T.convert(s)
+    return _fold_key(s)
+
+
+try:
+    from opencc import OpenCC as _OpenCC
+    _S2T = _OpenCC("s2t")
+except Exception:
+    _S2T = None
+
 # ════════════════════════════════════════════════════════════════
 # R103: AI 工具——Obsidian 笔记三件(核心自带能力的工具化; 顶层 import 顺带保证 PYZ 打包)
 # ════════════════════════════════════════════════════════════════
@@ -987,6 +1001,73 @@ try:
                     "content": body[:4000] + ("…(截断)" if len(body) > 4000 else "")}
         except Exception as e:
             return {"error": "读取失败: %s" % str(e)[:120]}
+
+    @_ai_tool("era_lookup",
+               "年号/帝王纪年检索(李崇智《中国历代年号考》762 条结构化)。q 命中帝王/年号/备注, "
+               "也支持公元年份(如 618)。返回年代区间+原书页码(溯源)。",
+               params={"type": "object",
+                       "properties": {"q": {"type": "string", "description": "帝王名/年号/关键词/公元年份"}},
+                       "required": ["q"]},
+               action=None)
+    def _t_era_lookup(q):
+        _load_nianhao_book()
+        if not _NIANHAO_BOOK:
+            return {"error": "年号数据未就绪"}
+        q_raw = str(q).strip()
+        q_l = _norm_key(q_raw)
+        if not q_l:
+            return {"error": "关键词为空"}
+        q_year = q_raw.isdigit() and 1 <= len(q_raw) <= 4
+        hits = []
+        for e in _NIANHAO_BOOK:
+            score = 0
+            if q_l in _norm_key(e.get("ruler")):
+                score += 3
+            for era in e.get("eras", []):
+                if q_l in _norm_key(era):
+                    score += 5
+            if q_raw in (e.get("year_span") or ""):
+                score += 2
+                if q_year:
+                    score += 2
+            if score:
+                hits.append((score, e))
+        hits.sort(key=lambda x: -x[0])
+        items = [{"ruler": e.get("ruler", ""), "eras": e.get("eras", []),
+                  "year_span": e.get("year_span", ""),
+                  "note": (e.get("note") or "")[:300], "page": e.get("page")}
+                 for _s, e in hits[:10]]
+        return {"total": len(hits), "items": items,
+                "source": "李崇智《中国历代年号考》(修订本), 中华书局 2001"}
+
+    @_ai_tool("place_dict_lookup",
+               "历史地名大辞典条目检索(史为乐《中国历史地名大辞典》)。注意: OCR 收录进行中(约 662/3277), "
+               "未命中不等于不存在。返回释义+原书页码(溯源)。",
+               params={"type": "object",
+                       "properties": {"q": {"type": "string", "description": "古地名"}},
+                       "required": ["q"]},
+               action=None)
+    def _t_place_dict_lookup(q):
+        _load_diming_book()
+        if not _DIMING_BOOK:
+            return {"error": "地名辞典数据未就绪(OCR 断点保留中)"}
+        q_l = _norm_key(str(q).strip())
+        if not q_l:
+            return {"error": "关键词为空"}
+        hits = []
+        for e in _DIMING_BOOK:
+            score = 0
+            if q_l in _norm_key(e.get("head")):
+                score += 5
+            if q_l in _norm_key(e.get("note")):
+                score += 1
+            if score:
+                hits.append((score, e))
+        hits.sort(key=lambda x: -x[0])
+        items = [{"head": e.get("head", ""), "note": (e.get("note") or "")[:300],
+                  "page": e.get("page")} for _s, e in hits[:10]]
+        return {"total": len(hits), "items": items, "partial": True,
+                "source": "史为乐《中国历史地名大辞典》, 中国社会科学出版社 2005"}
 
 except Exception:
     import logging as _lg_ob

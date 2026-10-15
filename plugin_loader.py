@@ -19,6 +19,13 @@ def _plugins_dir():
 
 PLUGINS_DIR = _plugins_dir()
 
+# R101c: 插件加载异常记录 {pid: 简短异常}, 供 /api/plugins skip_reason 透出(frozen stderr 不可见)
+_LOAD_ERRORS = {}
+
+
+def load_errors():
+    return dict(_LOAD_ERRORS)
+
 
 def user_plugins_dir():
     """用户插件目录(可写, 插件市场安装目标)。"""
@@ -166,6 +173,7 @@ def load_plugins(app):
                         _plugin_themes[pid] = ["/plugin/%s/static/%s" % (pid, t) for t in theme_css]
                 loaded.append(pid)
             except Exception as e:
+                _LOAD_ERRORS[pid] = "%s: %s" % (type(e).__name__, str(e)[:160])
                 skipped.append((pid, "%s: %s" % (type(e).__name__, str(e)[:120])))
                 traceback.print_exc()
     return nav_injects, loaded, skipped

@@ -4,6 +4,8 @@
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
 
 hiddenimports = ['pyodbc', 'clr', 'opencc', 'rapidocr', 'guji_punct', 'entity_tag', 'error_check']
+# R101: agent_tools 是插件运行时才导入的契约模块(核心不引用), 静态分析扫不到, 必须显式声明
+hiddenimports += ['agent_tools']
 hiddenimports += collect_submodules('webview')
 hiddenimports += collect_submodules('rapidocr')
 

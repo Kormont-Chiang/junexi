@@ -1261,7 +1261,7 @@ def chgis_regime():
 
 
 # ── 插件加载(骨架: 只注册不改现有路由) ──
-from plugin_loader import load_plugins, plugin_assets, plugin_themes
+from plugin_loader import load_plugins, plugin_assets, plugin_themes, load_errors
 _plugin_nav, _plugin_loaded, _plugin_skipped = load_plugins(app)
 
 # ── OCR provider 注册（capabilities: ["ocr"] 插件，见 docs/OCR插件化方案.md）──
@@ -1397,7 +1397,7 @@ def _scan_plugin_manifests():
                     "enabled": effective_enabled(m, pid, _ov),
                     "loaded": pid in _plugin_loaded,
                     "source": _src,
-                    "skip_reason": dict(_plugin_skipped).get(pid, "") if not effective_enabled(m, pid, _ov) else "",
+                    "skip_reason": (load_errors().get(pid, "") or dict(_plugin_skipped).get(pid, "")) if pid not in _plugin_loaded else "",
                 })
             except Exception as e:
                 items.append({"id": os.path.basename(os.path.dirname(mf)), "name": "?", "version": "?", "desc": "", "enabled": False, "loaded": False, "skip_reason": "manifest 解析失败: %s" % str(e)[:80]})

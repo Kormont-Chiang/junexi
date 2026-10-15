@@ -107,6 +107,11 @@ else:
 # ── 3. /api/ai/agent 循环(模型层打桩) ────────────────────
 import app as appmod
 
+# R101: agent 端点已插件化——load_plugins 在 import app 时已自动加载 ai-agent,
+# 此处仅校验端点真的存在(重复 register_blueprint 会撞名)
+_rules = [r.rule for r in appmod.app.url_map.iter_rules()]
+check("ai-agent 插件自动加载(/api/ai/agent 在路由表)", "/api/ai/agent" in _rules, str(_rules[:5]))
+
 client = appmod.app.test_client()
 
 

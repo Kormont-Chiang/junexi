@@ -1,0 +1,13 @@
+{
+  "id": "ai-agent",
+  "name": "AI 自动操作 (agent)",
+  "version": "1.0",
+  "desc": "给 AI 助手装上\"手\": function calling 工具循环, 直接操作 JuneXi——查 CBDB/开详情/上图。开关在 AI 助手页左侧。禁用时 AI 页退回纯对话。",
+  "author": "JuneXi",
+  "enabled": true,
+  "routes": "routes.py:bp",
+  "assets": {
+    "js": ["ai_agent.js"]
+  },
+  "icon": "🕹"
+}

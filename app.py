@@ -912,6 +912,8 @@ AGENT_SYSTEM_PROMPT = (
     "- 查看人物详情(生卒/字号/谥号/籍贯/官职履历)\n"
     "- 列出人物亲属(五服内血亲带服制, 或全部亲属记录)\n"
     "- 把人物标到历史地图(单人=生平轨迹视图, 多人=群体分布)\n"
+    "- 按官名查官职字典/任职者, 按地名查地名辞典(带坐标)\n"
+    "- 查两人亲属关系路径(称谓链+五服), 列人物社会关系记录\n"
     "当用户请求可用工具完成时, 优先调工具(可多步组合), 拿到结果后用中文简洁回答, "
     "并顺带说明你在 JuneXi 里打开了什么页面或地图。纯聊天、写作、翻译类问题不用工具, 直接答。\n"
     "铁律: 人物 ID 必须通过 search_person 先查, 绝不凭记忆编造 ID; 一步工具拿不到就换参数重试或如实说明。"
@@ -930,10 +932,16 @@ def ai_agent():
     if not tools:
         return jsonify({"error": "当前没有可用工具(插件未注册任何 AI 工具)"})
 
-    messages = [
-        {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-        {"role": "user", "content": message},
-    ]
+    messages = [{"role": "system", "content": AGENT_SYSTEM_PROMPT}]
+    # R100: 多轮操作对话——前端带最近 10 轮简史(user/assistant 才收, 防注入其他角色)
+    for h in (data.get("history") or [])[-10:]:
+        if not isinstance(h, dict):
+            continue
+        role = h.get("role")
+        content = str(h.get("content", ""))[:2000]
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+    messages.append({"role": "user", "content": message})
     steps = []
     actions = []
     final = ""

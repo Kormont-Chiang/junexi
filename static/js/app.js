@@ -3439,6 +3439,14 @@ function searchCBDBByName(name) {
     searchCBDB();
 }
 
+function searchCBDBByType(type, q) {
+    if (window._cbdbType !== type) switchCBDBType(type);
+    else renderCBDBSearchArea(type);
+    const input = document.getElementById('cbdbSearchInput');
+    if (input) input.value = q;
+    searchCBDB();
+}
+
 function showPlaceOnMap(lng, lat) {
     switchTab('map');
     setTimeout(() => {
@@ -6582,7 +6590,7 @@ async function sendAIChatAgent(text) {
         const res = await apiFetch('/api/ai/agent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text, model: window._aiModel || undefined })
+            body: JSON.stringify({ message: text, model: window._aiModel || undefined, history: (Array.isArray(window._aiHistory) ? window._aiHistory : []) })
         });
         const data = await res.json();
         const loadingEl = document.getElementById(loadingId);
@@ -6598,6 +6606,7 @@ async function sendAIChatAgent(text) {
                     '</div>';
             }
             const content = data.response || '(无回复)';
+            window._aiHistory = (Array.isArray(window._aiHistory) ? window._aiHistory : []).concat([{ role: 'user', content: text }, { role: 'assistant', content: content }]).slice(-10);
             box.innerHTML += `<div class="ai-message ai">${stepHtml}<div class="ai-bubble">${formatAIResponse(content)}</div><button class="ai-copy-btn" onclick="aiCopyResponse(this)" title="复制回答">📋</button></div>`;
             if (data.actions && data.actions.length) {
                 showToast(`AI 正在操作 JuneXi(${data.actions.length} 个动作)…`, 'info', 2000);
@@ -6617,7 +6626,8 @@ async function aiRunActions(actions) {
     for (const a of actions) {
         try {
             if (a.type === 'cbdb_search' && a.name) {
-                searchCBDBByName(a.name);
+                if (a.mode && typeof searchCBDBByType === 'function') searchCBDBByType(a.mode, a.name);
+                else searchCBDBByName(a.name);
             } else if (a.type === 'cbdb_person' && a.id) {
                 loadCBDBPersonDetail(a.id);
             } else if (a.type === 'cbdb_map' && Array.isArray(a.ids) && a.ids.length) {

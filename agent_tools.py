@@ -6,8 +6,27 @@
 - 动作模板: 工具执行成功(返回无 error)后, 按模板生成前端动作; 值 "{参数名}" 从工具入参取值, 其余原样传递
 """
 import json as _json
+import re as _re
 
 _REGISTRY = {}
+
+
+def to_int_list(v, limit=500):
+    """模型参数归一化: [1762]/"1762"/"1762,1493"/"1762 1493" → [1762, 1493]。
+    R99c 事故教训: 模型 array 参数可能序列化成字符串, 逐字符迭代会把 "1762" 拆成 [1,7,6,2]。"""
+    if v is None:
+        return []
+    if isinstance(v, (list, tuple)):
+        raw = list(v)
+    else:
+        raw = _re.split(r"[,，、;；\s]+", str(v).strip())
+    out = []
+    for x in raw:
+        try:
+            out.append(int(x))
+        except (TypeError, ValueError):
+            continue
+    return out[:limit]
 
 
 def tool(name, description, params=None, action=None):

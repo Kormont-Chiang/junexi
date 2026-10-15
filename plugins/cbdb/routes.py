@@ -3180,7 +3180,7 @@ def cbdb_health():
 # 本模块被 plugin_loader 导入时即注册; app.py /api/ai/agent 消费
 # ════════════════════════════════════════════════════════════════
 try:
-    from agent_tools import tool as _ai_tool, list_brief as _ai_brief
+    from agent_tools import tool as _ai_tool, list_brief as _ai_brief, to_int_list as _ai_ids
 
     @_ai_tool("search_person",
                "在 CBDB 按姓名检索人物。支持姓+名、字/号/别名(如'子瞻'能找到苏轼), 简体自动转繁体, "
@@ -3245,10 +3245,8 @@ try:
     def _t_cbdb_show_on_map(person_ids):
         if not CBDBConnection.is_available():
             return {"error": "CBDB 本地数据库未连接"}
-        # 模型有时把单个 id 序列化成字符串("1762" 或 "1762,1493"): 归一化, 防逐字符拆成 [1,7,6,2]
-        if isinstance(person_ids, str):
-            person_ids = [t for t in re.split(r"[,，\s]+", person_ids.strip()) if t]
-        ids = [int(x) for x in (person_ids or [])][:200]
+        # R99c 教训: 模型可能把 array 序列化成字符串/逗号串, 统一走 to_int_list 归一化
+        ids = _ai_ids(person_ids, limit=200)
         if not ids:
             return {"error": "person_ids 为空"}
         geo = CBDBConnection.persons_geojson(ids, addr_source=("all" if len(ids) == 1 else "bio"),
@@ -3256,6 +3254,103 @@ try:
         feats = geo.get("features", []) if isinstance(geo, dict) else []
         return {"mapped_features": len(feats),
                 "note": "前端地图页将自动渲染" if feats else "这些人物都没有可定位的地址记录"}
+
+
+    @_ai_tool("search_office",
+               "按官名检索 CBDB 官职字典(如 太守/宰相/團練副使), 门类筛选 category 简繁自动。返回官职ID/名称/朝代/门类, 后续接 office_persons 查任职者。",
+               params={"type": "object",
+                       "properties": {"name": {"type": "string", "description": "官名, 如 太守"},
+                                      "category": {"type": "string", "description": "门类(可选), 如 統稱/機構"}},
+                       "required": ["name"]},
+               action={"type": "cbdb_search", "mode": "office", "q": "{name}"})
+    def _t_cbdb_search_office(name, category=None):
+        if not CBDBConnection.is_available():
+            return {"error": "CBDB 本地数据库未连接"}
+        offices = CBDBConnection.search_offices(str(name).strip(), category=category or None)
+        if not offices:
+            return {"total": 0, "offices": [], "hint": "未命中: 可换简繁/异称重试"}
+        return {"total": len(offices),
+                "offices": _ai_brief(offices, limit=10,
+                                     fields=["office_id", "office_chn", "dynasty", "category"])}
+
+    @_ai_tool("office_persons",
+               "查某官职的全部任职者(含任期区间, 可 from_year/to_year 过滤)。office_id 来自 search_office。",
+               params={"type": "object",
+                       "properties": {"office_id": {"type": "integer"},
+                                      "from_year": {"type": "integer"},
+                                      "to_year": {"type": "integer"}},
+                       "required": ["office_id"]},
+               action=None)
+    def _t_cbdb_office_persons(office_id, from_year=None, to_year=None):
+        if not CBDBConnection.is_available():
+            return {"error": "CBDB 本地数据库未连接"}
+        oids = _ai_ids(office_id, limit=1)
+        if not oids:
+            return {"error": "office_id 无效"}
+        persons = CBDBConnection.persons_by_office(
+            oids[0], from_year=from_year or None, to_year=to_year or None)
+        if not persons:
+            return {"total": 0, "persons": []}
+        return {"total": len(persons),
+                "persons": _ai_brief(persons, limit=10,
+                                     fields=["id", "name", "dynasty", "firstyear", "lastyear"])}
+
+    @_ai_tool("search_place",
+               "按地名检索 CBDB 地名辞典(古今地名, 返回坐标/行政层级/存续年份)。",
+               params={"type": "object",
+                       "properties": {"q": {"type": "string", "description": "地名, 如 洛阳/黃州"}},
+                       "required": ["q"]},
+               action={"type": "cbdb_search", "mode": "place", "q": "{q}"})
+    def _t_cbdb_search_place(q):
+        if not CBDBConnection.is_available():
+            return {"error": "CBDB 本地数据库未连接"}
+        places = CBDBConnection.search_places(str(q).strip())
+        if isinstance(places, dict):
+            places = places.get("places") or places.get("results") or []
+        if not places:
+            return {"total": 0, "places": [], "hint": "未命中: 可换古今异称重试"}
+        return {"total": len(places),
+                "places": _ai_brief(places, limit=10,
+                                     fields=["addr_id", "name_chn", "x_coord", "y_coord",
+                                             "admin_type", "firstyear", "lastyear"])}
+
+    @_ai_tool("kin_path",
+               "查两个人物的亲属关系路径(BFS 最短路径): 返回关系链称谓(如 父/弟之女婿)与五服。两人须先用 search_person 查到 ID。",
+               params={"type": "object",
+                       "properties": {"person_a": {"type": "integer", "description": "人物A ID"},
+                                      "person_b": {"type": "integer", "description": "人物B ID"}},
+                       "required": ["person_a", "person_b"]},
+               action=None)
+    def _t_cbdb_kin_path(person_a, person_b):
+        if not CBDBConnection.is_available():
+            return {"error": "CBDB 本地数据库未连接"}
+        a = _ai_ids(person_a, limit=1)
+        b = _ai_ids(person_b, limit=1)
+        if not a or not b:
+            return {"error": "person_a/person_b 无效"}
+        r = CBDBConnection.kin_path(a[0], b[0])
+        if not r or not r.get("found"):
+            return {"found": False, "note": "两人无亲属路径(或超出步数上限)"}
+        return {"found": True, "depth": r.get("depth"),
+                "path_persons": _ai_brief(r.get("persons"), limit=12, fields=["id", "name"]),
+                "relation_chain": r.get("rel_chain"), "mourning": r.get("mourning")}
+
+    @_ai_tool("list_person_assoc",
+               "列出人物的社会关系记录(学术/政治/文学/交游等, 含年份与文献题名)。person_id 来自 search_person。",
+               params={"type": "object",
+                       "properties": {"person_id": {"type": "integer"}},
+                       "required": ["person_id"]},
+               action=None)
+    def _t_cbdb_person_assoc(person_id):
+        if not CBDBConnection.is_available():
+            return {"error": "CBDB 本地数据库未连接"}
+        ids = _ai_ids(person_id, limit=1)
+        if not ids:
+            return {"error": "person_id 无效"}
+        items = CBDBConnection.get_person_assoc(ids[0], limit=100) or []
+        return {"total": len(items),
+                "assoc": _ai_brief(items, limit=10,
+                                   fields=["id", "name_chn", "relation", "year", "text_title"])}
 
 except Exception:
     import logging as _lg

@@ -48,12 +48,17 @@ check("注册 16 件工具(cbdb 9 + zotero 2 + obsidian 3 + 史学 2)", len(tool
 check("史学工具已注册", all(n in names for n in ["era_lookup", "place_dict_lookup"]))
 check("obsidian 工具已注册", all(n in names for n in ["search_notes", "create_note", "read_note"]))
 check("zotero 工具已注册", "zotero_search" in names and "zotero_recent" in names)
-# 3.2 R104: 史学工具实测(年号=确定性命中, 走真实数据)
+# 3.2 R104/R105: 史学工具实测(年号=确定性命中, 走真实数据; R105 重建后貞觀在库)
 import app as _app4  # noqa: E402  (已 import, 此处仅强调顺序)
 r_era, _a_era = agent_tools.execute_tool("era_lookup", {"q": "建元"})
-check("era_lookup 建元命中(真实数据; 贞观暂缺系OCR对齐事故另案处理)",
+check("era_lookup 建元命中(真实数据)",
       isinstance(r_era, dict) and r_era.get("total", 0) > 0 and r_era.get("items"),
       str(r_era)[:150])
+r_zg, _a_zg = agent_tools.execute_tool("era_lookup", {"q": "贞观"})
+check("era_lookup 贞观命中(R105重建数据: 归太宗李世民)",
+      isinstance(r_zg, dict) and r_zg.get("total", 0) > 0
+      and any("世民" in (it.get("ruler") or "") for it in r_zg.get("items", [])),
+      str(r_zg)[:200])
 r_dm, _a_dm = agent_tools.execute_tool("place_dict_lookup", {"q": "洛阳"})
 check("place_dict_lookup 洛阳(partial 数据可 0 但结构正常)",
       isinstance(r_dm, dict) and "error" not in r_dm, str(r_dm)[:150])

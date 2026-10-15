@@ -38,3 +38,5 @@ _browsers/
 _exp*.mjs
 
 _shots_r40d/
+
+data/toolbooks/_raw/

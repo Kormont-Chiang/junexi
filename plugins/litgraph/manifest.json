@@ -1,0 +1,13 @@
+{
+  "id": "litgraph",
+  "name": "文献图谱",
+  "version": "0.1",
+  "desc": "顺藤摸瓜: 粘贴知网/国社科导出的题录(Refworks/GB7714), 一键生成引用关系网(参考文献+引证文献), 侧栏题录+原文检索跳转。数据源边界: 程序不直连知网(反爬+条款), 走官方导出; 国社科无开放API, 同走导出或页面检索跳转。",
+  "author": "JuneXi",
+  "enabled": true,
+  "routes": "routes.py:bp",
+  "assets": {
+    "js": ["litgraph.js"]
+  },
+  "icon": "🕸"
+}

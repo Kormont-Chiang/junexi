@@ -57,6 +57,7 @@ python app.py                     # 默认 127.0.0.1:5000
 | 插件 | 功能 |
 |---|---|
 | 📖 Zotero 联动 | 本地客户端状态/检索/书库/最近阅读 + PDF 内嵌直读 + 笔记落盘 Obsidian |
+| 🕹 AI 自动操作 | AI 助手 function calling 工具循环，直接操作 JuneXi（查 CBDB/开详情/上图）；开关在 AI 助手页，禁用时退回纯对话 |
 | 👁️ 灵眸 OCR | 本地古籍 OCR（PP-OCRv6），拍照→识别→句读→实体标注→错字校对→存 Obsidian 全链路 |
 | 🔍 百度 OCR | 云端高精度备选（`plugins/baidu-ocr`，需 API key） |
 

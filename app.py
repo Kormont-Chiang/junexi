@@ -1041,8 +1041,8 @@ try:
                 "source": "李崇智《中国历代年号考》(修订本), 中华书局 2001"}
 
     @_ai_tool("place_dict_lookup",
-               "历史地名大辞典条目检索(史为乐《中国历史地名大辞典》)。注意: OCR 收录进行中(约 662/3277), "
-               "未命中不等于不存在。返回释义+原书页码(溯源)。",
+               "历史地名大辞典条目检索(史为乐《中国历史地名大辞典》全本 6.7 万条, 简体数据)。注意: 约 2% 条目为 OCR 碎片已降权, "
+               "未命中也可能因词条以别名立目(如建康→建康府)。返回释义+原书页码(溯源)。",
                params={"type": "object",
                        "properties": {"q": {"type": "string", "description": "古地名"}},
                        "required": ["q"]},
@@ -1054,18 +1054,30 @@ try:
         q_l = _norm_key(str(q).strip())
         if not q_l:
             return {"error": "关键词为空"}
+        import re as _re
+        # R106: OCR 碎片 head 降权(年号考同病灶轻症版; 重修管线前权宜):
+        # 朝代+人名署名(清雍正/明张燮)、功能残片(治所/以来/为…/元年)、纪年残片
+        FRAG_HEAD = _re.compile(
+            u'^(以来|系|城镇|亦|在|曾|即|为|今|古|故|治所?|南朝|北[魏齐周]|'
+            u'[秦汉魏晋隋唐宋元明清](初|末|时|代)?[\u4e00-\u9fff]{1,3}'
+            u'|[0-9一二三四五六七八九十]+年|元[朔狩鼎封].{0,3}年)')
         hits = []
         for e in _DIMING_BOOK:
+            head = (e.get("head") or "").strip()
             score = 0
-            if q_l in _norm_key(e.get("head")):
+            if q_l in _norm_key(head):
                 score += 5
+                if len(head) <= 8:
+                    score += 2  # 精确短词优先
             if q_l in _norm_key(e.get("note")):
                 score += 1
             if score:
+                if FRAG_HEAD.match(head):
+                    score -= 4  # 碎片降权但不删除(数据诚实)
                 hits.append((score, e))
         hits.sort(key=lambda x: -x[0])
         items = [{"head": e.get("head", ""), "note": (e.get("note") or "")[:300],
-                  "page": e.get("page")} for _s, e in hits[:10]]
+                  "page": e.get("page")} for _s, e in hits[:10] if _s > 0]
         return {"total": len(hits), "items": items, "partial": True,
                 "source": "史为乐《中国历史地名大辞典》, 中国社会科学出版社 2005"}
 

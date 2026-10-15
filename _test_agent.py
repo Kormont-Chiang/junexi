@@ -37,12 +37,15 @@ _spec_zt = importlib.util.spec_from_file_location(
 _mod_zt = importlib.util.module_from_spec(_spec_zt)
 _spec_zt.loader.exec_module(_mod_zt)
 
+# R103: 核心 Obsidian 工具在 import app 时注册(顶层 try 段), 需先触发
+import app  # noqa: F401
 import agent_tools
 
 tools = agent_tools.get_openai_tools()
 names = [t["function"]["name"] for t in tools]
 print(f"已注册工具: {names}")
-check("注册 11 件工具(cbdb 9 + zotero 2)", len(tools) == 11, str(names))
+check("注册 14 件工具(cbdb 9 + zotero 2 + obsidian 3)", len(tools) == 14, str(names))
+check("obsidian 工具已注册", all(n in names for n in ["search_notes", "create_note", "read_note"]))
 check("zotero 工具已注册", "zotero_search" in names and "zotero_recent" in names)
 check("schema 合规(name/desc/params)",
       all(t["function"]["name"] and t["function"]["description"]

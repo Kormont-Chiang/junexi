@@ -901,6 +901,97 @@ def ai_analyze():
     return jsonify(result)
 
 
+
+# ════════════════════════════════════════════════════════════════
+# R103: AI 工具——Obsidian 笔记三件(核心自带能力的工具化; 顶层 import 顺带保证 PYZ 打包)
+# ════════════════════════════════════════════════════════════════
+try:
+    from agent_tools import tool as _ai_tool
+
+    @_ai_tool("search_notes",
+               "在你的 Obsidian 库中搜索笔记(文件名+正文匹配)。返回库内相对路径与命中片段, 可接 read_note。",
+               params={"type": "object",
+                       "properties": {"q": {"type": "string", "description": "关键词"}},
+                       "required": ["q"]},
+               action=None)
+    def _t_search_notes(q):
+        vault = _vault_path()
+        if not vault or not os.path.isdir(vault):
+            return {"error": "Obsidian 库未找到(未安装或未配置)"}
+        needle = str(q).strip().lower()
+        if not needle:
+            return {"error": "关键词为空"}
+        hits = []
+        for root, _dirs, files in os.walk(vault):
+            if len(hits) >= 20:
+                break
+            for fn in files:
+                if not fn.endswith(".md") or fn.startswith("."):
+                    continue
+                full = os.path.join(root, fn)
+                rel = os.path.relpath(full, vault).replace("\\", "/")
+                try:
+                    body = open(full, encoding="utf-8", errors="ignore").read(80000)
+                except Exception:
+                    continue
+                ix = body.lower().find(needle)
+                if needle in fn.lower() or ix >= 0:
+                    snippet = ""
+                    if ix >= 0:
+                        snippet = body[max(0, ix - 40):ix + 60].replace("\n", " ")
+                    hits.append({"path": rel, "snippet": snippet})
+        return {"total": len(hits), "notes": hits}
+
+    @_ai_tool("create_note",
+               "在 Obsidian 库中新建笔记(同名覆盖)。folder 可指定子目录(自动创建, 留空=根目录)。返回库内相对路径。",
+               params={"type": "object",
+                       "properties": {"title": {"type": "string", "description": "笔记标题(文件名)"},
+                                      "content": {"type": "string", "description": "Markdown 正文"},
+                                      "folder": {"type": "string", "description": "子目录(可选)"}},
+                       "required": ["title", "content"]},
+               action=None)
+    def _t_create_note(title, content, folder=""):
+        vault = _vault_path()
+        if not vault or not os.path.isdir(vault):
+            return {"error": "Obsidian 库未找到(未安装或未配置)"}
+        import re as _re
+        safe = _re.sub(r'[\\/:*?"<>|#\[\]]+', "-", str(title).strip()).strip(" .") or "未命名"
+        sub = ""
+        for part in str(folder or "").replace("\\", "/").split("/"):
+            part = part.strip()
+            if part and part not in (".", ".."):
+                sub = os.path.join(sub, part)
+        d = os.path.join(vault, sub) if sub else vault
+        os.makedirs(d, exist_ok=True)
+        fp = os.path.join(d, safe + ".md")
+        try:
+            open(fp, "w", encoding="utf-8").write(str(content))
+            rel = os.path.relpath(fp, vault).replace("\\", "/")
+            return {"ok": True, "path": rel, "bytes": os.path.getsize(fp)}
+        except Exception as e:
+            return {"error": "写入失败: %s" % str(e)[:120]}
+
+    @_ai_tool("read_note",
+               "读取 Obsidian 笔记全文。path 为库内相对路径(search_notes 的返回)。",
+               params={"type": "object",
+                       "properties": {"path": {"type": "string"}},
+                       "required": ["path"]},
+               action=None)
+    def _t_read_note(path):
+        fp = _vault_resolve(str(path))
+        if not fp or not os.path.isfile(fp):
+            return {"error": "笔记不存在或路径越界"}
+        try:
+            body = open(fp, encoding="utf-8", errors="ignore").read()
+            return {"path": str(path), "length": len(body),
+                    "content": body[:4000] + ("…(截断)" if len(body) > 4000 else "")}
+        except Exception as e:
+            return {"error": "读取失败: %s" % str(e)[:120]}
+
+except Exception:
+    import logging as _lg_ob
+    _lg_ob.getLogger("jx.core").error("obsidian AI tools 注册失败", exc_info=True)
+
 # ── API: CHGIS ──────────────────────────────────────────
 
 @app.route("/api/chgis/status", methods=["GET"])

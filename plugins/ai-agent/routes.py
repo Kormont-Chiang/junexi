@@ -16,11 +16,15 @@ MAX_AGENT_STEPS = 6
 
 AGENT_SYSTEM_PROMPT = (
     "你是「六月息」历史研究工作台的 AI 助手。你已接入 JuneXi 的工具, 可以直接操作它的功能"
-    "(人物/官职/地名/亲属/社会关系检索, 以及把人物标到历史地图等, 具体以工具清单为准)。\n"
+    "(人物/官职/地名/亲属/社会关系检索、Zotero 书库、Obsidian 笔记、地图等, 具体以工具清单为准)。\n"
     "当用户请求可用工具完成时, 优先调工具(可多步组合), 拿到结果后用中文简洁回答, "
     "并顺带说明你在 JuneXi 里打开了什么页面或地图。纯聊天、写作、翻译类问题不用工具, 直接答。\n"
-    "铁律: 人物/官职 ID 必须先检索后使用, 绝不凭记忆编造; 一步工具拿不到就换参数重试或如实说明。"
+    "铁律: 人物/官职 ID 必须先检索后使用, 绝不凭记忆编造; 一步工具拿不到就换参数重试或如实说明。\n"
+    "效率纪律: 整理笔记/写总结时优先用已有工具结果, 补查详情每次至多 2 人, 别把调用浪费在逐人详情上; "
+    "工具调用总数有限, 拿全所需材料就动手写, 不要恋战。"
 )
+
+MAX_TOOL_CALLS = 10  # 模型一轮可并行发多个 tool_call, 必须按调用总数兜底(R103b)
 
 
 @bp.route("/api/ai/agent", methods=["POST"])
@@ -52,6 +56,8 @@ def ai_agent():
     actions = []
     final = ""
     model_id = data.get("model")
+    total_calls = 0
+    capped = False
 
     for _step in range(MAX_AGENT_STEPS):
         result = deepseek_chat(messages, model_id=model_id, tools=tools)
@@ -66,6 +72,10 @@ def ai_agent():
             break
         messages.append(msg)
         for tc in tool_calls:
+            if total_calls >= MAX_TOOL_CALLS:
+                capped = True
+                break
+            total_calls += 1
             fn = tc.get("function") or {}
             fname = fn.get("name", "")
             try:
@@ -83,7 +93,22 @@ def ai_agent():
                 "name": fname,
                 "content": tool_message_content(tresult),
             })
-    else:
-        return jsonify({"response": "(已达最大步数, 请缩小范围重试)", "steps": steps, "actions": actions})
+        if capped:
+            break
 
-    return jsonify({"response": final, "steps": steps, "actions": actions})
+    if capped or not final:
+        # R103b: 工具数/步数耗尽时不用工具收个尾, 基于已有结果作答, 不甩裸失败
+        try:
+            summary = deepseek_chat(
+                messages + [{"role": "system", "content":
+                             "工具调用已达上限。请基于已获得的结果直接作答(中文简洁), 不要再请求工具。"}],
+                model_id=model_id)
+            if isinstance(summary, dict) and "choices" in summary:
+                final = summary["choices"][0]["message"].get("content") or final
+        except Exception:
+            pass
+        if capped and final:
+            final += "\n\n(已达工具调用上限, 未完成的计划已略去)"
+
+    return jsonify({"response": final or "(已达工具调用上限, 请缩小范围重试)",
+                    "steps": steps, "actions": actions})

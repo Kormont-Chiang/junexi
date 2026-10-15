@@ -237,5 +237,28 @@ finally:
 check("tool 结果正确回喂(结构/字段)", data4.get("response") == "收到回声", str(data4)[:200])
 check("假工具也生成动作? 无 action 模板 → 无动作", data4.get("actions") == [], str(data4.get("actions")))
 
+# 3.5 R103b: 一轮并行 12 个调用 → 总数截断 10, 且收尾不用工具给出答案(不甩裸失败)
+calls5 = {"n": 0}
+def fake5(messages, stream=False, model_id=None, tools=None):
+    calls5["n"] += 1
+    if calls5["n"] == 1:
+        return {"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": [
+            {"id": "c%d" % i, "type": "function",
+             "function": {"name": "_echo_test", "arguments": '{"x": "第%d个"}' % i}}
+            for i in range(12)]}}]}
+    # 收尾调用(无工具): 断言 messages 里没有发出新 tool 请求
+    assert calls5["n"] == 2, "应恰好两轮(截断+收尾)"
+    return {"choices": [{"message": {"role": "assistant", "content": "基于已有结果作答完毕"}}]}
+appmod.deepseek_chat = fake5
+try:
+    rv = client.post("/api/ai/agent", json={"message": "轰炸测试"})
+    data5 = rv.get_json()
+finally:
+    appmod.deepseek_chat = orig
+check("并行 tool_calls 截断在 MAX_TOOL_CALLS=10", len(data5.get("steps", [])) == 10, str(len(data5.get("steps", []))))
+check("截断后收尾作答不甩裸失败",
+      "基于已有结果作答完毕" in (data5.get("response") or "") and "上限" in data5["response"],
+      str(data5.get("response"))[:120])
+
 print(f"\n=== {PASS} pass / {FAIL} fail ===")
 sys.exit(1 if FAIL else 0)

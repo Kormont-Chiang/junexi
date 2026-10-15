@@ -30,7 +30,7 @@ Obsidian 和 Zotero 各管各的，CBDB 和地图数据更是各自为政。
 | 📖 读文献 | Zotero 全库列表（73+ 条目） + 内嵌 PDF 阅读器 + 边读边记直写 Obsidian 文献笔记（带 zotero:// 回链） |
 | 📚 史料库 | 70 个精选数据库导航（校内资源/综合古籍/期刊论文/简牍敦煌/数字人文工具等），支持多库联合检索和 AI 导购 |
 | 🛠️ 史学工具 | 年号换算/避讳查询/音韵反切/职官查询/古今地名/版本目录，附工具书依据和核查路径 |
-| 🤖 AI 助手 | 多供应商模型（DeepSeek 官方 ×2 + 硅基流动 ×8 + OpenClaw 网关）；内置提示词库 17 条（分读史料/写作/自检/语言四类，可折叠可搜索） |
+| 🤖 AI 助手 | 多供应商模型（DeepSeek 官方 ×2 + 硅基流动 ×8 + OpenClaw 网关）；内置提示词库 17 条（分读史料/写作/自检/语言四类，可折叠可搜索）；「自动操作」模式（试验）：AI 经 function calling 直接查 CBDB/打开详情/上图，动作白名单只读 |
 | 🧩 插件系统 | 文件夹即插件（manifest.json + routes.py），支持页面注入/一键启用停用/市场安装（URL/本地 .jxplugin）/registry 注册（PR 上架） |
 | 📰 学术动态 | arXiv 数字人文/计算历史学 + Medievalists.net + JSTOR Daily RSS 聚合，支持自定义源和 AI 中文翻译 |
 | ⌨️ 快捷键 | Ctrl+0=仪表盘, Ctrl+1~8=主标签, Ctrl+9=插件, Ctrl+/=全局搜索, Ctrl+B=打开 Obsidian, F11=专注模式 |

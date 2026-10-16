@@ -83,8 +83,12 @@
       (nd.authors && nd.authors.length ? '作者: ' + esc(nd.authors.join(', ')) + '\n' : '') +
       (nd.source ? '出处: ' + esc(nd.source) + '\n' : '') +
       (nd.year ? '年份: ' + esc(nd.year) + '\n' : '') +
+      (nd.cited_by_count ? '被引数: ' + esc(nd.cited_by_count) + '\n' : '') +
+      (nd.doi ? 'DOI: ' + esc(nd.doi) + '\n' : '') +
       '连接度: ' + (deg[nd.id] || 0) + (nd.n > 1 ? '\n同名合并 ×' + nd.n : '') +
       '</div>' +
+      (nd.oa_id ? '<a class="btn" target="_blank" href="https://openalex.org/' + esc(nd.oa_id) + '">在 OpenAlex 查看 ↗</a>' : '') +
+      (nd.doi ? '<a class="btn" target="_blank" href="https://doi.org/' + esc(nd.doi) + '">DOI 原文 ↗</a>' : '') +
       '<a class="btn" target="_blank" href="https://kns.cnki.net/kns8s/defaultresult/index?kw=' + q + '">在知网检索 ↗</a>' +
       '<a class="btn" target="_blank" href="https://www.ncpssd.org/Literature/articlelist?searchValue=' + q + '">在国社科文献中心检索 ↗</a>';
   }
@@ -130,10 +134,80 @@
     }
   }
 
+  // ── OpenAlex 种子制建图 ────────────────────────────────
+  let _oaSelected = null;
+
+  async function oaSearch() {
+    const q = document.getElementById('litOaQ').value.trim();
+    const box = document.getElementById('litOaCands');
+    const btn = document.getElementById('litOaSearch');
+    const build = document.getElementById('litOaBuild');
+    if (!q) { alert('先填标题或 DOI'); return; }
+    _oaSelected = null; build.style.display = 'none';
+    btn.disabled = true; btn.textContent = '搜索中…';
+    box.innerHTML = '<div style="font-size:12px;color:#888">正在问 OpenAlex(慢网络可能 1 分钟内)…</div>';
+    try {
+      const d = await api('/api/litgraph/oa_search', {
+        method: 'POST', body: JSON.stringify({ query: q }),
+      });
+      if (d.error) { box.innerHTML = '<div style="font-size:12px;color:#c0392b">' + esc(d.error) + '</div>'; return; }
+      if (!d.candidates || !d.candidates.length) {
+        box.innerHTML = '<div style="font-size:12px;color:#888">OpenAlex 未命中。换个标题/拼写, 或改用上方知网导出。</div>';
+        return;
+      }
+      box.innerHTML = d.candidates.map((c, i) => {
+        const au = (c.authors || []).slice(0, 2).join(', ');
+        const sub = [au, c.year, c.source, '被引' + c.cited_by_count].filter(Boolean).join(' · ');
+        return '<label style="display:block;padding:5px 6px;border:1px solid #e3e0d8;border-radius:5px;margin-bottom:5px;cursor:pointer">' +
+          '<input type="radio" name="litOaCand" value="' + i + '" style="margin-right:5px">' +
+          '<b style="font-size:12px">' + esc(c.title) + '</b><br>' +
+          '<span style="font-size:11px;color:#888">' + esc(sub) + '</span></label>';
+      }).join('');
+      box.querySelectorAll('input[name=litOaCand]').forEach(r => r.addEventListener('change', () => {
+        _oaSelected = d.candidates[parseInt(r.value, 10)];
+        build.style.display = _oaSelected ? 'block' : 'none';
+      }));
+    } catch (e) {
+      box.innerHTML = '<div style="font-size:12px;color:#c0392b">搜索失败: ' + esc(e) + '</div>';
+    } finally {
+      btn.disabled = false; btn.textContent = '搜索';
+    }
+  }
+
+  async function oaBuild() {
+    if (!_oaSelected) return;
+    const btn = document.getElementById('litOaBuild');
+    const st = document.getElementById('litOaStats');
+    btn.disabled = true; btn.textContent = '正在拉取参考文献与被引…';
+    st.textContent = 'OpenAlex 拉取中, 慢网络可能 1-3 分钟, 勿关闭窗口';
+    try {
+      const d = await api('/api/litgraph/oa_expand', {
+        method: 'POST',
+        body: JSON.stringify({ openalex_id: _oaSelected.oa_id }),
+      });
+      if (d.error) { alert(d.error); st.textContent = ''; return; }
+      renderGraph(d.graph);
+      const s = d.graph.stats || {};
+      st.textContent = (d.graph.source_note || '') + '\n保存于 ' + (d.graph.ts || '');
+      loadSavedList();
+    } catch (e) {
+      alert('建图失败: ' + e);
+      st.textContent = '';
+    } finally {
+      btn.disabled = false; btn.textContent = '用选中项生成图谱';
+    }
+  }
+
   document.addEventListener('jx-plugin-page', ev => {
     if (!ev.detail || ev.detail.pid !== 'litgraph') return;
     const btn = document.getElementById('litBuild');
     if (btn) btn.addEventListener('click', doImport);
+    const oaSearchBtn = document.getElementById('litOaSearch');
+    if (oaSearchBtn) oaSearchBtn.addEventListener('click', oaSearch);
+    const oaQ = document.getElementById('litOaQ');
+    if (oaQ) oaQ.addEventListener('keydown', e => { if (e.key === 'Enter') oaSearch(); });
+    const oaBuildBtn = document.getElementById('litOaBuild');
+    if (oaBuildBtn) oaBuildBtn.addEventListener('click', oaBuild);
     const graphBox = document.getElementById('litGraph');
     if (graphBox && typeof echarts !== 'undefined' && !_chart) {
       _chart = echarts.init(graphBox);

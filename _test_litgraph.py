@@ -114,8 +114,90 @@ r4 = c.post('/api/litgraph/delete/%s' % gid)
 r5 = c.get('/api/litgraph/graph/%s' % gid)
 check('API delete 生效', r4.status_code == 200 and r5.status_code == 404)
 
+# ── 5. OpenAlex fetcher 本体 ─────────────────────────────
+spec_f = _iu.spec_from_file_location('litf', os.path.join(ROOT, 'plugins', 'litgraph', 'fetcher.py'))
+litf = _iu.module_from_spec(spec_f)
+spec_f.loader.exec_module(litf)
+
+check('is_doi 识别', litf.is_doi('10.1086/663830') and litf.is_doi(' 10.2307/j.ctt1b3b969 ')
+      and not litf.is_doi('北魏洛阳城') and not litf.is_doi('10.x'), '')
+check('short_id 截取', litf._short_id('https://openalex.org/W123456') == 'W123456', '')
+
+FAKE_W = {
+    'id': 'https://openalex.org/W111', 'display_name': 'Reform in Medieval China',
+    'authorships': [{'author': {'display_name': 'John Smith'}},
+                    {'author': {'display_name': 'Mary Doe'}},
+                    {'author': {'display_name': 'Third Author'}},
+                    {'author': {'display_name': 'Fourth'}}],
+    'primary_location': {'source': {'display_name': "T'oung Pao"}},
+    'publication_year': 1997, 'doi': 'https://doi.org/10.1/abc',
+    'cited_by_count': 42, 'referenced_works': ['https://openalex.org/W201', 'https://openalex.org/W202'],
+}
+nw = litf.norm_work(FAKE_W)
+check('norm_work 字段映射', nw['oa_id'] == 'W111' and nw['year'] == '1997'
+      and nw['doi'] == '10.1/abc' and len(nw['authors']) == 3
+      and nw['source'] == "T'oung Pao" and nw['n_refs_total'] == 2,
+      json.dumps(nw, ensure_ascii=False))
+check('norm_work 空输入', litf.norm_work(None) is None, '')
+
+# ── 6. OpenAlex 扩展 API(mock fetcher) ───────────────────
+fetcher_mod = sys.modules.get('jx_plugin_litgraph_fetcher')
+check('fetcher 已注册', fetcher_mod is not None, str(list(sys.modules.keys())))
+
+
+def _mk(title, year, cb):
+    return {'title': title, 'authors': ['A One'], 'source': 'Journal X',
+            'year': str(year), 'oa_id': 'W' + title.replace(' ', '')[:6],
+            'doi': '', 'cited_by_count': cb, 'n_refs_total': 0}
+
+
+_orig = (fetcher_mod.search_works, fetcher_mod.get_work,
+         fetcher_mod.get_works_batch, fetcher_mod.get_cited_by)
+fetcher_mod.search_works = lambda q, limit=5: ([litf.norm_work(FAKE_W)], 1)
+fetcher_mod.get_work = lambda oid: FAKE_W
+fetcher_mod.get_works_batch = lambda ids: [_mk('Ref Work A', 1990, 5), _mk('Ref Work B', 1988, 3)]
+fetcher_mod.get_cited_by = lambda oid, limit=50: (300, [_mk('Cited Work Y', 2010, 20),
+                                                        _mk('Cited Work Z', 2015, 10)])
+try:
+    r = c.post('/api/litgraph/oa_search', data=json.dumps({'query': '10.1/abc'}),
+               content_type='application/json')
+    dd = json.loads(r.get_data(as_text=True))
+    check('oa_search 候选', r.status_code == 200 and len(dd.get('candidates') or []) == 1
+          and dd['candidates'][0]['oa_id'] == 'W111', dd.get('error', ''))
+
+    r = c.post('/api/litgraph/oa_expand', data=json.dumps({'openalex_id': 'W111'}),
+               content_type='application/json')
+    dd = json.loads(r.get_data(as_text=True))
+    check('oa_expand 建图', r.status_code == 200 and dd.get('ok'), dd.get('error', ''))
+    gg = dd.get('graph') or {}
+    st = gg.get('stats') or {}
+    check('oa stats', st.get('n_ref') == 2 and st.get('n_citedby') == 2
+          and st.get('n_citedby_total') == 300 and st.get('n_ref_total') == 2,
+          json.dumps(st, ensure_ascii=False))
+    seed_nd = [n for n in (gg.get('nodes') or []) if n.get('kind') == 'seed']
+    check('oa 种子带元数据', len(seed_nd) == 1 and seed_nd[0].get('doi') == '10.1/abc'
+          and seed_nd[0].get('oa_id') == 'W111' and seed_nd[0].get('cited_by_count') == 42,
+          json.dumps(seed_nd, ensure_ascii=False))
+    check('oa 截断标注', 'OpenAlex' in (gg.get('source_note') or '')
+          and '300' in gg['source_note'], gg.get('source_note', ''))
+    oa_gid = gg.get('gid')
+    r = c.get('/api/litgraph/list')
+    items = (json.loads(r.get_data(as_text=True)) or {}).get('items') or []
+    check('oa 图谱已持久化', any(it.get('gid') == oa_gid for it in items), oa_gid or '')
+
+    fetcher_mod.search_works = lambda q, limit=5: (_ for _ in ()).throw(RuntimeError('boom'))
+    r = c.post('/api/litgraph/oa_search', data=json.dumps({'query': 'x'}),
+               content_type='application/json')
+    dd = json.loads(r.get_data(as_text=True))
+    check('oa 失败诚实报错', r.status_code == 502 and 'boom' in (dd.get('error') or ''),
+          str(r.status_code) + ' ' + (dd.get('error') or '')[:60])
+finally:
+    fetcher_mod.search_works, fetcher_mod.get_work, \
+        fetcher_mod.get_works_batch, fetcher_mod.get_cited_by = _orig
+
 r6 = c.get('/plugin/litgraph/page')
-check('页面伺服 HTML', r6.status_code == 200 and 'litGraph' in r6.get_data(as_text=True))
+check('页面伺服 HTML', r6.status_code == 200 and 'litGraph' in r6.get_data(as_text=True)
+      and 'litOaSearch' in r6.get_data(as_text=True))
 
 print('=== litgraph %d pass / %d fail ===' % (_pass, _fail))
 sys.exit(1 if _fail else 0)

@@ -165,9 +165,17 @@ def load_plugins(app):
                     bp_s = _fl.Blueprint("jx_pstatic_%s" % pid, __name__,
                                          static_folder=sdir, static_url_path="/plugin/%s/static" % pid)
                     app.register_blueprint(bp_s)
+
+                    def _v(fname, _sd=sdir):
+                        # R108c: assets URL 带 mtime 防缓存——插件 js 更新后浏览器自动失效旧缓存
+                        try:
+                            return int(os.path.getmtime(os.path.join(_sd, fname)))
+                        except OSError:
+                            return 0
+
                     _plugin_assets[pid] = {
-                        "css": ["/plugin/%s/static/%s" % (pid, c) for c in css],
-                        "js": ["/plugin/%s/static/%s" % (pid, j) for j in js],
+                        "css": ["/plugin/%s/static/%s?v=%d" % (pid, c, _v(c)) for c in css],
+                        "js": ["/plugin/%s/static/%s?v=%d" % (pid, j, _v(j)) for j in js],
                     }
                     if theme_css:
                         _plugin_themes[pid] = ["/plugin/%s/static/%s" % (pid, t) for t in theme_css]

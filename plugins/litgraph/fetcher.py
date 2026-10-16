@@ -95,7 +95,7 @@ def search_works(query, limit=5):
     d = _get("/works", {
         "filter": "title.search:" + q,
         "per-page": str(min(limit, 25)),
-        "select": "id,display_name,authorships,primary_location,publication_year,doi,cited_by_count",
+        "select": "id,display_name,authorships,primary_location,publication_year,doi,cited_by_count,type",
     })
     out = [norm_work(w) for w in (d.get("results") or [])]
     return [o for o in out if o], d.get("meta", {}).get("count") or 0
@@ -129,7 +129,7 @@ def get_cited_by(oa_id, limit=50):
         "filter": "cites:" + sid,
         "sort": "cited_by_count:desc",
         "per-page": str(min(limit, 200)),
-        "select": "id,display_name,authorships,primary_location,publication_year,doi,cited_by_count",
+        "select": "id,display_name,authorships,primary_location,publication_year,doi,cited_by_count,type",
     })
     meta = d.get("meta") or {}
     out = [norm_work(w) for w in (d.get("results") or [])]

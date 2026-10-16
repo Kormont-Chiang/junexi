@@ -135,8 +135,9 @@ def parse_any(text):
 
 
 # ── 图谱装配 ────────────────────────────────────────────────
-def build_graph(seed_title, refs=None, citedby=None):
-    """refs=种子引用(出边), citedby=被引(入边)。返回 (seed_id, nodes, edges)。"""
+def build_graph(seed_title, refs=None, citedby=None, related=None):
+    """refs=种子引用(出边), citedby=被引(入边), related=相关文献(虚线, 无引用关系)。
+    返回 (seed_id, nodes, edges)。"""
     seed_title = (seed_title or "").strip()
     seed_id = norm_title(seed_title)
     if not seed_id:
@@ -162,6 +163,16 @@ def build_graph(seed_title, refs=None, citedby=None):
             if nid in nodes:
                 nd = nodes[nid]
                 if nd['kind'] != 'seed' and nd['kind'] != kind:
+                    # related 与 ref/citedby 重合时, 以真实引用关系为准
+                    if kind == 'related':
+                        nd['n'] = nd.get('n', 0) + 1
+                        _fill(nd, it)
+                        continue
+                    if nd['kind'] == 'related':
+                        nd['kind'] = kind
+                        edges.append({'s': seed_id, 't': nid} if kind == 'ref'
+                                     else {'s': nid, 't': seed_id})
+                        continue
                     nd['kind'] = 'both'
                 nd['n'] = nd.get('n', 0) + 1
                 _fill(nd, it)
@@ -171,16 +182,23 @@ def build_graph(seed_title, refs=None, citedby=None):
                     'source': it.get('source', ''), 'year': it.get('year', ''),
                     'kind': kind, 'n': 1,
                 }
-            edges.append({'s': seed_id, 't': nid} if kind == 'ref'
-                         else {'s': nid, 't': seed_id})
+            if kind == 'related':
+                edges.append({'s': seed_id, 't': nid, 'dash': True})
+            else:
+                edges.append({'s': seed_id, 't': nid} if kind == 'ref'
+                             else {'s': nid, 't': seed_id})
 
     add(refs or [], 'ref')
     add(citedby or [], 'citedby')
+    add(related or [], 'related')
     seen = set()
     dedup = []
     for e in edges:
-        k = (e['s'], e['t'])
+        k = (e['s'], e['t'], e.get('dash', False))
         if k not in seen:
             seen.add(k)
             dedup.append(e)
+    # 实线优先: 同两端已有实线(引用关系)时, 虚线(相关)让位
+    solid = {(e['s'], e['t']) for e in dedup if not e.get('dash')}
+    dedup = [e for e in dedup if not (e.get('dash') and (e['s'], e['t']) in solid)]
     return seed_id, list(nodes.values()), dedup

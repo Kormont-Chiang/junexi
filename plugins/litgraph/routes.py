@@ -53,55 +53,81 @@ def _index_save(items):
 
 _PAGE_HTML = u"""<div class="lit-wrap">
 <style>
-.lit-wrap{display:flex;gap:12px;height:calc(100vh - 170px);min-height:420px}
-.lit-left{width:340px;flex:none;overflow-y:auto;padding-right:4px}
-.lit-left h3{margin:4px 0 8px}
-.lit-hint{font-size:12px;color:#888;line-height:1.6;margin-bottom:10px}
-.lit-left label{display:block;font-size:12px;color:#555;margin:8px 0 3px}
-.lit-left input,.lit-left textarea{width:100%;box-sizing:border-box;font-size:12px;
-  padding:5px 7px;border:1px solid #ccc;border-radius:5px;background:#fff;color:#222}
-.lit-left textarea{height:88px;resize:vertical;font-family:Consolas,monospace}
-.lit-build{margin-top:10px;width:100%;padding:7px 0;border:0;border-radius:6px;
-  background:#d4af37;color:#fff;font-size:14px;cursor:pointer}
-.lit-stats{font-size:12px;color:#555;margin-top:8px;line-height:1.7;white-space:pre-wrap}
+.lit-wrap{display:flex;gap:14px;height:calc(100vh - 170px);min-height:440px}
+.lit-left{width:350px;flex:none;overflow-y:auto;padding:2px 4px 12px 2px}
+.lit-card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.lit-card h3{margin:0 0 3px;font-size:15px;letter-spacing:.4px}
+.lit-card-sub{font-size:11.5px;color:var(--text-muted);line-height:1.6;margin-bottom:10px}
+.lit-card label.lit-lab{display:block;font-size:12px;color:var(--text-muted);margin:9px 0 4px}
+.lit-card input,.lit-card textarea{width:100%;box-sizing:border-box;font-size:12.5px;
+  padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text)}
+.lit-card textarea{height:64px;resize:vertical;font-family:Consolas,monospace;margin-bottom:2px}
+.lit-go{margin-top:11px;width:100%;padding:8px 0;border:0;border-radius:9px;
+  background:linear-gradient(135deg,#d4b47e,#c9a96e);color:#fff;font-size:13.5px;letter-spacing:2px;cursor:pointer;transition:filter .15s,transform .1s}
+.lit-go:hover{filter:brightness(1.06)}
+.lit-go:active{transform:scale(.99)}
+.lit-go:disabled{opacity:.55;cursor:default}
+.lit-go.lit-go-blue{background:linear-gradient(135deg,#4a7c9e,#3a6a8a)}
+.lit-row{display:flex;gap:7px}
+.lit-row input{flex:1}
+.lit-row button{flex:none;padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);cursor:pointer;font-size:12.5px;color:var(--text)}
+.lit-row button:hover{background:var(--bg-card)}
+.lit-hint{font-size:11.5px;color:var(--text-muted);line-height:1.65;margin-top:8px}
+.lit-cand{display:block;padding:7px 9px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;cursor:pointer;transition:border-color .15s,background .15s}
+.lit-cand:hover{border-color:#c9a96e;background:rgba(201,169,110,.07)}
+.lit-cand input{margin-right:6px}
+.lit-cand .t{font-size:12.5px;font-weight:600}
+.lit-cand .s{font-size:11px;color:var(--text-muted);margin-top:2px}
+.lit-cand .warn{color:#c07a6a;font-size:11px}
+.lit-stats{font-size:11.5px;color:var(--text-muted);margin-top:9px;line-height:1.7;white-space:pre-wrap}
 .lit-saved{margin-top:10px;font-size:12px}
 .lit-saved a{color:#2e5e8c;cursor:pointer;display:inline-block;margin:0 6px 4px 0}
-.lit-right{flex:1;display:flex;gap:10px;min-width:0}
-#litGraph{flex:1;min-width:0;border:1px solid #e3e0d8;border-radius:8px;background:#fdfcf8}
-#litPanel{width:280px;flex:none;border:1px solid #e3e0d8;border-radius:8px;padding:12px;
-  overflow-y:auto;font-size:13px;display:none}
+.lit-right{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.lit-legend{display:flex;gap:7px;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--text-muted)}
+.lit-legend .lg{display:inline-flex;align-items:center;gap:5px;padding:3px 11px;border-radius:999px;border:1px solid var(--border);background:var(--bg-card)}
+.lit-legend .lg i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.lit-graphbox{flex:1;display:flex;gap:10px;min-height:0}
+#litGraph{flex:1;min-width:0;border:1px solid var(--border);border-radius:12px;background:var(--bg-card)}
+#litPanel{width:280px;flex:none;border:1px solid var(--border);border-radius:12px;padding:13px 14px;
+  overflow-y:auto;font-size:13px;display:none;background:var(--bg-card)}
 #litPanel h4{margin:0 0 8px;font-size:14px;line-height:1.5}
-#litPanel .lit-meta{color:#555;font-size:12px;line-height:1.8;margin-bottom:10px;white-space:pre-wrap}
-#litPanel a.btn{display:block;text-align:center;margin-top:6px;padding:6px 0;border-radius:5px;
-  background:#f4f1e8;color:#333;text-decoration:none;font-size:12px;border:1px solid #d8d3c4}
-#litPanel a.btn:hover{background:#ece7d8}
+#litPanel .lit-meta{color:var(--text-muted);font-size:12px;line-height:1.8;margin-bottom:10px;white-space:pre-wrap}
+#litPanel a.btn{display:block;text-align:center;margin-top:6px;padding:6px 0;border-radius:7px;
+  background:var(--bg);color:var(--text);text-decoration:none;font-size:12px;border:1px solid var(--border)}
+#litPanel a.btn:hover{border-color:#c9a96e}
 </style>
 <div class="lit-left">
-  <h3>🕸 文献图谱 · 顺藤摸瓜</h3>
-  <div class="lit-hint">知网(机构登录)或国社科文献中心: 文献页/检索页勾文献 → 导出与分析 →
-  复制 <b>Refworks</b> 或 <b>GB/T 7714</b> 文本粘贴到下面。① = 种子引用了谁, ② = 谁引用了种子。</div>
-  <label>种子文献标题</label>
-  <input id="litSeed" placeholder="如: 北魏洛阳城的形制与布局">
-  <label>① 参考文献导出(种子 → 这些)</label>
-  <textarea id="litRefs" placeholder="[1] 作者. 标题[J]. 刊名, 年.  或 Refworks 块"></textarea>
-  <label>② 引证文献导出(这些 → 种子)</label>
-  <textarea id="litCitedby" placeholder="同上, 来自知网'引证文献'页"></textarea>
-  <button class="lit-build" id="litBuild">生成图谱</button>
-  <div style="border-top:1px dashed #d8d3c4;margin:14px 0 10px"></div>
-  <label>🔎 或从 OpenAlex 自动建图(标题 / DOI)</label>
-  <div style="display:flex;gap:6px;margin-top:2px">
-    <input id="litOaQ" placeholder="粘贴英文标题或 DOI, 如 10.1086/663830" style="flex:1">
-    <button id="litOaSearch" style="flex:none;padding:5px 12px;border:1px solid #ccc;border-radius:5px;background:#f4f1e8;cursor:pointer;font-size:12px">搜索</button>
+  <div class="lit-card">
+    <h3>🔎 OpenAlex 自动建图</h3>
+    <div class="lit-card-sub">粘英文标题或 DOI，自动拉参考文献 + 被引 + 相关文献。英文文献首选此路。</div>
+    <div class="lit-row">
+      <input id="litOaQ" placeholder="标题 或 DOI, 如 10.1086/663830">
+      <button id="litOaSearch">搜索</button>
+    </div>
+    <div id="litOaCands"></div>
+    <button class="lit-go lit-go-blue" id="litOaBuild" style="display:none">用选中项生成图谱</button>
+    <div class="lit-stats" id="litOaStats"></div>
   </div>
-  <div class="lit-hint" style="margin-top:5px">OpenAlex 覆盖以英文文献为主; 中文文献的引用关系请仍用上方手动导出。网络慢时拉取可能 1-3 分钟。</div>
-  <div id="litOaCands"></div>
-  <button class="lit-build" id="litOaBuild" style="display:none;background:#2e5e8c">用选中项生成图谱</button>
-  <div class="lit-stats" id="litOaStats"></div>
+  <div class="lit-card">
+    <h3>📋 知网 / 国社科导出</h3>
+    <div class="lit-card-sub">中文文献引用关系只有中文库有。检索页勾文献 → 导出与分析 → 复制 <b>Refworks</b> 或 <b>GB/T 7714</b> 粘贴。① = 种子引用了谁，② = 谁引用了种子。</div>
+    <label class="lit-lab">种子文献标题</label>
+    <input id="litSeed" placeholder="如: 北魏洛阳城的形制与布局">
+    <label class="lit-lab">① 参考文献（种子 → 这些）</label>
+    <textarea id="litRefs" placeholder="[1] 作者. 标题[J]. 刊名, 年.  或 Refworks 块"></textarea>
+    <label class="lit-lab">② 引证文献（这些 → 种子）</label>
+    <textarea id="litCitedby" placeholder="同上, 来自知网'引证文献'页"></textarea>
+    <button class="lit-go" id="litBuild">生成图谱</button>
+  </div>
+  <div class="lit-stats" id="litStats"></div>
   <div class="lit-saved" id="litSaved"></div>
 </div>
 <div class="lit-right">
-  <div id="litGraph"></div>
-  <div id="litPanel"></div>
+  <div class="lit-legend" id="litLegend"></div>
+  <div class="lit-graphbox">
+    <div id="litGraph"></div>
+    <div id="litPanel"></div>
+  </div>
 </div>
 </div>"""
 
@@ -167,6 +193,7 @@ def litgraph_oa_expand():
         return jsonify({"error": "缺种子"}), 400
     n_refs = max(1, min(int(d.get("n_refs") or 100), 200))
     n_citedby = max(1, min(int(d.get("n_citedby") or 50), 200))
+    n_related = max(0, min(int(d.get("n_related") or 20), 50))
     try:
         if oa_id:
             w = _fetcher.get_work(oa_id)
@@ -185,9 +212,10 @@ def litgraph_oa_expand():
         refs_all = _fetcher.get_works_batch(refs_ids)
         refs_items = refs_all[:n_refs]
         cb_total, cb_items = _fetcher.get_cited_by(oa_id or seed.get("oa_id"), limit=n_citedby)
+        rel_items = _fetcher.get_related(oa_id or seed.get("oa_id"), limit=n_related) if n_related else []
     except Exception as e:
         return jsonify({"error": u"OpenAlex 扩展失败: %s" % e}), 502
-    seed_id, nodes, edges = _parser.build_graph(seed_title, refs_items, cb_items)
+    seed_id, nodes, edges = _parser.build_graph(seed_title, refs_items, cb_items, rel_items)
     if not seed_id:
         return jsonify({"error": "种子标题无效"}), 400
     for nd in nodes:
@@ -205,6 +233,7 @@ def litgraph_oa_expand():
         "nodes": nodes, "edges": edges,
         "stats": {
             "n_ref": len(refs_items), "n_citedby": len(cb_items),
+            "n_related": len(rel_items),
             "n_nodes": len(nodes), "n_edges": len(edges),
             "n_merged": sum(1 for nd in nodes if nd.get("n", 0) > 1),
             "n_ref_total": len(refs_ids),
@@ -212,8 +241,8 @@ def litgraph_oa_expand():
             "n_refs_truncated": max(0, len(refs_ids) - len(refs_items)),
         },
         "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "source_note": u"OpenAlex 自动扩展; 参考文献前 %d/%d 条, 被引按引用数取 top %d(全库命中 %d); 覆盖以英文文献为主" % (
-            len(refs_items), len(refs_ids), len(cb_items), cb_total),
+        "source_note": u"OpenAlex 自动扩展; 参考文献前 %d/%d 条, 被引按引用数取 top %d(全库命中 %d), 相关 %d 条(虚线, 非引用关系); 覆盖以英文文献为主" % (
+            len(refs_items), len(refs_ids), len(cb_items), cb_total, len(rel_items)),
     }
     gpath = os.path.join(_data_dir(), gid + ".json")
     json.dump(graph, open(gpath, "w", encoding="utf-8"), ensure_ascii=False)

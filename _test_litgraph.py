@@ -82,6 +82,20 @@ check('ref 方向 seed→t', all(e['s'] == seed_id for e in edges
       if any(n['id'] == e['t'] and n['kind'] == 'ref' for n in nodes)), json.dumps(edges, ensure_ascii=False))
 check('citedby 方向 s→seed', any(e['t'] == seed_id and e['s'] != seed_id for e in edges),
       json.dumps(edges, ensure_ascii=False))
+
+# R110: related(相关文献, 虚线, 非引用关系)
+REL = [{'title': '相关研究甲', 'authors': ['R A'], 'source': 'X 学刊', 'year': '2005'},
+       {'title': '北魏洛阳城和北邙陵墓——鲜卑遗迹辑录之三', 'authors': [], 'source': '', 'year': ''}]
+sid2, nodes2, edges2 = litp.build_graph('测试种子', refs=litp.parse_gbt(GBT), related=REL)
+rel_nd = [n for n in nodes2 if n.get('kind') == 'related']
+check('related 节点成虚线边', len(rel_nd) == 1 and rel_nd[0]['title'] == '相关研究甲'
+      and any(e.get('dash') and e['t'] == rel_nd[0]['id'] for e in edges2),
+      json.dumps({'rel': rel_nd, 'edges': edges2}, ensure_ascii=False))
+dup = [n for n in nodes2 if '北邙陵墓' in n['title']]
+check('related 与 ref 重合→实线优先', len(dup) == 1 and dup[0]['kind'] == 'ref'
+      and not any(e.get('dash') and (e['s'], e['t']) == (sid2, dup[0]['id']) for e in edges2)
+      and any(not e.get('dash') and e['t'] == dup[0]['id'] for e in edges2),
+      json.dumps(dup, ensure_ascii=False))
 norm = litp.norm_title('洛阳伽蓝记')
 check('简繁归一(洛阳=洛陽)', norm == litp.norm_title('洛陽伽藍記') and norm == litp.norm_title('洛阳伽蓝记'),
       norm)
@@ -154,12 +168,13 @@ def _mk(title, year, cb):
 
 
 _orig = (fetcher_mod.search_works, fetcher_mod.get_work,
-         fetcher_mod.get_works_batch, fetcher_mod.get_cited_by)
+         fetcher_mod.get_works_batch, fetcher_mod.get_cited_by, fetcher_mod.get_related)
 fetcher_mod.search_works = lambda q, limit=5: ([litf.norm_work(FAKE_W)], 1)
 fetcher_mod.get_work = lambda oid: FAKE_W
 fetcher_mod.get_works_batch = lambda ids: [_mk('Ref Work A', 1990, 5), _mk('Ref Work B', 1988, 3)]
 fetcher_mod.get_cited_by = lambda oid, limit=50: (300, [_mk('Cited Work Y', 2010, 20),
                                                         _mk('Cited Work Z', 2015, 10)])
+fetcher_mod.get_related = lambda oid, limit=20: [_mk('Related Work R', 2001, 7)]
 try:
     r = c.post('/api/litgraph/oa_search', data=json.dumps({'query': '10.1/abc'}),
                content_type='application/json')
@@ -174,8 +189,13 @@ try:
     gg = dd.get('graph') or {}
     st = gg.get('stats') or {}
     check('oa stats', st.get('n_ref') == 2 and st.get('n_citedby') == 2
-          and st.get('n_citedby_total') == 300 and st.get('n_ref_total') == 2,
+          and st.get('n_citedby_total') == 300 and st.get('n_ref_total') == 2
+          and st.get('n_related') == 1,
           json.dumps(st, ensure_ascii=False))
+    rel_nd = [n for n in (gg.get('nodes') or []) if n.get('kind') == 'related']
+    check('oa related 节点+虚线边', len(rel_nd) == 1
+          and any(e.get('dash') for e in (gg.get('edges') or [])),
+          json.dumps(rel_nd, ensure_ascii=False))
     seed_nd = [n for n in (gg.get('nodes') or []) if n.get('kind') == 'seed']
     check('oa 种子带元数据', len(seed_nd) == 1 and seed_nd[0].get('doi') == '10.1/abc'
           and seed_nd[0].get('oa_id') == 'W111' and seed_nd[0].get('cited_by_count') == 42,
@@ -195,7 +215,8 @@ try:
           str(r.status_code) + ' ' + (dd.get('error') or '')[:60])
 finally:
     fetcher_mod.search_works, fetcher_mod.get_work, \
-        fetcher_mod.get_works_batch, fetcher_mod.get_cited_by = _orig
+        fetcher_mod.get_works_batch, fetcher_mod.get_cited_by, \
+        fetcher_mod.get_related = _orig
 
 r6 = c.get('/plugin/litgraph/page')
 check('页面伺服 HTML', r6.status_code == 200 and 'litGraph' in r6.get_data(as_text=True)

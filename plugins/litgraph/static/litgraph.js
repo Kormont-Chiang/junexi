@@ -3,8 +3,8 @@
   let _chart = null;
   let _graph = null;
 
-  const KIND_COLOR = { seed: '#d4af37', ref: '#c0392b', citedby: '#2e5e8c', both: '#7d5ba6' };
-  const KIND_LABEL = { seed: '种子', ref: '参考文献', citedby: '引证文献', both: '双向(引证+参考)' };
+  const KIND_COLOR = { seed: '#d4af37', ref: '#c0392b', citedby: '#2e5e8c', both: '#7d5ba6', related: '#4a7c59' };
+  const KIND_LABEL = { seed: '种子', ref: '参考文献', citedby: '引证文献', both: '双向(引证+参考)', related: '相关文献' };
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
@@ -36,7 +36,8 @@
     }));
     const links = graph.edges.map(e => ({
       source: e.s, target: e.t,
-      lineStyle: { color: '#b8b2a4', width: 1.2, curveness: 0.08 },
+      lineStyle: { color: e.dash ? '#9ab3a5' : '#b8b2a4', width: e.dash ? 1 : 1.2,
+        curveness: 0.08, type: e.dash ? 'dashed' : 'solid' },
     }));
     _chart.setOption({
       animationDuration: 400,
@@ -61,13 +62,23 @@
     _chart.on('click', p => {
       if (p.dataType === 'node') showPanel(p.data._nd, deg);
     });
-    // 出度/入度图例计数
+    // 图例胶囊带计数 + 出度/入度统计
     const st = graph.stats || {};
+    const cnt = {};
+    graph.nodes.forEach(nd => { cnt[nd.kind] = (cnt[nd.kind] || 0) + 1; });
+    const lg = document.getElementById('litLegend');
+    if (lg) {
+      lg.innerHTML = ['seed', 'ref', 'citedby', 'both', 'related'].filter(k => cnt[k]).map(k =>
+        '<span class="lg"><i style="background:' + KIND_COLOR[k] + '"></i>' + KIND_LABEL[k] +
+        ' <b style="color:var(--text)">' + cnt[k] + '</b></span>').join('') +
+        (st.n_citedby_total ? '<span style="margin-left:auto">全库被引命中 <b style="color:var(--text)">' +
+          st.n_citedby_total + '</b> 篇</span>' : '');
+    }
     const stat = document.getElementById('litStats');
     if (stat) {
       stat.textContent = '种子: ' + graph.seed_title + '\n参考文献 ' + st.n_ref +
-        ' 篇 · 引证 ' + st.n_citedby + ' 篇 · 节点 ' + st.n_nodes +
-        ' · 合并同名 ' + (st.n_merged || 0) + ' 条\n保存于 ' + (graph.ts || '');
+        ' 篇 · 引证 ' + st.n_citedby + ' 篇' + (st.n_related ? ' · 相关 ' + st.n_related + ' 条' : '') +
+        ' · 节点 ' + st.n_nodes + ' · 合并同名 ' + (st.n_merged || 0) + ' 条\n保存于 ' + (graph.ts || '');
     }
   }
 
@@ -161,11 +172,10 @@
           c.type ? '类型:' + c.type : '', c.n_refs_total ? '参考文献' + c.n_refs_total + '条' : ''
         ].filter(Boolean).join(' · ');
         const warn = c.type === 'review' || c.type === 'book-review'
-          ? '<span style="color:#c0392b;font-size:11px"> ⚠书评(无参考文献列表,建议选书/文章本身)</span>' : '';
-        return '<label style="display:block;padding:5px 6px;border:1px solid #e3e0d8;border-radius:5px;margin-bottom:5px;cursor:pointer">' +
-          '<input type="radio" name="litOaCand" value="' + i + '" style="margin-right:5px">' +
-          '<b style="font-size:12px">' + esc(c.title) + '</b>' + warn + '<br>' +
-          '<span style="font-size:11px;color:#888">' + esc(sub) + '</span></label>';
+          ? '<span class="warn"> ⚠书评(无参考文献列表,建议选书/文章本身)</span>' : '';
+        return '<label class="lit-cand"><input type="radio" name="litOaCand" value="' + i + '">' +
+          '<span class="t">' + esc(c.title) + '</span>' + warn + '<br>' +
+          '<span class="s">' + esc(sub) + '</span></label>';
       }).join('');
       box.querySelectorAll('input[name=litOaCand]').forEach(r => r.addEventListener('change', () => {
         _oaSelected = d.candidates[parseInt(r.value, 10)];

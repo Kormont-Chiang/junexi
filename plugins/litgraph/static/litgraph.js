@@ -157,10 +157,14 @@
       }
       box.innerHTML = d.candidates.map((c, i) => {
         const au = (c.authors || []).slice(0, 2).join(', ');
-        const sub = [au, c.year, c.source, '被引' + c.cited_by_count].filter(Boolean).join(' · ');
+        const sub = [au, c.year, c.source, c.cited_by_count ? '被引' + c.cited_by_count : '',
+          c.type ? '类型:' + c.type : '', c.n_refs_total ? '参考文献' + c.n_refs_total + '条' : ''
+        ].filter(Boolean).join(' · ');
+        const warn = c.type === 'review' || c.type === 'book-review'
+          ? '<span style="color:#c0392b;font-size:11px"> ⚠书评(无参考文献列表,建议选书/文章本身)</span>' : '';
         return '<label style="display:block;padding:5px 6px;border:1px solid #e3e0d8;border-radius:5px;margin-bottom:5px;cursor:pointer">' +
           '<input type="radio" name="litOaCand" value="' + i + '" style="margin-right:5px">' +
-          '<b style="font-size:12px">' + esc(c.title) + '</b><br>' +
+          '<b style="font-size:12px">' + esc(c.title) + '</b>' + warn + '<br>' +
           '<span style="font-size:11px;color:#888">' + esc(sub) + '</span></label>';
       }).join('');
       box.querySelectorAll('input[name=litOaCand]').forEach(r => r.addEventListener('change', () => {

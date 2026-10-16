@@ -9,5 +9,10 @@
   "assets": {
     "js": ["litgraph.js"]
   },
+  "nav": {
+    "tab": "litgraph",
+    "label": "文献图谱",
+    "icon": "🕸"
+  },
   "icon": "🕸"
 }

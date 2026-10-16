@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """OpenAlex 客户端: 种子检索 + 参考文献/被引/相关 自动扩展。
 只用标准库(urllib), frozen 零新增依赖; 慢网络友好(timeout 60s x2 重试)。
 API 文档: https://docs.openalex.org
@@ -6,6 +6,7 @@ API 文档: https://docs.openalex.org
 import json
 import re
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -37,6 +38,13 @@ def _get(path, params=None):
             req = urllib.request.Request(url, headers={"User-Agent": UA})
             with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
                 return json.loads(r.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            # 4xx 确定性错误(除429限流)不重试; 5xx/429 走退避
+            if e.code != 429 and 400 <= e.code < 500:
+                raise
+            last = e
+            if attempt < RETRIES:
+                time.sleep(2 * (attempt + 1))
         except Exception as e:
             last = e
             if attempt < RETRIES:
@@ -67,6 +75,7 @@ def norm_work(w):
         "doi": doi,
         "cited_by_count": w.get("cited_by_count") or 0,
         "n_refs_total": len(w.get("referenced_works") or []),
+        "type": w.get("type") or "",
     }
 
 
@@ -79,8 +88,10 @@ def search_works(query, limit=5):
         try:
             w = _get("/works/doi:" + q)
             return [norm_work(w)], 1
-        except Exception:
-            return [], 0
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return [], 0  # DOI 不在库 ≠ 网络故障
+            raise
     d = _get("/works", {
         "filter": "title.search:" + q,
         "per-page": str(min(limit, 25)),
@@ -105,7 +116,7 @@ def get_works_batch(oa_ids):
         d = _get("/works", {
             "filter": "openalex_id:" + "|".join(chunk),
             "per-page": str(len(chunk)),
-            "select": "id,display_name,authorships,primary_location,publication_year,doi,cited_by_count",
+            "select": "id,display_name,authorships,primary_location,publication_year,doi,cited_by_count,type",
         })
         out += [norm_work(w) for w in (d.get("results") or [])]
     return [o for o in out if o and o.get("title")]

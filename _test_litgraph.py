@@ -132,11 +132,13 @@ FAKE_W = {
     'primary_location': {'source': {'display_name': "T'oung Pao"}},
     'publication_year': 1997, 'doi': 'https://doi.org/10.1/abc',
     'cited_by_count': 42, 'referenced_works': ['https://openalex.org/W201', 'https://openalex.org/W202'],
+    'type': 'article',
 }
 nw = litf.norm_work(FAKE_W)
 check('norm_work 字段映射', nw['oa_id'] == 'W111' and nw['year'] == '1997'
       and nw['doi'] == '10.1/abc' and len(nw['authors']) == 3
-      and nw['source'] == "T'oung Pao" and nw['n_refs_total'] == 2,
+      and nw['source'] == "T'oung Pao" and nw['n_refs_total'] == 2
+      and nw['type'] == 'article',
       json.dumps(nw, ensure_ascii=False))
 check('norm_work 空输入', litf.norm_work(None) is None, '')
 

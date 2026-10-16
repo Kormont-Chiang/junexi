@@ -198,6 +198,7 @@ def litgraph_oa_expand():
             nd["oa_id"] = seed.get("oa_id") or ""
             nd["doi"] = seed.get("doi") or ""
             nd["cited_by_count"] = seed.get("cited_by_count") or 0
+            nd["type"] = seed.get("type") or ""
     gid = "%d" % int(time.time())
     graph = {
         "gid": gid, "seed_id": seed_id, "seed_title": seed_title,

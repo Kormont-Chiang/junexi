@@ -135,33 +135,54 @@ async function loadPluginManager() {
             return;
         }
         const running = ps.filter(p => p.loaded).length;
-        const html = ps.map(p => {
+        const stopped = ps.length - running;
+        const stats = document.getElementById('pmStats');
+        if (stats) {
+            stats.innerHTML =
+                '<span class="pm-stat"><b>' + ps.length + '</b> 已安装</span>' +
+                '<span class="pm-stat"><i class="pm-dot on"></i><b>' + running + '</b> 运行中</span>' +
+                (stopped ? '<span class="pm-stat"><i class="pm-dot"></i><b>' + stopped + '</b> 停用</span>' : '') +
+                '<span class="pm-stat pm-stat-link"><a href="javascript:void(0)" onclick="window.open(\'https://github.com/Kormont-Chiang/junexi/blob/main/docs/%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%E6%8C%87%E5%8D%97.md\',\'_blank\')">📖 开发指南 ↗</a></span>';
+        }
+        list.innerHTML = ps.map(p => {
             const on = !!p.loaded;
             const enabled = !!p.enabled;
-            const dot = on ? '<span class="pm-dot on"></span>运行中' : (enabled ? '<span class="pm-dot warn"></span>待重启' : '<span class="pm-dot"></span>已停用');
+            const dot = on ? '<i class="pm-dot on"></i>运行中' : (enabled ? '<i class="pm-dot warn"></i>待重启' : '<i class="pm-dot"></i>已停用');
             const icon = (p.icon || '🧩');
-            return '<div class="pm-row' + (on ? '' : ' off') + '">' +
-                '<div class="pm-icon">' + icon + '</div>' +
-                '<div class="pm-main">' +
-                    '<div class="pm-title"><span class="pm-name">' + escapeHtml(p.name) + '</span>' +
-                    '<span class="pm-ver">' + escapeHtml(String(p.version || '')) + '</span>' +
-                    '<span class="pm-status">' + dot + '</span></div>' +
-                    '<div class="pm-desc">' + escapeHtml(p.desc || '(无描述)') + '</div>' +
-                    (p.skip_reason ? '<div class="pm-skip">' + escapeHtml(p.skip_reason) + '</div>' : '') +
+            return '<div class="pm-card' + (on ? '' : ' off') + '">' +
+                '<div class="pm-card-head"><span class="pm-icon">' + icon + '</span>' +
+                '<div class="pm-card-titles">' +
+                    '<div class="pm-name">' + escapeHtml(p.name) +
+                    '<span class="pm-ver">' + escapeHtml(String(p.version || '')) + '</span></div>' +
+                    '<div class="pm-status">' + dot + '</div>' +
                 '</div>' +
-                '<label class="pm-switch"><input type="checkbox" ' + (enabled ? 'checked' : '') + ' onchange="togglePlugin(\'' + p.id + '\')"><span></span></label>' +
-                (p.source === 'user' ? ('<button class="btn btn-sm pm-uninstall" onclick="uninstallPlugin(\'' + p.id + '\')" title="卸载">🗑</button>') : '') +
+                '<label class="pm-switch"><input type="checkbox" ' + (enabled ? 'checked' : '') + ' onchange="togglePlugin(\'' + p.id + '\')"><span></span></label></div>' +
+                '<div class="pm-desc">' + escapeHtml(p.desc || '(无描述)') + '</div>' +
+                (p.skip_reason ? '<div class="pm-skip">' + escapeHtml(p.skip_reason) + '</div>' : '') +
+                (p.source === 'user' ? ('<button class="pm-uninstall" onclick="uninstallPlugin(\'' + p.id + '\')" title="卸载">🗑 卸载</button>') : '') +
             '</div>';
         }).join('');
-        list.innerHTML = '<div class="pm-summary">已安装 ' + ps.length + ' 个插件 · ' + running + ' 个运行中</div>' + html;
     } catch (e) {
         list.innerHTML = '<div class="pm-empty">插件清单加载失败</div>';
     }
 }
 window.loadPluginManager = loadPluginManager;
 
-async function installPluginFromUrl() {
-    const url = (document.getElementById('pmInstallUrl')?.value || '').trim();
+async function installPluginSmart() {
+    const src = (document.getElementById('pmInstallSrc')?.value || '').trim();
+    if (!src) { setPmMsg('先填 URL 或本机路径'); return; }
+    if (/^https?:\/\//i.test(src)) return installPluginFromUrl(src);
+    return installPluginLocal(src);
+}
+window.installPluginSmart = installPluginSmart;
+
+function setPmMsg(t) {
+    const msg = document.getElementById('pmInstallMsg');
+    if (msg) msg.textContent = t;
+}
+
+async function installPluginFromUrl(urlOverride) {
+    const url = urlOverride || (document.getElementById('pmInstallUrl')?.value || '').trim() || (document.getElementById('pmInstallSrc')?.value || '').trim();
     const msg = document.getElementById('pmInstallMsg');
     if (!url) { if (msg) msg.textContent = '先填 URL'; return; }
     if (msg) msg.textContent = '下载并校验中……';
@@ -178,8 +199,8 @@ async function installPluginFromUrl() {
 }
 window.installPluginFromUrl = installPluginFromUrl;
 
-async function installPluginLocal() {
-    const lp = (document.getElementById('pmInstallLocal')?.value || '').trim();
+async function installPluginLocal(pathOverride) {
+    const lp = pathOverride || (document.getElementById('pmInstallLocal')?.value || '').trim() || (document.getElementById('pmInstallSrc')?.value || '').trim();
     const msg = document.getElementById('pmInstallMsg');
     if (!lp) { if (msg) msg.textContent = '先填本机路径'; return; }
     if (msg) msg.textContent = '校验安装中……';

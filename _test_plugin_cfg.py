@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """R115: 插件参数配置 API 测试（Obsidian 式声明设置）"""
 import json, os, sys, tempfile, shutil
+os.environ.setdefault('JX_LITGRAPH_DIR', tempfile.mkdtemp(prefix='jx_cfgtest_lit_'))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plugin_loader as pl
 

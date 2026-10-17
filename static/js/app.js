@@ -5507,9 +5507,10 @@ function searchMapPlace() {
 
     // 在都城中搜索
     const cityResults = [];
+    const mapQf = foldStr(query);
     if (typeof CHGIS_CAPITALS !== 'undefined') {
         Object.values(CHGIS_CAPITALS).forEach(cap => {
-            if ((cap.name && cap.name.includes(query)) || (cap.modern && cap.modern.includes(query))) {
+            if ((cap.name && foldStr(cap.name).includes(mapQf)) || (cap.modern && foldStr(cap.modern).includes(mapQf))) {
                 cityResults.push({ name: cap.name, modern: cap.modern, lat: cap.lat, lng: cap.lng, dynasty: cap.dynasty, type: '都城' });
             }
         });
@@ -5519,7 +5520,7 @@ function searchMapPlace() {
     const placeResults = [];
     if (PLACES_DB) {
         PLACES_DB.forEach(place => {
-            if ((place.ancient && place.ancient.includes(query)) || (place.modern && place.modern.includes(query))) {
+            if ((place.ancient && foldStr(place.ancient).includes(mapQf)) || (place.modern && foldStr(place.modern).includes(mapQf))) {
                 placeResults.push({ name: place.ancient, modern: place.modern, lat: place.lat, lng: place.lng, dynasty: place.dynasty, type: place.type, notes: place.notes });
             }
         });
@@ -5763,7 +5764,8 @@ function searchEra() {
     if (!query) return;
 
     const eras = ERA_NAMES_DB || [];
-    const results = eras.filter(e => e.era && e.era.includes(query));
+    const qf = foldStr(query);
+    const results = eras.filter(e => e.era && foldStr(e.era).includes(qf));
 
     if (results.length === 0) {
         container.innerHTML = emptyStateHTML({icon:'📅', text:'未找到相关年号', hint:'试试年号关键词或朝代筛选'});

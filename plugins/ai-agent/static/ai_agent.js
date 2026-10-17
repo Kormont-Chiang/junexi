@@ -7,23 +7,43 @@
 (function () {
     'use strict';
 
-    // ── 开关注入 AI 助手左栏(余额面板所在 section 末尾) ──
+    // ── 开关注入 AI 助手左栏(余额面板所在 section 末尾), R112 卡片化 ──
     function injectToggle() {
         if (document.getElementById('aiAgentMode')) return;
         const anchor = document.getElementById('aiBalancePanel');
         if (!anchor || !anchor.parentElement) return;
-        const label = document.createElement('label');
-        label.title = '开启后, AI 将直接操作 JuneXi: 检索/打开详情/上图(试验)';
-        label.style.cssText = 'display:flex;align-items:center;gap:5px;margin-top:8px;font-size:11px;cursor:pointer;color:var(--text)';
-        label.innerHTML = '<input type="checkbox" id="aiAgentMode" style="cursor:pointer">' +
-            '<span>🕹 自动操作 JuneXi <span style="color:var(--muted)">(试验)</span></span>';
-        anchor.parentElement.appendChild(label);
-        const cb = label.querySelector('#aiAgentMode');
+        const card = document.createElement('div');
+        card.style.cssText = 'margin-top:14px;border:1px solid var(--border);border-radius:12px;' +
+            'padding:12px 14px;background:var(--bg-card);transition:box-shadow .2s,border-color .2s';
+        card.innerHTML =
+            '<div style="display:flex;align-items:center;gap:9px">' +
+            '<span style="font-size:17px">🕹</span>' +
+            '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:13px;font-weight:600;letter-spacing:.5px">Agent 模式 <span style="font-size:10px;color:var(--text-muted);font-weight:400">试验</span></div>' +
+            '<div id="aiAgentState" style="font-size:11px;color:var(--text-muted);margin-top:1px">已关闭 · AI 只对话</div>' +
+            '</div>' +
+            '<label class="pm-switch" title="开启后 AI 直接操作 JuneXi" style="margin:0"><input type="checkbox" id="aiAgentMode"><span></span></label>' +
+            '</div>' +
+            '<div style="font-size:11.5px;color:var(--text-muted);line-height:1.65;margin-top:9px">' +
+            '开启后直接说人话，AI 自己操作 JuneXi：查 CBDB 人物、看详情、上地图、切页签。多步执行，逐步可见。' +
+            '</div>';
+        anchor.parentElement.appendChild(card);
+        const cb = card.querySelector('#aiAgentMode');
+        const st = card.querySelector('#aiAgentState');
+        function refresh() {
+            const on = cb.checked;
+            st.textContent = on ? '● 已开启 · 自动操作中' : '已关闭 · 仅对话';
+            st.style.color = on ? '#c9a96e' : 'var(--text-muted)';
+            card.style.borderColor = on ? 'rgba(201,169,110,.55)' : 'var(--border)';
+            card.style.boxShadow = on ? '0 0 0 1px rgba(201,169,110,.25), 0 4px 14px rgba(201,169,110,.12)' : 'none';
+        }
         cb.addEventListener('change', function () {
             try { localStorage.setItem('jx_ai_agent', cb.checked ? '1' : '0'); } catch (e) {}
-            if (cb.checked && typeof showToast === 'function') showToast('自动操作已开启: AI 回答后会直接操作 JuneXi(试验)', 'info', 2500);
+            refresh();
+            if (cb.checked && typeof showToast === 'function') showToast('Agent 模式已开启: 直接说需求, AI 自动操作 JuneXi(试验)', 'info', 3000);
         });
         try { cb.checked = localStorage.getItem('jx_ai_agent') === '1'; } catch (e) {}
+        refresh();
     }
 
     // AI 页签可能后开: DOM 就绪即注, 若面板还没渲染则轮询几次

@@ -80,6 +80,14 @@ python app.py                     # 默认 127.0.0.1:5000
 - 安全软件报警属误报，PyInstaller 打包的开源程序常被误标
 - 可将 JuneXi.exe 上传 [VirusTotal](https://www.virustotal.com) 自查
 
+## 插件路由（plugins/）
+
+插件经 `plugin_loader.py` 挂载，路由前缀 `/api/` 或 `/plugin/`：
+
+- **litgraph 文献图谱**：`/api/litgraph/import`（知网/国社科文本建图）· `/api/litgraph/oa_search`（OpenAlex 标题/DOI 候选）· `/api/litgraph/oa_expand`（种子建图：参考+被引+相关，related 为虚线第四色）· `/api/litgraph/oa_expand_node`（R111 节点级联扩展：任意带 oa_id 的节点再扩一层并入当前图，kind=ext）· `/api/litgraph/list` / `graph/<gid>` / `delete/<gid>`
+- **ai-agent**：`/api/ai/agent`（Agent 模式多步执行：LLM 决策动作→服务端校验执行→逐步返回）；前端开关在 🤖 AI 助手页左栏「🕹 Agent 模式」卡片
+- **feed / zotero / cbdb**：见各插件 manifest.json 与源码
+
 ## 测试
 
 ```bash

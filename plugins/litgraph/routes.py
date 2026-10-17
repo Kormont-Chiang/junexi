@@ -87,7 +87,10 @@ _PAGE_HTML = u"""<div class="lit-wrap">
 .lit-legend .lg{display:inline-flex;align-items:center;gap:5px;padding:3px 11px;border-radius:999px;border:1px solid var(--border);background:var(--bg-card)}
 .lit-legend .lg i{width:8px;height:8px;border-radius:50%;display:inline-block}
 .lit-graphbox{flex:1;display:flex;gap:10px;min-height:0}
-#litGraph{flex:1;min-width:0;border:1px solid var(--border);border-radius:12px;background:var(--bg-card)}
+#litGraph{flex:1;min-width:0;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);position:relative}
+#litGraph.lit-empty::after{content:'← 左侧选种子建图, 文献网络将在这里展开';position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px;
+  letter-spacing:1.5px;pointer-events:none}
 #litPanel{width:280px;flex:none;border:1px solid var(--border);border-radius:12px;padding:13px 14px;
   overflow-y:auto;font-size:13px;display:none;background:var(--bg-card)}
 #litPanel h4{margin:0 0 8px;font-size:14px;line-height:1.5}

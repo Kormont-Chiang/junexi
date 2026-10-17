@@ -27,11 +27,14 @@
     _chart = echarts.init(el, null, { renderer: 'canvas' });
     const deg = {};
     graph.edges.forEach(e => { deg[e.s] = (deg[e.s] || 0) + 1; deg[e.t] = (deg[e.t] || 0) + 1; });
+    const cssText = (getComputedStyle(document.body).getPropertyValue('--text') || '#888').trim() || '#888';
     const nodes = graph.nodes.map(nd => ({
       id: nd.id, name: nd.title,
       symbolSize: nd.kind === 'seed' ? 46 : Math.min(40, 14 + 5 * (deg[nd.id] || 1) + (nd.n > 1 ? 6 : 0)),
       itemStyle: { color: KIND_COLOR[nd.kind] || '#999' },
-      label: { show: nd.kind === 'seed', fontSize: 12, formatter: () => nd.title.length > 18 ? nd.title.slice(0, 18) + '…' : nd.title },
+      label: { show: nd.kind === 'seed' || (deg[nd.id] || 0) >= 4,
+        fontSize: 11, color: cssText,
+        formatter: () => nd.title.length > 16 ? nd.title.slice(0, 16) + '…' : nd.title },
       _nd: nd,
     }));
     const links = graph.edges.map(e => ({
@@ -39,6 +42,13 @@
       lineStyle: { color: e.dash ? '#9ab3a5' : '#b8b2a4', width: e.dash ? 1 : 1.2,
         curveness: 0.08, type: e.dash ? 'dashed' : 'solid' },
     }));
+    // R113: 力导向参数随规模自适应(沿用 CBDB 关系图经验)
+    const N = graph.nodes.length;
+    const repulsion = N > 120 ? 640 : N > 60 ? 480 : 320;
+    const edgeLen = N > 120 ? [70, 160] : [60, 130];
+    const friction = N > 60 ? 0.18 : 0.25;
+    const gEl = document.getElementById('litGraph');
+    if (gEl) gEl.classList.toggle('lit-empty', !N);
     _chart.setOption({
       animationDuration: 400,
       tooltip: {
@@ -48,19 +58,63 @@
           return '<b>' + esc(nd.title) + '</b><br/>' +
             KIND_LABEL[nd.kind] + (nd.year ? ' · ' + esc(nd.year) : '') + '<br/>' +
             esc((nd.authors || []).slice(0, 3).join(', ')) + '<br/>' +
-            '<span style="color:#888">点击看题录与跳转</span>';
+            '<span style="color:#888">' + (nd.oa_id && nd.kind !== 'seed' ? '单击看题录 · 双击再扩一层' : '点击看题录与跳转') + '</span>';
         }
       },
       series: [{
         type: 'graph', layout: 'force', roam: true, draggable: true,
-        force: { repulsion: 320, edgeLength: [60, 130], gravity: 0.12,
-                 friction: 0.25 },
-        emphasis: { focus: 'adjacency', lineStyle: { width: 2.6, color: '#8a6d1d' } },
+        fitView: true,
+        layoutAnimation: N <= 120,
+        force: { repulsion: repulsion, edgeLength: edgeLen, gravity: 0.12,
+                 friction: friction },
+        emphasis: { focus: 'adjacency', lineStyle: { width: 2.6, color: '#8a6d1d' },
+          label: { show: true, fontSize: 11,
+            formatter: p => { const t = p.data._nd.title; return t.length > 22 ? t.slice(0, 22) + '…' : t; } } },
         data: nodes, links: links,
       }],
     });
+    _chart.off('click');
+    window.__litChart = _chart; // R113 调试句柄(保留无害)
     _chart.on('click', p => {
       if (p.dataType === 'node') showPanel(p.data._nd, deg);
+    });
+    // R113b: 力导向跑完后按真实包围盒校正视野(种子节点在视野外问题)
+    _chart.off('finished');
+    let _fitted = false;
+    _chart.on('finished', () => {
+      if (_fitted) return;
+      _fitted = true;
+      try {
+        const data2 = _chart.getModel().getSeriesByIndex(0).getData();
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, cnt = 0;
+        for (let i = 0; i < data2.count(); i++) {
+          const l = data2.getItemLayout(i);
+          if (!l) continue;
+          const x = (l[0] !== undefined ? l[0] : l.x);
+          const y = (l[1] !== undefined ? l[1] : l.y);
+          if (isNaN(x) || isNaN(y)) continue;
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+          cnt++;
+        }
+        if (!cnt) return;
+        const W = gEl.clientWidth - 24, H = gEl.clientHeight - 24;
+        const bw = Math.max(maxX - minX, 40), bh = Math.max(maxY - minY, 40);
+        const zoomFit = Math.min(W / bw, H / bh, 4) * 0.94;
+        // graph.center = 视野中央对准的布局坐标点; zoom = 布局→像素缩放
+        _chart.setOption({ series: [{
+          center: [(minX + maxX) / 2, (minY + maxY) / 2], zoom: zoomFit }] });
+      } catch (e) { /* 视野校正失败不阻断渲染 */ }
+    });
+    // R113: 双击节点直接级联扩展
+    _chart.off('dblclick');
+    _chart.on('dblclick', p => {
+      if (p.dataType !== 'node') return;
+      const nd = p.data._nd;
+      if (!nd.oa_id) { litToast('该节点无 OpenAlex 标识(可能来自知网导出), 无法扩展'); return; }
+      if (nd.kind === 'seed') { litToast('种子节点已全量扩展, 双击其它节点'); return; }
+      if (!current || !current.gid) { litToast('请先保存图谱再扩展'); return; }
+      expandNode(nd.id, null);
     });
     // 图例胶囊带计数 + 出度/入度统计
     const st = graph.stats || {};

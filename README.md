@@ -101,9 +101,19 @@ Obsidian 式声明设置：插件在 `manifest.json` 的 `settings.fields` 声�
 ## 测试
 
 ```bash
-python _test_phase1.py   # CBDB 检索回归（14 项）
-python _test_phase7.py   # 亲属递归（19 项）
-# …共 9 个测试文件 109+ 项
+python _test_phase1.py      # CBDB 检索回归（14 项）
+python _test_phase2.py      # 亲属递归+五服
+python _test_phase3.py      # 三期跨查询传递
+python _test_phase4.py      # 社会关系检索
+python _test_phase5.py      # 二期关系递归
+python _test_phase6.py      # 六期群体网络
+python _test_phase7.py      # 两人亲属路径 BFS（19 项）
+python _test_phase8.py      # 地图联动
+python _test_phase10.py     # 地图联动深化（16 项）
+python _test_agent.py       # Agent 模式（44 项）
+python _test_litgraph.py    # 文献图谱（40 项）
+python _test_plugin_cfg.py  # 插件参数配置（16 项）
+# 共 12 个测试文件 220+ 项
 ```
 
 ## 技术栈

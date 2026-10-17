@@ -23,7 +23,15 @@ def hello():
     log = _core("_log_activity")
     if log:
         log("tool", "用了我的插件")
-    return jsonify({"ok": True, "msg": "hello from myplugin"})
+    # 读用户在管理页 ⚙ 里设置的参数（manifest settings.fields 声明的合并值）
+    cfg = {}
+    try:
+        import plugin_loader as _pl
+        cfg = _pl.get_plugin_config("my-plugin")
+    except Exception:
+        pass
+    return jsonify({"ok": True, "msg": "hello from myplugin",
+                    "page_size": cfg.get("page_size"), "mode": cfg.get("mode")})
 
 
 @bp.route("/api/myplugin/fetch-remote")

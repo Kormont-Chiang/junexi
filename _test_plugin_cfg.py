@@ -98,6 +98,35 @@ finally:
     lit_f.search_works, lit_f.get_work, lit_f.get_works_batch, \
         lit_f.get_cited_by, lit_f.get_related = _orig
 
+# bool/select/password 类型校验（真实插件只试点 int, 类型边界并进来）
+_F = [
+    {'key': 'dry_run', 'type': 'bool', 'label': '试运行', 'default': False},
+    {'key': 'mode', 'type': 'select', 'label': '模式', 'default': 'std',
+     'options': [{'value': 'std', 'label': '标准'}, {'value': 'fast', 'label': '快速'}]},
+    {'key': 'api_key', 'type': 'password', 'label': 'Key', 'default': ''},
+    {'key': 'limit2', 'type': 'int', 'label': '条数', 'default': 20, 'min': 5, 'max': 100},
+]
+_mfd = {'id': 'demo', 'settings': {'fields': _F}}
+pl._MANIFESTS['demo'] = _mfd
+_cases = [
+    ('bool 收 True', {'dry_run': True}, True, True),
+    ('bool 收 0/1 转布尔', {'dry_run': 1}, True, True),
+    ('select 收合法值', {'mode': 'fast'}, True, 'fast'),
+    ('select 拒非法值', {'mode': 'evil'}, False, None),
+    ('select 拒大小写变体', {'mode': 'STD'}, False, None),
+    ('password 收字符串', {'api_key': 'sk-abc'}, True, 'sk-abc'),
+    ('int 裁剪到下限', {'limit2': 1}, True, 5),
+]
+for _name, _upd, _eo, _ev in _cases:
+    _clean, _err = pl.validate_plugin_config('demo', _upd, manifest=_mfd)
+    _ok = (not _err) == _eo
+    if _ok and _eo and _ev is not None and len(_upd) == 1:
+        _ok = _clean.get(list(_upd.keys())[0]) == _ev
+    ck('types/' + _name, _ok, '%r %r' % (_clean, _err))
+ck('types/合并 manifest 默认值',
+   pl.get_plugin_config('demo') == {'dry_run': False, 'mode': 'std', 'api_key': '', 'limit2': 20},
+   str(pl.get_plugin_config('demo')))
+
 shutil.rmtree(_tmp, ignore_errors=True)
 print('=== plugin-config %s ===' % ('ALL PASS' if fails == 0 else '%d FAIL' % fails))
 sys.exit(1 if fails else 0)

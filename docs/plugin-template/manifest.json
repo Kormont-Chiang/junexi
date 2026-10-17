@@ -10,5 +10,16 @@
   "permissions": ["network"],
   "nav": { "tab": "myplugin", "label": "我的插件", "icon": "🔌" },
   "assets": { "css": ["style.css"], "js": ["page.js"] },
-  "warmup": "warmup.py:run"
+  "warmup": "warmup.py:run",
+  "settings": {
+    "fields": [
+      { "key": "page_size", "type": "int", "label": "每页条数",
+        "default": 20, "min": 5, "max": 100 },
+      { "key": "verbose", "type": "bool", "label": "详细日志", "default": false },
+      { "key": "mode", "type": "select", "label": "模式",
+        "default": "std",
+        "options": [{ "value": "std", "label": "标准" },
+                    { "value": "fast", "label": "快速" }] }
+    ]
+  }
 }

@@ -112,8 +112,9 @@ python _test_phase8.py      # 地图联动
 python _test_phase10.py     # 地图联动深化（16 项）
 python _test_agent.py       # Agent 模式（44 项）
 python _test_litgraph.py    # 文献图谱（40 项）
-python _test_plugin_cfg.py  # 插件参数配置（16 项）
-# 共 12 个测试文件 220+ 项
+python _test_plugin_cfg.py  # 插件参数配置（24 项）
+python _test_toolbook_t2s.py  # 工具书简繁折叠守护（10 项，需 venv 装 opencc-python-reimplemented）
+# 共 13 个测试文件 230+ 项
 ```
 
 ## 技术栈

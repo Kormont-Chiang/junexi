@@ -5875,9 +5875,10 @@ function searchOfficial() {
     if (!query) return;
 
     const officials = OFFICIALS_DB || [];
+    const qf = foldStr(query);
     const results = officials.filter(o =>
-        (o.name && o.name.includes(query)) ||
-        (o.duties && o.duties.includes(query))
+        (o.name && foldStr(o.name).includes(qf)) ||
+        (o.duties && foldStr(o.duties).includes(qf))
     );
 
     if (results.length === 0) {
@@ -6058,6 +6059,16 @@ function toolSrcGoto(toolKey, target) {
 }
 window.toolSrcGoto = toolSrcGoto;
 
+// ── R119: 简繁折叠(查询/数据双侧折叠, 配 static/js/data/t2s_map.js) ──
+function foldStr(s) {
+    if (s === null || s === undefined) return '';
+    const m = (typeof T2S_MAP !== 'undefined') ? T2S_MAP : {};
+    let out = '';
+    for (const ch of String(s)) out += m[ch] || ch;
+    return out;
+}
+window.foldStr = foldStr;
+
 function searchTaboo() {
     const input = document.getElementById('tabooInput');
     const container = document.getElementById('tabooResults');
@@ -6066,10 +6077,14 @@ function searchTaboo() {
     if (!query) return;
 
     const taboos = TABOO_DB || [];
+    const qf = foldStr(query);
     const results = taboos.filter(t =>
-        (t.name && t.name.includes(query)) ||
-        (t.tabooChars && t.tabooChars.includes(query)) ||
-        (t.alternatives && t.alternatives.includes(query))
+        (t.name && foldStr(t.name).includes(qf)) ||
+        (t.emperor && foldStr(t.emperor).includes(qf)) ||
+        (t.dynasty && foldStr(t.dynasty).includes(qf)) ||
+        (t.notes && foldStr(t.notes).includes(qf)) ||
+        (t.tabooChars && foldStr(t.tabooChars).includes(qf)) ||
+        (t.alternatives && foldStr(t.alternatives).includes(qf))
     );
 
     if (results.length === 0) {
@@ -6107,7 +6122,7 @@ function searchPhonology() {
     const data = PHONOLOGY_DB || [];
 
     const results = chars.map(ch => {
-        const entry = data.find(e => e.char === ch);
+        const entry = data.find(e => e.char === ch || e.char === foldStr(ch));
         if (!entry) return { char: ch, found: false };
         return { char: ch, found: true, ...entry };
     });
@@ -6147,9 +6162,10 @@ function searchVersion() {
     if (!query) return;
 
     const versions = VERSIONS_DB || [];
+    const qf = foldStr(query);
     const results = versions.filter(v =>
-        (v.title && v.title.includes(query)) ||
-        (v.author && v.author.includes(query))
+        (v.title && foldStr(v.title).includes(qf)) ||
+        (v.author && foldStr(v.author).includes(qf))
     );
 
     if (results.length === 0) {

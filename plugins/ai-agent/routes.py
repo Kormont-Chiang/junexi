@@ -61,8 +61,17 @@ def ai_agent():
     model_id = data.get("model")
     total_calls = 0
     capped = False
+    # R115: 用户可在插件设置里调步数/工具数上限
+    max_steps, max_tool_calls = MAX_AGENT_STEPS, MAX_TOOL_CALLS
+    try:
+        import plugin_loader as _pl
+        _cfg = _pl.get_plugin_config("ai-agent")
+        max_steps = max(2, min(int(_cfg.get("max_steps") or MAX_AGENT_STEPS), 20))
+        max_tool_calls = max(2, min(int(_cfg.get("max_tool_calls") or MAX_TOOL_CALLS), 30))
+    except Exception:
+        pass
 
-    for _step in range(MAX_AGENT_STEPS):
+    for _step in range(max_steps):
         result = deepseek_chat(messages, model_id=model_id, tools=tools)
         if not isinstance(result, dict) or "choices" not in result:
             err = result.get("error") if isinstance(result, dict) else "模型服务不可用"
@@ -75,7 +84,7 @@ def ai_agent():
             break
         messages.append(msg)
         for tc in tool_calls:
-            if total_calls >= MAX_TOOL_CALLS:
+            if total_calls >= max_tool_calls:
                 capped = True
                 break
             total_calls += 1

@@ -197,6 +197,18 @@ def litgraph_oa_expand():
     n_refs = max(1, min(int(d.get("n_refs") or 100), 200))
     n_citedby = max(1, min(int(d.get("n_citedby") or 50), 200))
     n_related = max(0, min(int(d.get("n_related") or 20), 50))
+    # R115: 未显式传参时用插件配置的默认值
+    try:
+        import plugin_loader as _pl
+        _cfg = _pl.get_plugin_config("litgraph")
+        if not d.get("n_refs"):
+            n_refs = int(_cfg.get("n_refs") or n_refs)
+        if not d.get("n_citedby"):
+            n_citedby = int(_cfg.get("n_citedby") or n_citedby)
+        if not d.get("n_related"):
+            n_related = int(_cfg.get("n_related") or n_related)
+    except Exception:
+        pass
     try:
         if oa_id:
             w = _fetcher.get_work(oa_id)
@@ -281,6 +293,18 @@ def litgraph_oa_expand_node():
     n_refs = max(1, min(int(d.get("n_refs") or 30), 100))
     n_citedby = max(1, min(int(d.get("n_citedby") or 20), 100))
     n_related = max(0, min(int(d.get("n_related") or 10), 30))
+    # R115: 未显式传参时用插件配置的默认值(节点扩展档)
+    try:
+        import plugin_loader as _pl
+        _cfg = _pl.get_plugin_config("litgraph")
+        if not d.get("n_refs"):
+            n_refs = max(1, min(int(_cfg.get("n_refs") or n_refs) // 3, 100))
+        if not d.get("n_citedby"):
+            n_citedby = max(1, min(int(_cfg.get("n_citedby") or n_citedby) // 3, 100))
+        if not d.get("n_related"):
+            n_related = max(0, min(int(_cfg.get("n_related") or n_related) // 2, 30))
+    except Exception:
+        pass
     try:
         w = _fetcher.get_work(oa_id)
         refs_ids = w.get("referenced_works") or []

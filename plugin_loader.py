@@ -83,6 +83,81 @@ def effective_enabled(manifest, plugin_id, overrides):
     return manifest.get("enabled", True) is not False
 
 
+# ── R115: 插件参数配置(Obsidian 式声明设置) ──
+# manifest.settings.fields 声明字段, 用户值存 %LOCALAPPDATA%\JuneXi\plugin-config.json
+_MANIFESTS = {}
+
+
+def _config_path():
+    return os.path.join(_user_data_dir(), "plugin-config.json")
+
+
+def load_config():
+    try:
+        return json.load(open(_config_path(), encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_config(cfg):
+    tmp = _config_path() + ".tmp"
+    json.dump(cfg, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    os.replace(tmp, _config_path())
+
+
+def plugin_manifest(pid):
+    return _MANIFESTS.get(pid) or {}
+
+
+def get_plugin_config(pid, manifest=None):
+    """合并 manifest 声明的 default 与用户已存值 → {key: value}。只收声明过的字段。"""
+    mf = manifest if manifest is not None else plugin_manifest(pid)
+    fields = ((mf or {}).get("settings") or {}).get("fields") or []
+    stored = (load_config().get(pid) or {})
+    out = {}
+    for f in fields:
+        k = f.get("key")
+        if not k:
+            continue
+        out[k] = stored[k] if k in stored else f.get("default")
+    return out
+
+
+def validate_plugin_config(pid, updates, manifest=None):
+    """按声明校验+清洗 updates → (clean_dict, error)。error 非空即拒绝。"""
+    mf = manifest if manifest is not None else plugin_manifest(pid)
+    fields = {f.get("key"): f for f in (((mf or {}).get("settings") or {}).get("fields") or []) if f.get("key")}
+    clean = {}
+    for k, v in (updates or {}).items():
+        f = fields.get(k)
+        if not f:
+            return {}, u"未声明的字段: %s" % k
+        t = f.get("type", "text")
+        try:
+            if t == "bool":
+                clean[k] = bool(v)
+            elif t == "int":
+                iv = int(v)
+                lo, hi = f.get("min"), f.get("max")
+                if lo is not None:
+                    iv = max(int(lo), iv)
+                if hi is not None:
+                    iv = min(int(hi), iv)
+                clean[k] = iv
+            elif t == "select":
+                opts = [o.get("value") if isinstance(o, dict) else o for o in (f.get("options") or [])]
+                if v not in opts:
+                    return {}, u"%s 的可选值: %s" % (k, "/".join(map(str, opts)))
+                clean[k] = v
+            elif t == "password":
+                clean[k] = str(v)[:500]
+            else:  # text
+                clean[k] = str(v)[:int(f.get("max_len") or 2000)]
+        except Exception:
+            return {}, u"字段 %s 类型不符(%s)" % (k, t)
+    return clean, ""
+
+
 def load_plugins(app):
     """扫描 PLUGINS_DIR, 注册各插件 Blueprint。返回 nav 注入清单 [{tab,label,icon}]。"""
     nav_injects = []
@@ -103,6 +178,7 @@ def load_plugins(app):
                 continue
             try:
                 manifest = json.load(open(mf, encoding="utf-8"))
+                _MANIFESTS[pid] = manifest
                 if not effective_enabled(manifest, pid, overrides):
                     skipped.append((pid, "disabled"))
                     continue

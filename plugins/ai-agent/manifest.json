@@ -9,5 +9,11 @@
   "assets": {
     "js": ["ai_agent.js"]
   },
-  "icon": "🕹"
+  "icon": "🕹",
+  "settings": {
+    "fields": [
+      {"key": "max_steps", "type": "int", "label": "最大思考步数", "default": 6, "min": 2, "max": 20},
+      {"key": "max_tool_calls", "type": "int", "label": "最大工具调用数", "default": 10, "min": 2, "max": 30}
+    ]
+  }
 }

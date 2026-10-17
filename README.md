@@ -88,6 +88,16 @@ python app.py                     # 默认 127.0.0.1:5000
 - **ai-agent**：`/api/ai/agent`（Agent 模式多步执行：LLM 决策动作→服务端校验执行→逐步返回）；前端开关在 🤖 AI 助手页左栏「🕹 Agent 模式」卡片
 - **feed / zotero / cbdb**：见各插件 manifest.json 与源码
 
+## 插件参数配置（R115）
+
+Obsidian 式声明设置：插件在 `manifest.json` 的 `settings.fields` 声明字段（`bool`/`int`/`select`/`text`/`password`，含 `default`/`min`/`max`/`options`），插件管理页卡片上的 ⚙ 按钮展开设置面板，改即存。
+
+- 端点：`GET /api/plugins/<pid>/config`（声明+当前值）· `PUT /api/plugins/<pid>/config`（`{updates:{k:v}}`，按声明校验：int 裁剪 min/max、select 校验 options、未声明字段 400）
+- 存储：`%LOCALAPPDATA%\JuneXi\plugin-config.json`（原子写，与 plugin-overrides.json 并列）；插件运行时经 `plugin_loader.get_plugin_config(pid)` 读合并值（manifest 默认 + 用户覆盖）
+- 列表 API 每项带 `has_settings`；`plugin_loader.validate_plugin_config` 做写入校验
+- 试点：litgraph（n_refs/n_citedby/n_related 默认扩展量）、ai-agent（max_steps/max_tool_calls）；显式请求参数优先于配置默认
+- 测试：`_test_plugin_cfg.py`（16 项，monkeypatch 用户目录隔离）
+
 ## 测试
 
 ```bash

@@ -149,19 +149,28 @@ async function loadPluginManager() {
             const enabled = !!p.enabled;
             const dot = on ? '<i class="pm-dot on"></i>运行中' : (enabled ? '<i class="pm-dot warn"></i>待重启' : '<i class="pm-dot"></i>已停用');
             const icon = (p.icon || '🧩');
-            return '<div class="pm-card' + (on ? '' : ' off') + '">' +
+            return '<div class="pm-card' + (on ? '' : ' off') + '" data-pid="' + p.id + '">' +
                 '<div class="pm-card-head"><span class="pm-icon">' + icon + '</span>' +
                 '<div class="pm-card-titles">' +
                     '<div class="pm-name">' + escapeHtml(p.name) +
                     '<span class="pm-ver">' + escapeHtml(String(p.version || '')) + '</span></div>' +
                     '<div class="pm-status">' + dot + '</div>' +
                 '</div>' +
+                (p.has_settings ? '<button class="pm-cfg-btn" data-cfg="' + p.id + '" title="参数设置">⚙</button>' : '') +
                 '<label class="pm-switch"><input type="checkbox" ' + (enabled ? 'checked' : '') + ' onchange="togglePlugin(\'' + p.id + '\')"><span></span></label></div>' +
                 '<div class="pm-desc">' + escapeHtml(p.desc || '(无描述)') + '</div>' +
                 (p.skip_reason ? '<div class="pm-skip">' + escapeHtml(p.skip_reason) + '</div>' : '') +
                 (p.source === 'user' ? ('<button class="pm-uninstall" onclick="uninstallPlugin(\'' + p.id + '\')" title="卸载">🗑 卸载</button>') : '') +
+                '<div class="pm-cfg" id="pmcfg-' + p.id + '" style="display:none"></div>' +
             '</div>';
         }).join('');
+        if (!list._cfgBound) {
+            list._cfgBound = true;
+            list.addEventListener('click', ev => {
+                const b = ev.target.closest('[data-cfg]');
+                if (b) togglePluginCfg(b.dataset.cfg, b);
+            });
+        }
     } catch (e) {
         list.innerHTML = '<div class="pm-empty">插件清单加载失败</div>';
     }
@@ -216,6 +225,89 @@ async function installPluginLocal(pathOverride) {
     }
 }
 window.installPluginLocal = installPluginLocal;
+
+// ── R115: 插件参数设置(Obsidian 式, manifest.settings.fields 声明) ──
+function pmCfgFlash(el, color) {
+    el.style.transition = 'box-shadow .3s';
+    el.style.boxShadow = '0 0 0 2px ' + color;
+    setTimeout(() => { el.style.boxShadow = ''; }, 750);
+}
+
+async function togglePluginCfg(pid, btn) {
+    const box = document.getElementById('pmcfg-' + pid);
+    if (!box) return;
+    if (box.style.display !== 'none') {
+        box.style.display = 'none';
+        if (btn) btn.classList.remove('on');
+        return;
+    }
+    if (btn) btn.classList.add('on');
+    box.style.display = 'block';
+    box.innerHTML = '<div class="pm-cfg-loading">加载配置…</div>';
+    try {
+        const d = await (await apiFetch('/api/plugins/' + encodeURIComponent(pid) + '/config')).json();
+        if (!d.ok) {
+            box.innerHTML = '<div class="pm-cfg-loading">' + escapeHtml(d.error || '加载失败') + '</div>';
+            return;
+        }
+        const fields = d.fields || [];
+        if (!fields.length) {
+            box.innerHTML = '<div class="pm-cfg-loading">该插件没有可配置项</div>';
+            return;
+        }
+        box.innerHTML = fields.map(f => {
+            const v = (d.values || {})[f.key];
+            let ctrl = '';
+            if (f.type === 'bool') {
+                ctrl = '<label class="pm-switch" style="margin:0"><input type="checkbox" data-k="' + f.key + '" ' + (v ? 'checked' : '') + '><span></span></label>';
+            } else if (f.type === 'int') {
+                ctrl = '<input type="number" class="pm-cfg-in" data-k="' + f.key + '" value="' + (v === null || v === undefined ? '' : v) + '"' +
+                    (f.min !== undefined ? ' min="' + f.min + '"' : '') +
+                    (f.max !== undefined ? ' max="' + f.max + '"' : '') + '>';
+            } else if (f.type === 'select') {
+                const opts = (f.options || []).map(o => {
+                    const val = (o && typeof o === 'object') ? o.value : o;
+                    const lab = (o && typeof o === 'object') ? (o.label || o.value) : o;
+                    return '<option value="' + escapeHtml(String(val)) + '"' + (String(val) === String(v) ? ' selected' : '') + '>' + escapeHtml(String(lab)) + '</option>';
+                }).join('');
+                ctrl = '<select class="pm-cfg-in" data-k="' + f.key + '">' + opts + '</select>';
+            } else {
+                const t = f.type === 'password' ? 'password' : 'text';
+                ctrl = '<input type="' + t + '" class="pm-cfg-in" data-k="' + f.key + '" value="' + escapeHtml(v === null || v === undefined ? '' : String(v)) + '">';
+            }
+            const hint = (f.min !== undefined && f.type === 'int') ? ' <span class="pm-cfg-hint">' + f.min + '–' + f.max + '</span>' : '';
+            return '<div class="pm-cfg-row"><span class="pm-cfg-lab">' + escapeHtml(f.label || f.key) + hint + '</span>' + ctrl + '</div>';
+        }).join('');
+        box.querySelectorAll('[data-k]').forEach(el => {
+            el.addEventListener('change', async () => {
+                const k = el.dataset.k;
+                let val;
+                if (el.type === 'checkbox') val = el.checked;
+                else if (el.type === 'number') { if (el.value === '') return; val = Number(el.value); }
+                else val = el.value;
+                const upd = {}; upd[k] = val;
+                try {
+                    const r = await (await apiFetch('/api/plugins/' + encodeURIComponent(pid) + '/config', {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ updates: upd })
+                    })).json();
+                    if (r.ok) {
+                        pmCfgFlash(el, 'rgba(125,154,106,.85)');
+                        if (typeof showToast === 'function') showToast('已保存', 'info', 1200);
+                    } else {
+                        pmCfgFlash(el, 'rgba(192,122,106,.85)');
+                        if (typeof showToast === 'function') showToast(r.error || '保存失败', 'error', 2600);
+                    }
+                } catch (e) {
+                    pmCfgFlash(el, 'rgba(192,122,106,.85)');
+                }
+            });
+        });
+    } catch (e) {
+        box.innerHTML = '<div class="pm-cfg-loading">配置加载失败</div>';
+    }
+}
+window.togglePluginCfg = togglePluginCfg;
 
 async function loadPluginMarket() {
     const el = document.getElementById('pmMarketList');

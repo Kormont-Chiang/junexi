@@ -14,5 +14,12 @@
     "label": "文献图谱",
     "icon": "🕸"
   },
-  "icon": "🕸"
+  "icon": "🕸",
+  "settings": {
+    "fields": [
+      {"key": "n_refs", "type": "int", "label": "参考文献默认条数", "default": 100, "min": 10, "max": 200},
+      {"key": "n_citedby", "type": "int", "label": "被引文献默认条数", "default": 50, "min": 10, "max": 200},
+      {"key": "n_related", "type": "int", "label": "相关文献默认条数", "default": 20, "min": 0, "max": 50}
+    ]
+  }
 }

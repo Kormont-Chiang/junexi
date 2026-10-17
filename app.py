@@ -1581,6 +1581,7 @@ def _scan_plugin_manifests():
                     "enabled": effective_enabled(m, pid, _ov),
                     "loaded": pid in _plugin_loaded,
                     "source": _src,
+                    "has_settings": bool(((m.get("settings") or {}).get("fields") or [])),
                     "skip_reason": (load_errors().get(pid, "") or dict(_plugin_skipped).get(pid, "")) if pid not in _plugin_loaded else "",
                 })
             except Exception as e:
@@ -1612,6 +1613,43 @@ def api_plugins_toggle(pid):
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)[:120]}), 500
     return jsonify({"ok": False, "error": "插件不存在"}), 404
+
+
+# ── R115: 插件参数配置(Obsidian 式声明设置) ──
+@app.route("/api/plugins/<pid>/config", methods=["GET"])
+def api_plugins_config_get(pid):
+    from plugin_loader import plugin_manifest, get_plugin_config
+    mf = plugin_manifest(pid)
+    if not mf:
+        return jsonify({"ok": False, "error": "插件不存在"}), 404
+    fields = ((mf.get("settings") or {}).get("fields") or [])
+    return jsonify({"ok": True, "fields": fields,
+                    "values": get_plugin_config(pid, mf)})
+
+
+@app.route("/api/plugins/<pid>/config", methods=["PUT"])
+def api_plugins_config_put(pid):
+    from plugin_loader import (plugin_manifest, get_plugin_config,
+                               validate_plugin_config, load_config, save_config)
+    mf = plugin_manifest(pid)
+    if not mf:
+        return jsonify({"ok": False, "error": "插件不存在"}), 404
+    if not ((mf.get("settings") or {}).get("fields") or []):
+        return jsonify({"ok": False, "error": "该插件没有可配置项"}), 400
+    d = request.get_json(silent=True) or {}
+    updates = d.get("updates")
+    if not isinstance(updates, dict) or not updates:
+        return jsonify({"ok": False, "error": "updates 需为非空对象"}), 400
+    clean, err = validate_plugin_config(pid, updates, mf)
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    cfg = load_config()
+    merged = dict(cfg.get(pid) or {})
+    merged.update(clean)
+    cfg[pid] = merged
+    save_config(cfg)
+    return jsonify({"ok": True, "values": get_plugin_config(pid, mf),
+                    "note": "已保存(即时生效或下次请求生效, 视插件而定)"})
 
 
 @app.route("/api/plugins/<pid>/uninstall", methods=["POST"])

@@ -12457,6 +12457,21 @@ html.dash-fit, body.dash-fit { overflow: hidden; }
 .pm-card:hover .pm-uninstall { opacity: .65; }
 .pm-card:hover .pm-uninstall:hover { opacity: 1; color: #c07a6a; }
 .pm-card .pm-skip { font-size: 11px; color: #c07a6a; }
+/* ── R115: 卡片内参数设置区(Obsidian 式) ── */
+.pm-cfg-btn { flex: none; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; cursor: pointer; font-size: 14px; line-height: 1; color: var(--text-muted);
+  margin: 2px 8px 0 0; transition: color .15s, border-color .15s, transform .3s; }
+.pm-cfg-btn:hover { color: var(--text); border-color: #c9a96e; }
+.pm-cfg-btn.on { color: #c9a96e; border-color: rgba(201,169,110,.6); transform: rotate(45deg); }
+.pm-cfg { border-top: 1px dashed var(--border); margin-top: 3px; padding-top: 10px; }
+.pm-cfg-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
+.pm-cfg-lab { flex: 1; font-size: 12px; color: var(--text); opacity: .85; }
+.pm-cfg-hint { font-size: 10px; color: var(--text-muted); opacity: .8; }
+.pm-cfg-in { width: 110px; padding: 5px 9px; font-size: 12.5px; border: 1px solid var(--border);
+  border-radius: 7px; background: var(--bg); color: var(--text); text-align: right; }
+.pm-cfg-in:focus { outline: none; border-color: #c9a96e; }
+select.pm-cfg-in { text-align: left; width: 130px; }
+.pm-cfg-loading { font-size: 12px; color: var(--text-muted); padding: 6px 0; }
 
 .era-book-block { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 10px; }
 .era-book-title { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }

@@ -3,8 +3,8 @@
   let _chart = null;
   let _graph = null;
 
-  const KIND_COLOR = { seed: '#d4af37', ref: '#c0392b', citedby: '#2e5e8c', both: '#7d5ba6', related: '#4a7c59' };
-  const KIND_LABEL = { seed: '种子', ref: '参考文献', citedby: '引证文献', both: '双向(引证+参考)', related: '相关文献' };
+  const KIND_COLOR = { seed: '#d4af37', ref: '#c0392b', citedby: '#2e5e8c', both: '#7d5ba6', related: '#4a7c59', ext: '#8a8f98' };
+  const KIND_LABEL = { seed: '种子', ref: '参考文献', citedby: '引证文献', both: '双向(引证+参考)', related: '相关文献', ext: '扩展节点' };
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
@@ -68,7 +68,7 @@
     graph.nodes.forEach(nd => { cnt[nd.kind] = (cnt[nd.kind] || 0) + 1; });
     const lg = document.getElementById('litLegend');
     if (lg) {
-      lg.innerHTML = ['seed', 'ref', 'citedby', 'both', 'related'].filter(k => cnt[k]).map(k =>
+      lg.innerHTML = ['seed', 'ref', 'citedby', 'both', 'related', 'ext'].filter(k => cnt[k]).map(k =>
         '<span class="lg"><i style="background:' + KIND_COLOR[k] + '"></i>' + KIND_LABEL[k] +
         ' <b style="color:var(--text)">' + cnt[k] + '</b></span>').join('') +
         (st.n_citedby_total ? '<span style="margin-left:auto">全库被引命中 <b style="color:var(--text)">' +
@@ -98,10 +98,52 @@
       (nd.doi ? 'DOI: ' + esc(nd.doi) + '\n' : '') +
       '连接度: ' + (deg[nd.id] || 0) + (nd.n > 1 ? '\n同名合并 ×' + nd.n : '') +
       '</div>' +
+      (nd.oa_id && nd.kind !== 'seed' && current && current.gid
+        ? '<a class="btn lit-ext-btn" data-nid="' + esc(nd.id) + '" style="background:linear-gradient(135deg,#8a93a0,#6e7784);color:#fff;border-color:transparent;font-weight:600">🔍 以此为种子再扩一层</a>' : '') +
       (nd.oa_id ? '<a class="btn" target="_blank" href="https://openalex.org/' + esc(nd.oa_id) + '">在 OpenAlex 查看 ↗</a>' : '') +
       (nd.doi ? '<a class="btn" target="_blank" href="https://doi.org/' + esc(nd.doi) + '">DOI 原文 ↗</a>' : '') +
       '<a class="btn" target="_blank" href="https://kns.cnki.net/kns8s/defaultresult/index?kw=' + q + '">在知网检索 ↗</a>' +
       '<a class="btn" target="_blank" href="https://www.ncpssd.org/Literature/articlelist?searchValue=' + q + '">在国社科文献中心检索 ↗</a>';
+    const extBtn = panel.querySelector('.lit-ext-btn');
+    if (extBtn) extBtn.addEventListener('click', () => expandNode(extBtn.getAttribute('data-nid'), extBtn));
+  }
+
+  function litToast(msg) {
+    let t = document.getElementById('litToast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'litToast';
+      t.style.cssText = 'position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:99999;' +
+        'background:rgba(38,42,50,.94);color:#fff;padding:9px 20px;border-radius:999px;font-size:12.5px;' +
+        'box-shadow:0 5px 18px rgba(0,0,0,.28);transition:opacity .3s;pointer-events:none;max-width:70%';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(litToast._t);
+    litToast._t = setTimeout(() => { t.style.opacity = '0'; }, 3600);
+  }
+
+  async function expandNode(nodeId, btn) {
+    if (!current || !current.gid) return;
+    const gid = current.gid;
+    const old = btn ? btn.textContent : '';
+    if (btn) { btn.textContent = '⏳ 扩展中(1-3 分钟)…'; btn.style.pointerEvents = 'none'; }
+    litToast('正在向 OpenAlex 拉取该节点的引用网络…');
+    try {
+      const r = await fetch('/api/litgraph/oa_expand_node', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gid: gid, node_id: nodeId })
+      });
+      const d = await r.json();
+      if (!r.ok || !d.ok) { litToast(d.error || '扩展失败'); if (btn) { btn.textContent = old; btn.style.pointerEvents = ''; } return; }
+      renderGraph(d.graph, null);
+      current = { graph: d.graph, gid: gid };
+      litToast('已并入 ' + d.added.nodes + ' 个新节点（引用' + d.added.ref + '/被引' + d.added.citedby + '/相关' + d.added.related + '），全图 ' + d.graph.stats.n_nodes + ' 节点');
+    } catch (e) {
+      litToast('扩展失败: ' + String(e).slice(0, 60));
+      if (btn) { btn.textContent = old; btn.style.pointerEvents = ''; }
+    }
   }
 
   async function loadSavedList() {

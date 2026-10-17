@@ -218,6 +218,77 @@ finally:
         fetcher_mod.get_works_batch, fetcher_mod.get_cited_by, \
         fetcher_mod.get_related = _orig
 
+# ── R111 节点级联扩展 ──
+_orig2 = (fetcher_mod.search_works, fetcher_mod.get_work, fetcher_mod.get_works_batch,
+          fetcher_mod.get_cited_by, fetcher_mod.get_related)
+fetcher_mod.search_works = lambda q, limit=5: ([litf.norm_work(FAKE_W)], 1)
+fetcher_mod.get_work = lambda oid: (dict(FAKE_W, referenced_works=['W:x1', 'W:x2'])
+                                    if oid == 'WRefWor' else FAKE_W)
+
+def _batch2(ids):
+    if any((i or '') in ('W:x1', 'W:x2') for i in ids):
+        return [_mk('Deep Ref One', 2001, 4), _mk('Deep Ref Two', 2002, 5)]
+    return [_mk('Ref Work A', 1990, 5), _mk('Ref Work B', 1988, 3)]
+fetcher_mod.get_works_batch = _batch2
+
+def _cb2(oid, limit=50):
+    if oid == 'WRefWor':
+        return (40, [_mk('Deep Cited M', 2018, 22)])
+    return (300, [_mk('Cited Work Y', 2010, 20), _mk('Cited Work Z', 2015, 10)])
+fetcher_mod.get_cited_by = _cb2
+
+def _rel2(oid, limit=20):
+    if oid == 'WRefWor':
+        return [_mk('Deep Rel N', 2010, 8)]
+    return [_mk('Related Work R', 2001, 7)]
+fetcher_mod.get_related = _rel2
+try:
+    r = c.post('/api/litgraph/oa_expand', data=json.dumps({'seed_title': 'Seed T'}),
+               content_type='application/json')
+    gid = (r.get_json() or {}).get('graph', {}).get('gid')
+    check('R111 建图拿到 gid', bool(gid), str(gid))
+    g0 = (r.get_json() or {}).get('graph') or {}
+    tgt = [n for n in g0.get('nodes') or [] if n.get('title') == 'Ref Work A']
+    check('R111 节点带 oa_id 元数据', bool(tgt) and (tgt[0].get('oa_id') or '') == 'WRefWor',
+          json.dumps(tgt[:1], ensure_ascii=False))
+    seed_nd = [n for n in g0.get('nodes') or [] if n.get('kind') == 'seed']
+    check('R111 种子带 oa_id', bool(seed_nd) and bool(seed_nd[0].get('oa_id')),
+          json.dumps(seed_nd[:1], ensure_ascii=False))
+    if gid and tgt:
+        nid = tgt[0]['id']
+        r2 = c.post('/api/litgraph/oa_expand_node',
+                    data=json.dumps({'gid': gid, 'node_id': nid}),
+                    content_type='application/json')
+        d2 = r2.get_json() or {}
+        g2 = d2.get('graph') or {}
+        st2 = g2.get('stats') or {}
+        ext_nd = [n for n in g2.get('nodes') or [] if n.get('kind') == 'ext']
+        check('R111 扩展并入 ext 节点', r2.status_code == 200 and len(ext_nd) == 4,
+              json.dumps({'added': d2.get('added'), 'ext': [n['title'] for n in ext_nd]}, ensure_ascii=False))
+        check('R111 n_ext 计数', st2.get('n_ext') == 1, str(st2.get('n_ext')))
+        # 幂等: 同节点再扩一次, 节点数不变
+        r3 = c.post('/api/litgraph/oa_expand_node',
+                    data=json.dumps({'gid': gid, 'node_id': nid}),
+                    content_type='application/json')
+        d3 = r3.get_json() or {}
+        check('R111 重复扩展边去重',
+              (d3.get('graph') or {}).get('stats', {}).get('n_nodes') == st2.get('n_nodes')
+              and (d3.get('added') or {}).get('edges') == 0,
+              json.dumps(d3.get('added'), ensure_ascii=False))
+        # 种子节点拒绝再扩
+        r4 = c.post('/api/litgraph/oa_expand_node',
+                    data=json.dumps({'gid': gid, 'node_id': g0.get('seed_id')}),
+                    content_type='application/json')
+        check('R111 种子拒绝扩展', r4.status_code == 400, str(r4.status_code))
+        # 持久化: 读回图一致
+        r5 = c.get('/api/litgraph/graph/%s' % gid)
+        check('R111 扩展结果已持久化',
+              ((r5.get_json() or {}).get('graph') or {}).get('stats', {}).get('n_ext') == 2,
+              str(r5.status_code))
+finally:
+    fetcher_mod.search_works, fetcher_mod.get_work, fetcher_mod.get_works_batch, \
+        fetcher_mod.get_cited_by, fetcher_mod.get_related = _orig2
+
 r6 = c.get('/plugin/litgraph/page')
 check('页面伺服 HTML', r6.status_code == 200 and 'litGraph' in r6.get_data(as_text=True)
       and 'litOaSearch' in r6.get_data(as_text=True))

@@ -145,11 +145,13 @@ def build_graph(seed_title, refs=None, citedby=None, related=None):
     nodes = {seed_id: {
         'id': seed_id, 'title': seed_title, 'authors': [], 'source': '',
         'year': '', 'kind': 'seed', 'n': 0,
+        'oa_id': '', 'doi': '', 'cited_by_count': 0, 'otype': '',
     }}
     edges = []
+    _META_F = ('source', 'year', 'oa_id', 'doi', 'cited_by_count', 'otype')
 
     def _fill(nd, it):
-        for f in ('source', 'year'):
+        for f in _META_F:
             if not nd.get(f) and it.get(f):
                 nd[f] = it[f]
         if not nd.get('authors') and it.get('authors'):
@@ -180,6 +182,9 @@ def build_graph(seed_title, refs=None, citedby=None, related=None):
                 nodes[nid] = {
                     'id': nid, 'title': it.get('title', ''), 'authors': it.get('authors') or [],
                     'source': it.get('source', ''), 'year': it.get('year', ''),
+                    'oa_id': it.get('oa_id', ''), 'doi': it.get('doi', ''),
+                    'cited_by_count': it.get('cited_by_count', 0),
+                    'otype': it.get('type', ''),
                     'kind': kind, 'n': 1,
                 }
             if kind == 'related':

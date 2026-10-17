@@ -216,17 +216,17 @@ def litgraph_oa_expand():
     except Exception as e:
         return jsonify({"error": u"OpenAlex 扩展失败: %s" % e}), 502
     seed_id, nodes, edges = _parser.build_graph(seed_title, refs_items, cb_items, rel_items)
-    if not seed_id:
-        return jsonify({"error": "种子标题无效"}), 400
+    # 种子节点的 OpenAlex 元数据塞回（供题录面板跳 OA/DOI + 后续识别）
     for nd in nodes:
         if nd["id"] == seed_id:
             nd["authors"] = seed.get("authors") or []
-            nd["source"] = seed.get("source") or ""
-            nd["year"] = seed.get("year") or ""
-            nd["oa_id"] = seed.get("oa_id") or ""
-            nd["doi"] = seed.get("doi") or ""
+            for f in ("source", "year", "oa_id", "doi"):
+                nd[f] = seed.get(f) or ""
             nd["cited_by_count"] = seed.get("cited_by_count") or 0
-            nd["type"] = seed.get("type") or ""
+            nd["otype"] = seed.get("type") or ""
+            break
+    if not seed_id:
+        return jsonify({"error": "种子标题无效"}), 400
     gid = "%d" % int(time.time())
     graph = {
         "gid": gid, "seed_id": seed_id, "seed_title": seed_title,
@@ -251,6 +251,100 @@ def litgraph_oa_expand():
                      "n_nodes": graph["stats"]["n_nodes"]})
     _index_save(items[:50])
     return jsonify({"ok": True, "graph": graph})
+
+
+@bp.route("/api/litgraph/oa_expand_node", methods=["POST"])
+def litgraph_oa_expand_node():
+    """R111 节点级联扩展: 以图中某节点为中心再扩一层, 合并进当前图谱。
+    新节点 kind='ext'(相对种子的二级扩展); 与中心已有边则去重。"""
+    d = request.get_json(silent=True) or {}
+    gid = (d.get("gid") or "").strip()
+    node_id = (d.get("node_id") or "").strip()
+    if not gid or not node_id:
+        return jsonify({"error": "缺参数"}), 400
+    gpath = os.path.join(_data_dir(), gid + ".json")
+    if not os.path.exists(gpath):
+        return jsonify({"error": "图谱不存在"}), 404
+    graph = json.load(open(gpath, encoding="utf-8"))
+    if node_id == graph.get("seed_id"):
+        return jsonify({"error": "种子节点已全量扩展过, 换个二级节点"}), 400
+    nodes = {nd["id"]: nd for nd in graph.get("nodes") or []}
+    center = nodes.get(node_id)
+    if not center:
+        return jsonify({"error": "节点不在图谱中"}), 404
+    oa_id = (center.get("oa_id") or "").strip()
+    if not oa_id:
+        return jsonify({"error": "该节点无 OpenAlex 标识(可能来自知网手动导出), 无法自动扩展"}), 400
+    n_refs = max(1, min(int(d.get("n_refs") or 30), 100))
+    n_citedby = max(1, min(int(d.get("n_citedby") or 20), 100))
+    n_related = max(0, min(int(d.get("n_related") or 10), 30))
+    try:
+        w = _fetcher.get_work(oa_id)
+        refs_ids = w.get("referenced_works") or []
+        refs_items = _fetcher.get_works_batch(refs_ids)[:n_refs]
+        cb_total, cb_items = _fetcher.get_cited_by(oa_id, limit=n_citedby)
+        rel_items = _fetcher.get_related(oa_id, limit=n_related) if n_related else []
+    except Exception as e:
+        return jsonify({"error": u"OpenAlex 扩展失败: %s" % e}), 502
+    edges = list(graph.get("edges") or [])
+    have = {(e.get("s"), e.get("t")) for e in edges}
+    added = {"nodes": 0, "edges": 0, "ref": 0, "citedby": 0, "related": 0}
+
+    def _add(items, kind):
+        for it in items:
+            nid = _parser.norm_title(it.get("title"))
+            if not nid or nid == node_id:
+                continue
+            nd = nodes.get(nid)
+            if nd is None:
+                nd = {
+                    "id": nid, "title": it.get("title", ""), "authors": it.get("authors") or [],
+                    "source": it.get("source", ""), "year": it.get("year", ""),
+                    "oa_id": it.get("oa_id", ""), "doi": it.get("doi", ""),
+                    "cited_by_count": it.get("cited_by_count", 0),
+                    "otype": it.get("type", ""), "kind": "ext", "n": 1,
+                }
+                nodes[nid] = nd
+                added["nodes"] += 1
+            else:
+                nd["n"] = nd.get("n", 0) + 1
+                for f in ("source", "year", "oa_id", "doi", "cited_by_count", "otype"):
+                    if not nd.get(f) and it.get(f):
+                        nd[f] = it[f]
+                if not nd.get("authors") and it.get("authors"):
+                    nd["authors"] = it["authors"]
+            e = {"s": node_id, "t": nid} if kind == "ref" else {"s": nid, "t": node_id}
+            if kind == "related":
+                e["dash"] = True
+            if (e["s"], e["t"]) not in have:
+                have.add((e["s"], e["t"]))
+                edges.append(e)
+                added["edges"] += 1
+                added[kind] += 1
+
+    _add(refs_items, "ref")
+    _add(cb_items, "citedby")
+    _add(rel_items, "related")
+    graph["nodes"] = list(nodes.values())
+    graph["edges"] = edges
+    st = graph.setdefault("stats", {})
+    st["n_nodes"] = len(graph["nodes"])
+    st["n_edges"] = len(edges)
+    st["n_ext"] = int(st.get("n_ext") or 0) + 1
+    graph["ts"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    mark = u"第 %d 轮扩展·以《%s》为中心 (+引用%d/被引%d/相关%d)" % (
+        st["n_ext"], (center.get("title") or "")[:30],
+        added["ref"], added["citedby"], added["related"])
+    graph["source_note"] = (graph.get("source_note", "") + u"\n" + mark).strip()
+    json.dump(graph, open(gpath, "w", encoding="utf-8"), ensure_ascii=False)
+    items = _index_load()
+    for it in items:
+        if it.get("gid") == gid:
+            it["n_nodes"] = st["n_nodes"]
+            it["ts"] = graph["ts"]
+    _index_save(items[:50])
+    return jsonify({"ok": True, "graph": graph, "expanded_from": center.get("title", ""),
+                    "added": added})
 
 
 @bp.route("/api/litgraph/list")

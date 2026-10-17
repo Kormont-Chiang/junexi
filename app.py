@@ -2148,6 +2148,10 @@ def _load_diming_book():
                 _DIMING_BOOK.append(_json.loads(ln))
     except Exception:
         pass
+    # R126: 预计算折叠键（6.7 万条 × 每次查询 2 次 fold = 主要耗时来源），加载一次终身受益
+    for e in _DIMING_BOOK:
+        e['head_f'] = _fold_key((e.get('head') or '').lower())
+        e['note_f'] = _fold_key((e.get('note') or '').lower())
 
 @app.route("/api/tools/diming/book", methods=["GET"])
 def tools_diming_book():
@@ -2162,9 +2166,9 @@ def tools_diming_book():
     hits = []
     for e in _DIMING_BOOK:
         score = 0
-        if q_l and q_l in _fold_key((e.get("head") or "").lower()):
+        if q_l and q_l in e.get('head_f', ''):
             score += 5
-        if q_l and q_l in _fold_key((e.get("note") or "").lower()):
+        if q_l and q_l in e.get('note_f', ''):
             score += 1
         if score:
             hits.append((score, e))

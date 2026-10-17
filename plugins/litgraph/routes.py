@@ -123,6 +123,10 @@ _PAGE_HTML = u"""<div class="lit-wrap">
     <button class="lit-go" id="litBuild">生成图谱</button>
   </div>
   <div class="lit-stats" id="litStats"></div>
+  <div class="lit-export" id="litExport" style="display:none;margin:6px 0">
+    <button class="btn" id="litCsvBtn" title="节点与边各一个 CSV, Excel 可直接打开">⬇ 导出 CSV</button>
+    <button class="btn" id="litPngBtn" title="当前图谱视口截图为 PNG">🖼 导出 PNG</button>
+  </div>
   <div class="lit-saved" id="litSaved"></div>
 </div>
 <div class="lit-right">

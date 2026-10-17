@@ -19,8 +19,66 @@
     return r.json();
   }
 
+  // R127: 图谱导出（CSV 节点+边 / PNG 视口截图）
+  function _slug(s) {
+    return String(s || 'graph').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40);
+  }
+  function _download(name, content, mime) {
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+  }
+  function exportCsv() {
+    if (!_graph || !_graph.nodes || !_graph.nodes.length) return;
+    const stamp = new Date().toISOString().slice(0, 10);
+    const base = 'litgraph_' + _slug(_graph.seed_title) + '_' + _graph.nodes.length + 'nodes_' + stamp;
+    const q = v => {
+      const s = String(v == null ? '' : v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const kindOf = id => { const n = _graph.nodes.find(x => x.id === id); return n ? n.kind : ''; };
+    const nodesCsv = '﻿' + ['id', 'kind', 'title', 'year', 'authors', 'source', 'cited_by', 'oa_id', 'doi'].join(',') + '\n' +
+      _graph.nodes.map(n => [n.id, n.kind, n.title, n.year || '',
+        (n.authors || []).join('; '), n.source || '', n.cited_by || '',
+        n.oa_id || '', n.doi || ''].map(q).join(',')).join('\n');
+    const edgesCsv = '﻿' + ['source', 'target', 'source_kind', 'target_kind', 'type'].join(',') + '\n' +
+      _graph.edges.map(e => [e.s, e.t, kindOf(e.s), kindOf(e.t), e.dash ? 'related' : 'citation'].map(q).join(',')).join('\n');
+    _download(base + '_nodes.csv', nodesCsv, 'text/csv;charset=utf-8');
+    setTimeout(() => _download(base + '_edges.csv', edgesCsv, 'text/csv;charset=utf-8'), 400);
+  }
+  function exportPng() {
+    if (!_chart) return;
+    try {
+      const url = _chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#ffffff' });
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'litgraph_' + _slug(_graph && _graph.seed_title) + '.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      alert('PNG 导出失败: ' + e);
+    }
+  }
+  function _wireExport() {
+    const bar = document.getElementById('litExport');
+    if (!bar || bar.getAttribute('data-wired')) return;
+    bar.setAttribute('data-wired', '1');
+    document.getElementById('litCsvBtn').addEventListener('click', exportCsv);
+    document.getElementById('litPngBtn').addEventListener('click', exportPng);
+  }
+
   function renderGraph(graph) {
     _graph = graph;
+    const exBar = document.getElementById('litExport');
+    if (exBar) {
+      exBar.style.display = (graph.nodes && graph.nodes.length) ? 'block' : 'none';
+      _wireExport();
+    }
     const el = document.getElementById('litGraph');
     if (!el || typeof echarts === 'undefined') return;
     if (_chart) { _chart.dispose(); _chart = null; }
